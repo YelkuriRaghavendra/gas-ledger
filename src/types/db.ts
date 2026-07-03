@@ -51,3 +51,12 @@ export interface ActivityEntry {
   created_by: string | null
   created_at: string
 }
+
+export interface AgencySettings {
+  id: boolean
+  business_name: string
+  business_phone: string | null
+  business_address: string | null
+  price_per_cylinder: number
+  updated_at: string
+}
