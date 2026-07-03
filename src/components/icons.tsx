@@ -65,6 +65,15 @@ export function CreditCardIcon({ size = 24, color = '#3B6EA5', strokeWidth = 2 }
   )
 }
 
+export function UserPlusIcon({ size = 24, color = 'currentColor', strokeWidth = 2.2 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="8" r="4" />
+      <path d="M3 20v-1a5 5 0 0 1 5-5h2M19 8v6M22 11h-6" />
+    </svg>
+  )
+}
+
 export function ChevronLeftIcon({ size = 18, color = 'currentColor', strokeWidth = 2.2 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
