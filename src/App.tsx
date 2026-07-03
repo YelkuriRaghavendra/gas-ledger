@@ -11,6 +11,7 @@ import { LogReturn } from './pages/LogReturn'
 import { RecordPayment } from './pages/RecordPayment'
 import { ActivityFeed } from './pages/ActivityFeed'
 import { Account } from './pages/Account'
+import { BusinessDetails } from './pages/BusinessDetails'
 
 export default function App() {
   const location = useLocation()
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/customers/:id/payment" element={<RecordPayment />} />
           <Route path="/activity" element={<ActivityFeed />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/account/business" element={<BusinessDetails />} />
         </Route>
       </Routes>
       {!hideNav && <BottomNav />}
