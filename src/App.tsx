@@ -13,6 +13,7 @@ import { ActivityFeed } from './pages/ActivityFeed'
 import { Account } from './pages/Account'
 import { BusinessDetails } from './pages/BusinessDetails'
 import { CylinderPricing } from './pages/CylinderPricing'
+import { ExportLedger } from './pages/ExportLedger'
 
 export default function App() {
   const location = useLocation()
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/account" element={<Account />} />
           <Route path="/account/business" element={<BusinessDetails />} />
           <Route path="/account/pricing" element={<CylinderPricing />} />
+          <Route path="/account/export" element={<ExportLedger />} />
         </Route>
       </Routes>
       {!hideNav && <BottomNav />}
