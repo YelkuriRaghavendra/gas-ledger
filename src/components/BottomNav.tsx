@@ -18,7 +18,7 @@ export function BottomNav() {
             to={tab.to}
             end={tab.to === '/'}
             className={({ isActive }) =>
-              `flex-1 py-3 text-center text-sm font-medium ${isActive ? 'text-accent' : 'text-ink/60'}`
+              `flex-1 py-3 text-center text-sm font-medium ${isActive ? 'text-accent' : 'text-muted'}`
             }
           >
             {tab.label}
@@ -37,7 +37,7 @@ export function BottomNav() {
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `flex-1 py-3 text-center text-sm font-medium ${isActive ? 'text-accent' : 'text-ink/60'}`
+              `flex-1 py-3 text-center text-sm font-medium ${isActive ? 'text-accent' : 'text-muted'}`
             }
           >
             {tab.label}

@@ -69,7 +69,7 @@ export function CustomerDetail() {
     refreshBalance()
   }
 
-  if (loading) return <p className="p-4 text-ink/60">Loading…</p>
+  if (loading) return <p className="p-4 text-muted">Loading…</p>
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
 
   return (
@@ -81,17 +81,17 @@ export function CustomerDetail() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-ink/20 px-3 py-2"
+            className="w-full rounded-lg border border-borderMuted px-3 py-2"
           />
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-lg border border-ink/20 px-3 py-2"
+            className="w-full rounded-lg border border-borderMuted px-3 py-2"
           />
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="w-full rounded-lg border border-ink/20 px-3 py-2"
+            className="w-full rounded-lg border border-borderMuted px-3 py-2"
           />
           <div className="flex gap-2">
             <button
@@ -104,7 +104,7 @@ export function CustomerDetail() {
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="flex-1 rounded-lg border border-ink/20 py-2 font-semibold text-ink"
+              className="flex-1 rounded-lg border border-borderMuted py-2 font-semibold text-ink"
             >
               Cancel
             </button>
@@ -116,7 +116,7 @@ export function CustomerDetail() {
             <Avatar name={balance.name} />
             <div>
               <h1 className="text-xl font-bold text-ink">{balance.name}</h1>
-              <p className="text-sm text-ink/60">{balance.phone}</p>
+              <p className="text-sm text-muted">{balance.phone}</p>
             </div>
           </div>
           {isOwner && (
@@ -136,7 +136,7 @@ export function CustomerDetail() {
         {balance.phone && (
           <a
             href={`tel:${balance.phone}`}
-            className="flex-1 rounded-lg border border-ink/20 bg-white py-2 text-center text-sm font-semibold text-ink"
+            className="flex-1 rounded-lg border border-borderMuted bg-white py-2 text-center text-sm font-semibold text-ink"
           >
             📞 Call
           </a>
@@ -146,7 +146,7 @@ export function CustomerDetail() {
             href={`https://maps.google.com/?q=${encodeURIComponent(balance.address)}`}
             target="_blank"
             rel="noreferrer"
-            className="flex-1 rounded-lg border border-ink/20 bg-white py-2 text-center text-sm font-semibold text-ink"
+            className="flex-1 rounded-lg border border-borderMuted bg-white py-2 text-center text-sm font-semibold text-ink"
           >
             📍 {balance.address}
           </a>
@@ -154,25 +154,25 @@ export function CustomerDetail() {
       </div>
 
       <HeroCard>
-        <p className="mb-2 text-xs font-semibold uppercase text-white/60">Empty cylinder balance</p>
+        <p className="mb-2 text-xs font-semibold uppercase text-mutedOnDark">Empty cylinder balance</p>
         <div className="flex items-center gap-2">
           <div>
             <p className="font-display text-2xl font-bold text-white">{balance.sold}</p>
-            <p className="text-xs text-white/60">Sold</p>
+            <p className="text-xs text-mutedOnDark">Sold</p>
           </div>
           <span className="text-white/40">−</span>
           <div>
             <p className="font-display text-2xl font-bold text-green-400">{balance.returned}</p>
-            <p className="text-xs text-white/60">Returned</p>
+            <p className="text-xs text-mutedOnDark">Returned</p>
           </div>
           <span className="text-white/40">=</span>
           <div className="ml-auto rounded-xl bg-accent/20 px-4 py-2 text-center">
             <p className="font-display text-2xl font-bold text-accent">{balance.empties_outstanding}</p>
-            <p className="text-xs text-white/60">Empties</p>
+            <p className="text-xs text-mutedOnDark">Empties</p>
           </div>
         </div>
         <div className="mt-4 flex justify-between border-t border-white/10 pt-4">
-          <p className="text-white/60">Amount due</p>
+          <p className="text-mutedOnDark">Amount due</p>
           <p className="font-display text-xl font-bold text-accent">{formatCurrency(balance.amount_due)}</p>
         </div>
       </HeroCard>
@@ -205,12 +205,12 @@ export function CustomerDetail() {
             <span className="text-xl">{getActivityIcon(t.type)}</span>
             <div className="flex-1">
               <p className="text-sm font-semibold capitalize text-ink">{t.type}</p>
-              <p className="text-xs text-ink/60">{formatDate(t.created_at)}</p>
+              <p className="text-xs text-muted">{formatDate(t.created_at)}</p>
             </div>
             <div className="text-right">
               {t.amount > 0 && <p className="text-sm font-semibold text-ink">{formatCurrency(t.amount)}</p>}
               {(t.qty > 0 || t.empties > 0) && (
-                <p className="text-xs text-ink/60">
+                <p className="text-xs text-muted">
                   qty {t.qty} · empties {t.empties}
                 </p>
               )}
@@ -222,7 +222,7 @@ export function CustomerDetail() {
             )}
           </li>
         ))}
-        {transactions.length === 0 && <p className="text-ink/60">No transactions yet.</p>}
+        {transactions.length === 0 && <p className="text-muted">No transactions yet.</p>}
       </ul>
     </div>
   )

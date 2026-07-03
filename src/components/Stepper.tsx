@@ -6,7 +6,7 @@ interface StepperProps {
 
 export function Stepper({ value, onChange, min = 0 }: StepperProps) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-ink/20 bg-white px-2 py-2">
+    <div className="flex items-center justify-between rounded-lg border border-borderMuted bg-white px-2 py-2">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}

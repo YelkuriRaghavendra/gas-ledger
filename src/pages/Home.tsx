@@ -21,7 +21,7 @@ export function Home() {
     <div className="p-4">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <p className="text-sm text-ink/60">Welcome back</p>
+          <p className="text-sm text-muted">Welcome back</p>
           <h1 className="text-xl font-bold text-ink">{profile?.name ?? '…'}</h1>
         </div>
         <button onClick={signOut} className="text-sm text-accent">
@@ -29,26 +29,26 @@ export function Home() {
         </button>
       </div>
 
-      {loading && <p className="text-ink/60">Loading…</p>}
+      {loading && <p className="text-muted">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
 
       {!loading && !error && (
         <>
           <HeroCard>
-            <p className="text-xs font-semibold uppercase text-white/60">Amount to collect</p>
+            <p className="text-xs font-semibold uppercase text-mutedOnDark">Amount to collect</p>
             <p className="mb-1 font-display text-3xl font-bold text-white">{formatCurrency(totalDue)}</p>
-            <p className="mb-4 text-sm text-white/60">outstanding from {customersWithDue} customers</p>
+            <p className="mb-4 text-sm text-mutedOnDark">outstanding from {customersWithDue} customers</p>
             <div className="flex gap-6 border-t border-white/10 pt-4">
               <div>
-                <p className="text-xs text-white/60">Sold</p>
+                <p className="text-xs text-mutedOnDark">Sold</p>
                 <p className="font-display font-bold text-white">{totalSold}</p>
               </div>
               <div>
-                <p className="text-xs text-white/60">Returned</p>
+                <p className="text-xs text-mutedOnDark">Returned</p>
                 <p className="font-display font-bold text-green-400">{totalReturned}</p>
               </div>
               <div>
-                <p className="text-xs text-white/60">Empties out</p>
+                <p className="text-xs text-mutedOnDark">Empties out</p>
                 <p className="font-display font-bold text-accent">{totalEmptiesOut}</p>
               </div>
             </div>
@@ -60,7 +60,7 @@ export function Home() {
             </Link>
             <Link
               to="/return"
-              className="flex-1 rounded-lg border border-ink/20 bg-white py-3 text-center font-semibold text-ink"
+              className="flex-1 rounded-lg border border-borderMuted bg-white py-3 text-center font-semibold text-ink"
             >
               ↩ Log return
             </Link>
@@ -78,16 +78,16 @@ export function Home() {
                 <span className="text-xl">{getActivityIcon(entry.type)}</span>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-ink">{entry.customer_name}</p>
-                  <p className="text-xs text-ink/60">
+                  <p className="text-xs text-muted">
                     {entry.type === 'sale' && `${entry.qty} sold · ${entry.empties} empties in`}
                     {entry.type === 'return' && 'Empties returned'}
                     {entry.type === 'payment' && formatCurrency(entry.amount)}
                   </p>
                 </div>
-                <p className="text-xs text-ink/60">{formatDate(entry.created_at)}</p>
+                <p className="text-xs text-muted">{formatDate(entry.created_at)}</p>
               </li>
             ))}
-            {activity.length === 0 && <p className="text-ink/60">No activity yet.</p>}
+            {activity.length === 0 && <p className="text-muted">No activity yet.</p>}
           </ul>
         </>
       )}

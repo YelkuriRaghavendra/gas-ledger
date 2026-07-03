@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { REMEMBER_ME_STORAGE_KEY } from '../lib/supabase'
+import { CylinderIcon } from '../components/CylinderIcon'
 
 export function Login() {
   const { session, signIn } = useAuth()
@@ -27,14 +28,14 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-3xl">
-        🛢️
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent">
+        <CylinderIcon size={38} />
       </div>
       <h1 className="mb-1 text-2xl font-bold text-ink">{settings?.business_name || 'Cylinder Tracker'}</h1>
-      <p className="mb-8 text-sm text-ink/60">Cylinder distribution ledger</p>
+      <p className="mb-8 text-sm text-muted">Cylinder distribution ledger</p>
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#6E655A]">Email</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Email</p>
           <input
             type="email"
             required
@@ -44,7 +45,7 @@ export function Login() {
           />
         </div>
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#6E655A]">Password</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Password</p>
           <input
             type="password"
             required

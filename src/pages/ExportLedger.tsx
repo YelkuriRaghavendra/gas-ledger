@@ -41,7 +41,7 @@ export function ExportLedger() {
   return (
     <div className="p-4">
       <h1 className="mb-4 text-xl font-bold text-ink">Export ledger</h1>
-      <p className="mb-4 text-sm text-ink/60">Download every sale, return, and payment as a CSV file.</p>
+      <p className="mb-4 text-sm text-muted">Download every sale, return, and payment as a CSV file.</p>
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
       <button
         onClick={handleExport}

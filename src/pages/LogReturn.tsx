@@ -32,7 +32,7 @@ export function LogReturn() {
           placeholder="Search customer"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-ink/20 bg-white px-3 py-2"
+          className="mb-4 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
         />
         <ul className="space-y-2">
           {filtered.map((c) => (
@@ -42,11 +42,11 @@ export function LogReturn() {
                 className="w-full rounded-xl bg-white p-4 text-left shadow-sm"
               >
                 <p className="font-semibold text-ink">{c.name}</p>
-                <p className="text-xs text-ink/60">{c.phone}</p>
+                <p className="text-xs text-muted">{c.phone}</p>
               </button>
             </li>
           ))}
-          {filtered.length === 0 && <p className="text-ink/60">No customers found.</p>}
+          {filtered.length === 0 && <p className="text-muted">No customers found.</p>}
         </ul>
       </div>
     )
@@ -83,8 +83,8 @@ export function LogReturn() {
     <div className="p-4">
       <h1 className="mb-4 text-xl font-bold text-ink">Log empty return</h1>
       <div className="mb-4">
-        <p className="mb-1 text-xs font-semibold uppercase text-ink/60">Customer</p>
-        <div className="rounded-lg border border-ink/20 bg-white px-4 py-3 font-semibold text-ink">
+        <p className="mb-1 text-xs font-semibold uppercase text-muted">Customer</p>
+        <div className="rounded-lg border border-borderMuted bg-white px-4 py-3 font-semibold text-ink">
           {customer?.name}
         </div>
       </div>
@@ -94,7 +94,7 @@ export function LogReturn() {
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase text-ink/60">Empty cylinders returned</p>
+          <p className="mb-1 text-xs font-semibold uppercase text-muted">Empty cylinders returned</p>
           <Stepper value={qty} onChange={setQty} min={1} />
         </div>
         <div className="rounded-xl bg-green-50 p-4">

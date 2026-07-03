@@ -59,7 +59,7 @@ export function Customers() {
           {showAdd ? 'Cancel' : '+ Add'}
         </button>
       </div>
-      <p className="mb-4 text-sm text-ink/60">
+      <p className="mb-4 text-sm text-muted">
         {data.length} accounts · {totalEmptiesOut} empties outstanding
       </p>
 
@@ -70,19 +70,19 @@ export function Customers() {
             placeholder="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-ink/20 px-3 py-2"
+            className="w-full rounded-lg border border-borderMuted px-3 py-2"
           />
           <input
             placeholder="Phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-lg border border-ink/20 px-3 py-2"
+            className="w-full rounded-lg border border-borderMuted px-3 py-2"
           />
           <input
             placeholder="Address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="w-full rounded-lg border border-ink/20 px-3 py-2"
+            className="w-full rounded-lg border border-borderMuted px-3 py-2"
           />
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <button
@@ -99,10 +99,10 @@ export function Customers() {
         placeholder="Search by name or phone"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 w-full rounded-lg border border-ink/20 px-3 py-2"
+        className="mb-4 w-full rounded-lg border border-borderMuted px-3 py-2"
       />
 
-      {loading && <p className="text-ink/60">Loading…</p>}
+      {loading && <p className="text-muted">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
 
       <ul className="space-y-2">
@@ -112,16 +112,16 @@ export function Customers() {
               <Avatar name={c.name} size={40} />
               <div className="flex-1">
                 <p className="font-semibold text-ink">{c.name}</p>
-                <p className="text-xs text-ink/60">{c.phone}</p>
+                <p className="text-xs text-muted">{c.phone}</p>
               </div>
               <div className="text-right">
                 <StatusPill owed={c.empties_outstanding} />
-                <p className="mt-1 text-xs text-ink/60">{formatCurrency(c.amount_due)} due</p>
+                <p className="mt-1 text-xs text-muted">{formatCurrency(c.amount_due)} due</p>
               </div>
             </Link>
           </li>
         ))}
-        {!loading && filtered.length === 0 && <p className="text-ink/60">No customers found.</p>}
+        {!loading && filtered.length === 0 && <p className="text-muted">No customers found.</p>}
       </ul>
     </div>
   )

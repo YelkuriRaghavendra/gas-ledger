@@ -26,7 +26,7 @@ export function QuickAddSheet({ open, onClose, onNavigate }: QuickAddSheetProps)
           >
             <div>
               <p className="font-semibold text-ink">{item.label}</p>
-              <p className="text-sm text-ink/60">{item.description}</p>
+              <p className="text-sm text-muted">{item.description}</p>
             </div>
           </button>
         ))}

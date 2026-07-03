@@ -33,17 +33,17 @@ export function CylinderPricing() {
     navigate('/account')
   }
 
-  if (loading) return <p className="p-4 text-ink/60">Loading…</p>
+  if (loading) return <p className="p-4 text-muted">Loading…</p>
 
   return (
     <div className="p-4">
       <h1 className="mb-4 text-xl font-bold text-ink">Cylinder pricing</h1>
-      <p className="mb-4 text-sm text-ink/60">
+      <p className="mb-4 text-sm text-muted">
         This is the default price per 19 kg cylinder — it prefills the "Price each" field on the New Sale form
         and can still be overridden per sale.
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block text-xs font-semibold uppercase text-ink/60">
+        <label className="block text-xs font-semibold uppercase text-muted">
           Price per cylinder (₹)
           <input
             type="number"
@@ -51,7 +51,7 @@ export function CylinderPricing() {
             step="0.01"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-ink/20 bg-white px-3 py-2"
+            className="mt-1 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
           />
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}

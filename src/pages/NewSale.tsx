@@ -37,7 +37,7 @@ export function NewSale() {
           placeholder="Search customer"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-ink/20 bg-white px-3 py-2"
+          className="mb-4 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
         />
         <ul className="space-y-2">
           {filtered.map((c) => (
@@ -47,11 +47,11 @@ export function NewSale() {
                 className="w-full rounded-xl bg-white p-4 text-left shadow-sm"
               >
                 <p className="font-semibold text-ink">{c.name}</p>
-                <p className="text-xs text-ink/60">{c.phone}</p>
+                <p className="text-xs text-muted">{c.phone}</p>
               </button>
             </li>
           ))}
-          {filtered.length === 0 && <p className="text-ink/60">No customers found.</p>}
+          {filtered.length === 0 && <p className="text-muted">No customers found.</p>}
         </ul>
       </div>
     )
@@ -89,18 +89,18 @@ export function NewSale() {
     <div className="p-4">
       <h1 className="mb-4 text-xl font-bold text-ink">Record a sale</h1>
       <div className="mb-4">
-        <p className="mb-1 text-xs font-semibold uppercase text-ink/60">Customer</p>
-        <div className="rounded-lg border border-ink/20 bg-white px-4 py-3 font-semibold text-ink">
+        <p className="mb-1 text-xs font-semibold uppercase text-muted">Customer</p>
+        <div className="rounded-lg border border-borderMuted bg-white px-4 py-3 font-semibold text-ink">
           {customer?.name}
         </div>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase text-ink/60">19 kg cylinders sold</p>
+          <p className="mb-1 text-xs font-semibold uppercase text-muted">19 kg cylinders sold</p>
           <Stepper value={qty} onChange={setQty} min={1} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs font-semibold uppercase text-ink/60">
+          <label className="block text-xs font-semibold uppercase text-muted">
             Price each (₹)
             <input
               type="number"
@@ -108,21 +108,21 @@ export function NewSale() {
               value={priceEach}
               placeholder={String(settings?.price_per_cylinder ?? 0)}
               onChange={(e) => setPriceEach(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-ink/20 bg-white px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
             />
           </label>
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase text-ink/60">Empties taken</p>
+            <p className="mb-1 text-xs font-semibold uppercase text-muted">Empties taken</p>
             <Stepper value={empties} onChange={setEmpties} min={0} />
           </div>
         </div>
         <div className="rounded-xl bg-white p-4 shadow-sm">
           <div className="flex justify-between">
-            <p className="text-sm text-ink/60">Sale total</p>
+            <p className="text-sm text-muted">Sale total</p>
             <p className="font-display font-bold text-ink">{formatCurrency(saleTotal)}</p>
           </div>
           <div className="flex justify-between">
-            <p className="text-sm text-ink/60">New empties owed</p>
+            <p className="text-sm text-muted">New empties owed</p>
             <p className="font-display font-bold text-accent">
               {newEmptiesOwed >= 0 ? `+${newEmptiesOwed}` : newEmptiesOwed} cylinders
             </p>

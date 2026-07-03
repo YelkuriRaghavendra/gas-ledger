@@ -8,7 +8,7 @@ export function ActivityFeed() {
   return (
     <div className="p-4">
       <h1 className="mb-4 text-xl font-bold text-ink">Activity</h1>
-      {loading && <p className="text-ink/60">Loading…</p>}
+      {loading && <p className="text-muted">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
       <ul className="space-y-2">
         {data.map((entry) => (
@@ -17,15 +17,15 @@ export function ActivityFeed() {
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-ink">{entry.customer_name}</p>
-                <p className="text-xs text-ink/60">{formatDate(entry.created_at)}</p>
+                <p className="text-xs text-muted">{formatDate(entry.created_at)}</p>
               </div>
-              <p className="text-xs capitalize text-ink/60">
+              <p className="text-xs capitalize text-muted">
                 {entry.type} {entry.amount > 0 && `· ${formatCurrency(entry.amount)}`}
               </p>
             </div>
           </li>
         ))}
-        {!loading && data.length === 0 && <p className="text-ink/60">No activity yet.</p>}
+        {!loading && data.length === 0 && <p className="text-muted">No activity yet.</p>}
       </ul>
     </div>
   )
