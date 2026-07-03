@@ -27,7 +27,7 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6">
+    <div className="flex min-h-screen flex-col items-start justify-center px-6">
       <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent">
         <CylinderIcon size={38} />
       </div>
