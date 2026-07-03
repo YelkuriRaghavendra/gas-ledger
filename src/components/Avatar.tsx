@@ -1,9 +1,7 @@
-const PALETTE = ['#E4571B', '#2F6B4F', '#2F5C8A', '#7A4FA3', '#B5852B', '#A3355C']
+const PALETTE = ['#E4571B', '#2E8B57', '#3B6EA5', '#8A5AC2', '#C2833B', '#B5405A']
 
-function colorForName(name: string) {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
-  return PALETTE[hash % PALETTE.length]
+function colorForId(id: number) {
+  return PALETTE[(id - 1) % PALETTE.length]
 }
 
 function initialsForName(name: string) {
@@ -13,13 +11,13 @@ function initialsForName(name: string) {
   return (first + second).toUpperCase()
 }
 
-export function Avatar({ name, size = 48 }: { name: string; size?: number }) {
+export function Avatar({ id, name, size = 48 }: { id: number; name: string; size?: number }) {
   return (
     <div
-      style={{ width: size, height: size, backgroundColor: colorForName(name) }}
-      className="flex shrink-0 items-center justify-center rounded-2xl font-bold text-white"
+      style={{ width: size, height: size, backgroundColor: colorForId(id) }}
+      className="flex shrink-0 items-center justify-center rounded-[30%] font-display font-bold text-white"
     >
-      {initialsForName(name)}
+      <span style={{ fontSize: size * 0.36 }}>{initialsForName(name)}</span>
     </div>
   )
 }

@@ -5,11 +5,7 @@ import { useActivityFeed } from '../hooks/useActivityFeed'
 import { formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { HeroCard } from '../components/HeroCard'
-
-function initialsFor(name: string) {
-  const parts = name.trim().split(/\s+/)
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase()
-}
+import { InitialsBadge } from '../components/InitialsBadge'
 
 export function Home() {
   const { profile } = useAuth()
@@ -33,9 +29,7 @@ export function Home() {
             Hello, {profile?.name ?? '…'}
           </p>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-ink font-display text-base font-bold text-white">
-          {initialsFor(profile?.name ?? '?')}
-        </div>
+        <InitialsBadge name={profile?.name ?? '?'} size={44} radius={14} />
       </div>
 
       {loading && <p className="text-muted">Loading…</p>}
