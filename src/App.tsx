@@ -12,6 +12,7 @@ import { RecordPayment } from './pages/RecordPayment'
 import { ActivityFeed } from './pages/ActivityFeed'
 import { Account } from './pages/Account'
 import { BusinessDetails } from './pages/BusinessDetails'
+import { CylinderPricing } from './pages/CylinderPricing'
 
 export default function App() {
   const location = useLocation()
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/activity" element={<ActivityFeed />} />
           <Route path="/account" element={<Account />} />
           <Route path="/account/business" element={<BusinessDetails />} />
+          <Route path="/account/pricing" element={<CylinderPricing />} />
         </Route>
       </Routes>
       {!hideNav && <BottomNav />}
