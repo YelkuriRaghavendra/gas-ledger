@@ -13,7 +13,10 @@ const conditionalStorage = {
   getItem: (key: string) => localStorage.getItem(key) ?? sessionStorage.getItem(key),
   setItem: (key: string, value: string) => {
     const remember = localStorage.getItem(REMEMBER_KEY) === 'true'
-    ;(remember ? localStorage : sessionStorage).setItem(key, value)
+    const active = remember ? localStorage : sessionStorage
+    const inactive = remember ? sessionStorage : localStorage
+    active.setItem(key, value)
+    inactive.removeItem(key)
   },
   removeItem: (key: string) => {
     localStorage.removeItem(key)
