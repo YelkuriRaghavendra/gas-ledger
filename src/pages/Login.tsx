@@ -33,22 +33,26 @@ export function Login() {
       <h1 className="mb-1 text-2xl font-bold text-ink">{settings?.business_name || 'Cylinder Tracker'}</h1>
       <p className="mb-8 text-sm text-ink/60">Cylinder distribution ledger</p>
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <input
-          type="email"
-          required
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg border border-ink/20 bg-white px-4 py-3"
-        />
-        <input
-          type="password"
-          required
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-ink/20 bg-white px-4 py-3"
-        />
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#6E655A]">Email</p>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-[52px] w-full rounded-[14px] border-[1.5px] border-[#E6DCCB] bg-white px-4 font-semibold text-ink"
+          />
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#6E655A]">Password</p>
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-[52px] w-full rounded-[14px] border-[1.5px] border-[#E6DCCB] bg-white px-4 font-semibold text-ink"
+          />
+        </div>
         <label className="flex items-center gap-2 text-sm text-ink/70">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
           Remember me
