@@ -8,6 +8,10 @@ export default {
         ink: '#211913',
         accent: '#E4571B',
       },
+      fontFamily: {
+        sans: ['Manrope', 'system-ui', 'sans-serif'],
+        display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+      },
     },
   },
   plugins: [],

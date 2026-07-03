@@ -91,7 +91,7 @@ export function RecordPayment() {
       </div>
       <div className="mb-4 flex justify-between rounded-xl bg-ink p-4 text-white">
         <p>Currently due</p>
-        <p className="font-bold text-accent">{formatCurrency(currentlyDue)}</p>
+        <p className="font-display font-bold text-accent">{formatCurrency(currentlyDue)}</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center justify-between">
@@ -116,7 +116,7 @@ export function RecordPayment() {
         <div className="rounded-xl bg-blue-50 p-4">
           <div className="flex justify-between">
             <p className="text-blue-800">Balance after payment</p>
-            <p className="font-bold text-blue-800">{formatCurrency(balanceAfter)}</p>
+            <p className="font-display font-bold text-blue-800">{formatCurrency(balanceAfter)}</p>
           </div>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}

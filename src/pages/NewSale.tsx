@@ -119,11 +119,11 @@ export function NewSale() {
         <div className="rounded-xl bg-white p-4 shadow-sm">
           <div className="flex justify-between">
             <p className="text-sm text-ink/60">Sale total</p>
-            <p className="font-bold text-ink">{formatCurrency(saleTotal)}</p>
+            <p className="font-display font-bold text-ink">{formatCurrency(saleTotal)}</p>
           </div>
           <div className="flex justify-between">
             <p className="text-sm text-ink/60">New empties owed</p>
-            <p className="font-bold text-accent">
+            <p className="font-display font-bold text-accent">
               {newEmptiesOwed >= 0 ? `+${newEmptiesOwed}` : newEmptiesOwed} cylinders
             </p>
           </div>

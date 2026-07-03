@@ -90,7 +90,7 @@ export function LogReturn() {
       </div>
       <div className="mb-4 flex justify-between rounded-xl bg-ink p-4 text-white">
         <p>Currently owed by customer</p>
-        <p className="font-bold text-accent">{currentlyOwed} empties</p>
+        <p className="font-display font-bold text-accent">{currentlyOwed} empties</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -100,7 +100,7 @@ export function LogReturn() {
         <div className="rounded-xl bg-green-50 p-4">
           <div className="flex justify-between">
             <p className="text-green-800">Remaining after return</p>
-            <p className="font-bold text-green-800">{remaining} empties</p>
+            <p className="font-display font-bold text-green-800">{remaining} empties</p>
           </div>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}

@@ -36,20 +36,20 @@ export function Home() {
         <>
           <HeroCard>
             <p className="text-xs font-semibold uppercase text-white/60">Amount to collect</p>
-            <p className="mb-1 text-3xl font-bold text-white">{formatCurrency(totalDue)}</p>
+            <p className="mb-1 font-display text-3xl font-bold text-white">{formatCurrency(totalDue)}</p>
             <p className="mb-4 text-sm text-white/60">outstanding from {customersWithDue} customers</p>
             <div className="flex gap-6 border-t border-white/10 pt-4">
               <div>
                 <p className="text-xs text-white/60">Sold</p>
-                <p className="font-bold text-white">{totalSold}</p>
+                <p className="font-display font-bold text-white">{totalSold}</p>
               </div>
               <div>
                 <p className="text-xs text-white/60">Returned</p>
-                <p className="font-bold text-green-400">{totalReturned}</p>
+                <p className="font-display font-bold text-green-400">{totalReturned}</p>
               </div>
               <div>
                 <p className="text-xs text-white/60">Empties out</p>
-                <p className="font-bold text-accent">{totalEmptiesOut}</p>
+                <p className="font-display font-bold text-accent">{totalEmptiesOut}</p>
               </div>
             </div>
           </HeroCard>

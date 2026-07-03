@@ -157,23 +157,23 @@ export function CustomerDetail() {
         <p className="mb-2 text-xs font-semibold uppercase text-white/60">Empty cylinder balance</p>
         <div className="flex items-center gap-2">
           <div>
-            <p className="text-2xl font-bold text-white">{balance.sold}</p>
+            <p className="font-display text-2xl font-bold text-white">{balance.sold}</p>
             <p className="text-xs text-white/60">Sold</p>
           </div>
           <span className="text-white/40">−</span>
           <div>
-            <p className="text-2xl font-bold text-green-400">{balance.returned}</p>
+            <p className="font-display text-2xl font-bold text-green-400">{balance.returned}</p>
             <p className="text-xs text-white/60">Returned</p>
           </div>
           <span className="text-white/40">=</span>
           <div className="ml-auto rounded-xl bg-accent/20 px-4 py-2 text-center">
-            <p className="text-2xl font-bold text-accent">{balance.empties_outstanding}</p>
+            <p className="font-display text-2xl font-bold text-accent">{balance.empties_outstanding}</p>
             <p className="text-xs text-white/60">Empties</p>
           </div>
         </div>
         <div className="mt-4 flex justify-between border-t border-white/10 pt-4">
           <p className="text-white/60">Amount due</p>
-          <p className="text-xl font-bold text-accent">{formatCurrency(balance.amount_due)}</p>
+          <p className="font-display text-xl font-bold text-accent">{formatCurrency(balance.amount_due)}</p>
         </div>
       </HeroCard>
 
