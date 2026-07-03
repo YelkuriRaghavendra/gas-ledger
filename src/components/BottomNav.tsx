@@ -61,9 +61,9 @@ export function BottomNav() {
       <QuickAddSheet
         open={quickAddOpen}
         onClose={() => setQuickAddOpen(false)}
-        onNavigate={(path, state) => {
+        onNavigate={(path) => {
           setQuickAddOpen(false)
-          navigate(path, { state })
+          navigate(path)
         }}
       />
     </>

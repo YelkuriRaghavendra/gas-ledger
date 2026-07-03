@@ -5,6 +5,7 @@ import { ConnectionBanner } from './components/ConnectionBanner'
 import { Login } from './pages/Login'
 import { Home } from './pages/Home'
 import { Customers } from './pages/Customers'
+import { AddCustomer } from './pages/AddCustomer'
 import { CustomerDetail } from './pages/CustomerDetail'
 import { NewSale } from './pages/NewSale'
 import { LogReturn } from './pages/LogReturn'
@@ -27,6 +28,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Home />} />
           <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/new" element={<AddCustomer />} />
           <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/sale" element={<NewSale />} />
           <Route path="/customers/:id/sale" element={<NewSale />} />

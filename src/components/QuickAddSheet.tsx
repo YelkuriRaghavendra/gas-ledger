@@ -4,7 +4,7 @@ import { PlusIcon, ReturnIcon, CreditCardIcon, UserPlusIcon } from './icons'
 interface QuickAddSheetProps {
   open: boolean
   onClose: () => void
-  onNavigate: (path: string, state?: Record<string, unknown>) => void
+  onNavigate: (path: string) => void
 }
 
 const items = [
@@ -33,13 +33,12 @@ const items = [
     iconColor: '#3B6EA5',
   },
   {
-    path: '/customers',
+    path: '/customers/new',
     label: 'Add customer',
     description: 'New account',
     iconBg: '#EDE7DA',
     Icon: UserPlusIcon,
     iconColor: '#211913',
-    state: { openAdd: true },
   },
 ]
 
@@ -48,10 +47,10 @@ export function QuickAddSheet({ open, onClose, onNavigate }: QuickAddSheetProps)
     <BottomSheet open={open} onClose={onClose}>
       <h2 className="mb-4 font-display text-[19px] font-bold text-ink">Quick add</h2>
       <div className="flex flex-col gap-[11px]">
-        {items.map(({ path, label, description, iconBg, Icon, iconColor, state }) => (
+        {items.map(({ path, label, description, iconBg, Icon, iconColor }) => (
           <button
             key={path}
-            onClick={() => onNavigate(path, state)}
+            onClick={() => onNavigate(path)}
             className="flex items-center gap-[14px] rounded-2xl border border-[#EBE1D1] bg-white p-[15px] text-left"
           >
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]" style={{ backgroundColor: iconBg }}>

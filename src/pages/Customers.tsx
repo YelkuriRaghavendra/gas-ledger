@@ -1,6 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { formatCurrency } from '../utils/format'
 import { Avatar } from '../components/Avatar'
@@ -8,21 +7,8 @@ import { StatusPill } from '../components/StatusPill'
 import { SearchIcon } from '../components/icons'
 
 export function Customers() {
-  const { data, loading, error, refresh } = useCustomerBalances()
-  const location = useLocation()
+  const { data, loading, error } = useCustomerBalances()
   const [search, setSearch] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if ((location.state as { openAdd?: boolean } | null)?.openAdd) {
-      setShowAdd(true)
-    }
-  }, [location.state])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -32,70 +18,12 @@ export function Customers() {
 
   const totalEmptiesOut = data.reduce((sum, c) => sum + c.empties_outstanding, 0)
 
-  async function handleAdd(e: FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setFormError(null)
-    const { error } = await supabase.from('customers').insert({ name, phone, address })
-    setSaving(false)
-    if (error) {
-      setFormError(error.message)
-      return
-    }
-    setName('')
-    setPhone('')
-    setAddress('')
-    setShowAdd(false)
-    refresh()
-  }
-
   return (
     <div className="p-5 pb-[110px] pt-2">
       <h1 className="mb-1 font-display text-2xl font-bold tracking-[-0.4px] text-ink">Customers</h1>
       <p className="mb-4 text-[13px] font-semibold text-muted">
         {data.length} accounts · {totalEmptiesOut} empties outstanding
       </p>
-
-      {showAdd && (
-        <form onSubmit={handleAdd} className="mb-4 space-y-3 rounded-2xl border border-[#EFE7D8] bg-white p-4">
-          <input
-            required
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
-          />
-          <input
-            placeholder="Phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
-          />
-          <input
-            placeholder="Address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
-          />
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 rounded-[14px] bg-accent py-2 font-bold text-white disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save customer'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAdd(false)}
-              className="flex-1 rounded-[14px] border-[1.5px] border-borderMuted py-2 font-bold text-ink"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
 
       <div className="relative mb-[18px]">
         <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2">
