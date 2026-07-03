@@ -26,13 +26,26 @@ export function Login() {
     if (error) setError(error)
   }
 
+  const businessName = settings?.business_name || 'Cylinder Tracker'
+  const nameWords = businessName.trim().split(/\s+/)
+  const nameLine1 = nameWords.length > 1 ? nameWords.slice(0, -1).join(' ') : nameWords[0]
+  const nameLine2 = nameWords.length > 1 ? nameWords[nameWords.length - 1] : null
+
   return (
-    <div className="flex min-h-screen flex-col items-start justify-center px-6">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent">
+    <div className="flex min-h-screen flex-col items-start justify-center px-7">
+      <div className="mb-[26px] flex h-[74px] w-[74px] items-center justify-center rounded-[22px] bg-accent shadow-[0_14px_30px_-8px_rgba(228,87,27,0.6)]">
         <CylinderIcon size={38} />
       </div>
-      <h1 className="mb-1 text-2xl font-bold text-ink">{settings?.business_name || 'Cylinder Tracker'}</h1>
-      <p className="mb-8 text-sm text-muted">Cylinder distribution ledger</p>
+      <h1 className="font-display text-[30px] font-bold leading-[1.05] tracking-[-0.5px] text-ink">
+        {nameLine1}
+        {nameLine2 && (
+          <>
+            <br />
+            {nameLine2}
+          </>
+        )}
+      </h1>
+      <p className="mb-8 mt-[10px] text-sm font-medium text-muted">Cylinder distribution ledger</p>
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Email</p>
@@ -62,7 +75,7 @@ export function Login() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-lg bg-accent py-3 font-semibold text-white disabled:opacity-50"
+          className="h-[54px] w-full rounded-[14px] bg-accent font-bold text-white shadow-[0_12px_26px_-10px_rgba(228,87,27,0.7)] disabled:opacity-50"
         >
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
