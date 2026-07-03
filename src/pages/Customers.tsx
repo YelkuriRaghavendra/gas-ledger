@@ -1,11 +1,14 @@
-import { FormEvent, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { formatCurrency } from '../utils/format'
+import { Avatar } from '../components/Avatar'
+import { StatusPill } from '../components/StatusPill'
 
 export function Customers() {
   const { data, loading, error, refresh } = useCustomerBalances()
+  const location = useLocation()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
@@ -14,11 +17,19 @@ export function Customers() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if ((location.state as { openAdd?: boolean } | null)?.openAdd) {
+      setShowAdd(true)
+    }
+  }, [location.state])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return data
     return data.filter((c) => c.name.toLowerCase().includes(q) || (c.phone ?? '').includes(q))
   }, [data, search])
+
+  const totalEmptiesOut = data.reduce((sum, c) => sum + c.empties_outstanding, 0)
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
@@ -39,7 +50,7 @@ export function Customers() {
 
   return (
     <div className="p-4">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <h1 className="text-xl font-bold text-ink">Customers</h1>
         <button
           onClick={() => setShowAdd((v) => !v)}
@@ -48,6 +59,9 @@ export function Customers() {
           {showAdd ? 'Cancel' : '+ Add'}
         </button>
       </div>
+      <p className="mb-4 text-sm text-ink/60">
+        {data.length} accounts · {totalEmptiesOut} empties outstanding
+      </p>
 
       {showAdd && (
         <form onSubmit={handleAdd} className="mb-4 space-y-3 rounded-xl bg-white p-4 shadow-sm">
@@ -94,17 +108,15 @@ export function Customers() {
       <ul className="space-y-2">
         {filtered.map((c) => (
           <li key={c.id}>
-            <Link
-              to={`/customers/${c.id}`}
-              className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm"
-            >
-              <div>
+            <Link to={`/customers/${c.id}`} className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
+              <Avatar name={c.name} size={40} />
+              <div className="flex-1">
                 <p className="font-semibold text-ink">{c.name}</p>
                 <p className="text-xs text-ink/60">{c.phone}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-semibold text-accent">{formatCurrency(c.amount_due)}</p>
-                <p className="text-xs text-ink/60">{c.empties_outstanding} empties out</p>
+                <StatusPill owed={c.empties_outstanding} />
+                <p className="mt-1 text-xs text-ink/60">{formatCurrency(c.amount_due)} due</p>
               </div>
             </Link>
           </li>
