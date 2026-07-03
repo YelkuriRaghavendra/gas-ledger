@@ -123,7 +123,9 @@ export function NewSale() {
           </div>
           <div className="flex justify-between">
             <p className="text-sm text-ink/60">New empties owed</p>
-            <p className="font-bold text-accent">+{newEmptiesOwed} cylinders</p>
+            <p className="font-bold text-accent">
+              {newEmptiesOwed >= 0 ? `+${newEmptiesOwed}` : newEmptiesOwed} cylinders
+            </p>
           </div>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
