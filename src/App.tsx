@@ -28,6 +28,7 @@ export default function App() {
           <Route path="/customers/:id/sale" element={<NewSale />} />
           <Route path="/return" element={<LogReturn />} />
           <Route path="/customers/:id/return" element={<LogReturn />} />
+          <Route path="/payment" element={<RecordPayment />} />
           <Route path="/customers/:id/payment" element={<RecordPayment />} />
           <Route path="/activity" element={<ActivityFeed />} />
         </Route>
