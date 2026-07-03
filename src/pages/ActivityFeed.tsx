@@ -1,5 +1,5 @@
 import { useActivityFeed } from '../hooks/useActivityFeed'
-import { formatCurrency, formatDate } from '../utils/format'
+import { formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon } from '../utils/activityIcon'
 
 export function ActivityFeed() {
@@ -17,7 +17,7 @@ export function ActivityFeed() {
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-ink">{entry.customer_name}</p>
-                <p className="text-xs text-muted">{formatDate(entry.created_at)}</p>
+                <p className="text-xs text-muted">{formatRelativeDate(entry.created_at)}</p>
               </div>
               <p className="text-xs capitalize text-muted">
                 {entry.type} {entry.amount > 0 && `· ${formatCurrency(entry.amount)}`}

@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalance } from '../hooks/useCustomerBalance'
 import { useTransactions } from '../hooks/useTransactions'
-import { formatCurrency, formatDate } from '../utils/format'
+import { formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon } from '../utils/activityIcon'
 import { Avatar } from '../components/Avatar'
 import { HeroCard } from '../components/HeroCard'
@@ -205,7 +205,7 @@ export function CustomerDetail() {
             <span className="text-xl">{getActivityIcon(t.type)}</span>
             <div className="flex-1">
               <p className="text-sm font-semibold capitalize text-ink">{t.type}</p>
-              <p className="text-xs text-muted">{formatDate(t.created_at)}</p>
+              <p className="text-xs text-muted">{formatRelativeDate(t.created_at)}</p>
             </div>
             <div className="text-right">
               {t.amount > 0 && <p className="text-sm font-semibold text-ink">{formatCurrency(t.amount)}</p>}
