@@ -37,8 +37,10 @@ alter table customers alter column starting_empties_product_id set not null;
 
 -- customer_balances keeps amount_due (product-agnostic) and drops the
 -- per-product sold/returned/empties columns, which are now ambiguous
--- across two products.
-create or replace view customer_balances as
+-- across two products. DROP + CREATE (not CREATE OR REPLACE) because we are
+-- removing columns, which CREATE OR REPLACE VIEW cannot do.
+drop view if exists customer_balances;
+create view customer_balances as
 select
   c.id, c.name, c.phone, c.address, c.starting_empties_owed,
   coalesce(sum(t.amount) filter (where t.type = 'sale' and not t.paid), 0)

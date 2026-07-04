@@ -157,7 +157,10 @@ alter table transactions add column method text check (method in ('cash','upi'))
 
 alter table customers add column starting_empties_owed int not null default 0;
 
-create or replace view customer_balances as
+-- Reshaping the view (inserting a column) requires DROP + CREATE; Postgres
+-- CREATE OR REPLACE VIEW can only append columns at the end, not reorder them.
+drop view if exists customer_balances;
+create view customer_balances as
 select
   c.id, c.name, c.phone, c.address, c.starting_empties_owed,
   c.starting_empties_owed + coalesce(sum(t.qty) filter (where t.type='sale'), 0)          as sold,
@@ -214,8 +217,10 @@ alter table customers alter column starting_empties_product_id set not null;
 
 -- customer_balances keeps amount_due (product-agnostic) and drops the
 -- per-product sold/returned/empties columns, which are now ambiguous
--- across two products.
-create or replace view customer_balances as
+-- across two products. DROP + CREATE (not CREATE OR REPLACE) because we are
+-- removing columns, which CREATE OR REPLACE VIEW cannot do.
+drop view if exists customer_balances;
+create view customer_balances as
 select
   c.id, c.name, c.phone, c.address, c.starting_empties_owed,
   coalesce(sum(t.amount) filter (where t.type = 'sale' and not t.paid), 0)
