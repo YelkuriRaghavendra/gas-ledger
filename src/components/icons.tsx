@@ -107,3 +107,14 @@ export function MapPinIcon({ size = 16, color = '#E4571B', strokeWidth = 2 }: Ic
     </svg>
   )
 }
+
+export function TruckIcon({ size = 24, color = 'currentColor', strokeWidth = 2 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 3h13v13H1z" />
+      <path d="M14 8h4l3 3v5h-7V8Z" />
+      <circle cx="5.5" cy="18.5" r="2.5" />
+      <circle cx="17.5" cy="18.5" r="2.5" />
+    </svg>
+  )
+}

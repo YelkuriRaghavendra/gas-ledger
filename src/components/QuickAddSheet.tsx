@@ -1,5 +1,5 @@
 import { BottomSheet } from './BottomSheet'
-import { PlusIcon, ReturnIcon, CreditCardIcon, UserPlusIcon } from './icons'
+import { PlusIcon, ReturnIcon, CreditCardIcon, UserPlusIcon, TruckIcon } from './icons'
 
 interface QuickAddSheetProps {
   open: boolean
@@ -39,6 +39,14 @@ const items = [
     iconBg: '#EDE7DA',
     Icon: UserPlusIcon,
     iconColor: '#211913',
+  },
+  {
+    path: '/purchases/new',
+    label: 'Record purchase',
+    description: 'Cylinders in from supplier',
+    iconBg: '#FBEDE4',
+    Icon: TruckIcon,
+    iconColor: '#E4571B',
   },
 ]
 

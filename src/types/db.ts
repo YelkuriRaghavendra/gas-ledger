@@ -13,6 +13,7 @@ export interface Product {
   id: number
   name: string
   price: number
+  godown_capacity: number | null
   created_at: string
 }
 
@@ -57,6 +58,27 @@ export interface CustomerProductBalance {
   sold: number
   returned: number
   empties_outstanding: number
+}
+
+export interface Purchase {
+  id: number
+  product_id: number
+  qty: number
+  empties_given: number
+  amount: number
+  paid: boolean
+  method: PaymentMethod | null
+  note: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface GodownStock {
+  product_id: number
+  product_name: string
+  godown_capacity: number | null
+  full_cylinders: number
+  empty_cylinders: number
 }
 
 export interface ActivityEntry {
