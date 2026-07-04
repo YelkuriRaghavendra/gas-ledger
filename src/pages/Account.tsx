@@ -39,10 +39,10 @@ export function Account() {
           Products <span style={{ color: '#C0B4A2' }}>›</span>
         </Link>
         <Link
-          to="/account/export"
+          to="/account/reports"
           className="flex items-center justify-between border-b border-[#F1E9DB] px-[18px] py-4 text-sm font-semibold text-ink"
         >
-          Export ledger <span style={{ color: '#C0B4A2' }}>›</span>
+          Reports <span style={{ color: '#C0B4A2' }}>›</span>
         </Link>
         <Link
           to="/purchases"
@@ -50,8 +50,14 @@ export function Account() {
         >
           Purchases <span style={{ color: '#C0B4A2' }}>›</span>
         </Link>
-        <Link to="/godown" className="flex items-center justify-between px-[18px] py-4 text-sm font-semibold text-ink">
+        <Link
+          to="/godown"
+          className="flex items-center justify-between border-b border-[#F1E9DB] px-[18px] py-4 text-sm font-semibold text-ink"
+        >
           Godown inventory <span style={{ color: '#C0B4A2' }}>›</span>
+        </Link>
+        <Link to="/account/export" className="flex items-center justify-between px-[18px] py-4 text-sm font-semibold text-ink">
+          Export ledger <span style={{ color: '#C0B4A2' }}>›</span>
         </Link>
       </div>
 
