@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 interface StepperProps {
   value: number
   onChange: (value: number) => void
@@ -6,6 +8,23 @@ interface StepperProps {
 }
 
 export function Stepper({ value, onChange, min = 0, variant = 'primary' }: StepperProps) {
+  const [text, setText] = useState(String(value))
+
+  useEffect(() => {
+    setText(String(value))
+  }, [value])
+
+  function handleTextChange(raw: string) {
+    const digits = raw.replace(/\D/g, '')
+    setText(digits)
+    if (digits === '') return
+    onChange(Math.max(min, Number(digits)))
+  }
+
+  function handleBlur() {
+    if (text === '') setText(String(value))
+  }
+
   if (variant === 'secondary') {
     return (
       <div className="flex h-[52px] items-center justify-between rounded-[14px] border-[1.5px] border-borderMuted bg-white px-2 py-[6px]">
@@ -17,7 +36,14 @@ export function Stepper({ value, onChange, min = 0, variant = 'primary' }: Stepp
         >
           −
         </button>
-        <span className="font-display text-xl font-bold text-ink">{value}</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={text}
+          onChange={(e) => handleTextChange(e.target.value)}
+          onBlur={handleBlur}
+          className="w-16 border-none bg-transparent text-center font-display text-xl font-bold text-ink focus:outline-none"
+        />
         <button
           type="button"
           onClick={() => onChange(value + 1)}
@@ -39,7 +65,14 @@ export function Stepper({ value, onChange, min = 0, variant = 'primary' }: Stepp
       >
         −
       </button>
-      <span className="font-display text-[32px] font-bold text-ink">{value}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => handleTextChange(e.target.value)}
+        onBlur={handleBlur}
+        className="w-20 border-none bg-transparent text-center font-display text-[32px] font-bold text-ink focus:outline-none"
+      />
       <button
         type="button"
         onClick={() => onChange(value + 1)}

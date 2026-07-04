@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAgencySettings } from '../hooks/useAgencySettings'
-import { isValidPhone } from '../utils/validation'
+import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 
 export function BusinessDetails() {
   const { data, loading, refresh } = useAgencySettings()
@@ -63,8 +63,10 @@ export function BusinessDetails() {
         <label className="block text-xs font-semibold uppercase text-muted">
           Phone
           <input
+            inputMode="numeric"
+            maxLength={10}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
             className="mt-1 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
           />
         </label>

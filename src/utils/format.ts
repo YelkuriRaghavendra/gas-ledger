@@ -25,3 +25,22 @@ export function formatRelativeDate(iso: string) {
   if (diffDays > 1 && diffDays < 7) return `${diffDays} days ago`
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
+
+function pad(n: number) {
+  return String(n).padStart(2, '0')
+}
+
+export function dateInputValue(iso: string) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+export function todayInputValue() {
+  return dateInputValue(new Date().toISOString())
+}
+
+export function combineDateWithNow(dateStr: string) {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const now = new Date()
+  return new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()).toISOString()
+}

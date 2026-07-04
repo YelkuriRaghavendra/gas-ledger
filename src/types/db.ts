@@ -7,6 +7,7 @@ export interface Profile {
 }
 
 export type TransactionType = 'sale' | 'return' | 'payment'
+export type PaymentMethod = 'cash' | 'upi'
 
 export interface Customer {
   id: number
@@ -23,6 +24,8 @@ export interface Transaction {
   qty: number
   empties: number
   amount: number
+  paid: boolean
+  method: PaymentMethod | null
   note: string | null
   created_by: string | null
   created_at: string

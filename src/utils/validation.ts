@@ -1,6 +1,7 @@
 export function isValidPhone(phone: string): boolean {
-  const digits = phone.replace(/\D/g, '')
-  if (digits.length === 10) return true
-  if (digits.length === 12 && digits.startsWith('91')) return true
-  return false
+  return phone.replace(/\D/g, '').length === 10
+}
+
+export function sanitizePhoneInput(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 10)
 }

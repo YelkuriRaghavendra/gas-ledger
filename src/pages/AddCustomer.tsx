@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ChevronLeftIcon } from '../components/icons'
-import { isValidPhone } from '../utils/validation'
+import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 
 export function AddCustomer() {
   const navigate = useNavigate()
@@ -54,8 +54,10 @@ export function AddCustomer() {
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Phone number</p>
           <input
             placeholder="10-digit mobile"
+            inputMode="numeric"
+            maxLength={10}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
             className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
           />
         </div>

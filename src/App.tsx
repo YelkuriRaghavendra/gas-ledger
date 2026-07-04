@@ -32,10 +32,13 @@ export default function App() {
           <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/sale" element={<NewSale />} />
           <Route path="/customers/:id/sale" element={<NewSale />} />
+          <Route path="/customers/:id/sale/:txId/edit" element={<NewSale />} />
           <Route path="/return" element={<LogReturn />} />
           <Route path="/customers/:id/return" element={<LogReturn />} />
+          <Route path="/customers/:id/return/:txId/edit" element={<LogReturn />} />
           <Route path="/payment" element={<RecordPayment />} />
           <Route path="/customers/:id/payment" element={<RecordPayment />} />
+          <Route path="/customers/:id/payment/:txId/edit" element={<RecordPayment />} />
           <Route path="/activity" element={<ActivityFeed />} />
           <Route path="/account" element={<Account />} />
           <Route path="/account/business" element={<BusinessDetails />} />

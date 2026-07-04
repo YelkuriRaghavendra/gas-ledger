@@ -4,11 +4,12 @@ import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalance } from '../hooks/useCustomerBalance'
 import { useTransactions } from '../hooks/useTransactions'
-import { formatCurrency, formatRelativeDate } from '../utils/format'
+import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
-import { isValidPhone } from '../utils/validation'
+import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
 import { HeroCard } from '../components/HeroCard'
+import { BottomSheet } from '../components/BottomSheet'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon } from '../components/icons'
 import type { Transaction } from '../types/db'
 
@@ -31,8 +32,15 @@ function historyTitle(t: Transaction) {
 
 function historySubtitle(t: Transaction) {
   const date = formatRelativeDate(t.created_at)
-  if (t.type === 'sale') return `${date} · ${formatCurrency(t.amount)}${t.empties ? ` · ${t.empties} empties collected` : ''}`
-  if (t.type === 'payment') return `${date} · ${formatCurrency(t.amount)}`
+  if (t.type === 'sale') {
+    const empties = t.empties ? ` · ${t.empties} empties collected` : ''
+    const paid = t.paid ? ` · Paid${t.method ? ` (${t.method === 'upi' ? 'UPI' : 'Cash'})` : ''}` : ''
+    return `${date} · ${formatCurrency(t.amount)}${empties}${paid}`
+  }
+  if (t.type === 'payment') {
+    const method = t.method ? ` · ${t.method === 'upi' ? 'UPI' : 'Cash'}` : ''
+    return `${date} · ${formatCurrency(t.amount)}${method}`
+  }
   return date
 }
 
@@ -40,6 +48,10 @@ function historyAmount(t: Transaction) {
   if (t.type === 'sale') return `+${t.qty}`
   if (t.type === 'return') return `−${t.qty}`
   return formatCurrency(t.amount)
+}
+
+function transactionEditPath(t: Transaction) {
+  return `/customers/${t.customer_id}/${t.type}/${t.id}/edit`
 }
 
 function dayKey(iso: string) {
@@ -51,7 +63,7 @@ function buildHistoryGroups(transactions: Transaction[]): HistoryGroup[] {
   const chronological = [...transactions].reverse()
   let running = 0
   const withBalance: HistoryEntry[] = chronological.map((t) => {
-    if (t.type === 'sale') running += t.amount
+    if (t.type === 'sale' && !t.paid) running += t.amount
     else if (t.type === 'payment') running -= t.amount
     return { ...t, balanceAfter: running }
   })
@@ -69,6 +81,7 @@ function buildHistoryGroups(transactions: Transaction[]): HistoryGroup[] {
     if (t.type === 'sale') group.sales += 1
     if (t.type === 'return') group.returns += 1
     if (t.type === 'payment') group.collected += t.amount
+    if (t.type === 'sale' && t.paid) group.collected += t.amount
   }
   return groups
 }
@@ -95,6 +108,7 @@ export function CustomerDetail() {
   const [address, setAddress] = useState('')
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
 
   function startEdit() {
     if (!balance) return
@@ -167,8 +181,10 @@ export function CustomerDetail() {
             className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
           />
           <input
+            inputMode="numeric"
+            maxLength={10}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
             className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
           />
           <input
@@ -305,13 +321,24 @@ export function CustomerDetail() {
                       </p>
                     </div>
                     <p className="mt-[2px] text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
+                    {t.note && <p className="mt-[1px] text-xs italic text-muted">{t.note}</p>}
                     <p className="mt-[1px] text-xs font-semibold text-muted">Balance: {formatCurrency(t.balanceAfter)}</p>
                   </div>
-                  {isOwner && (
-                    <button onClick={() => handleDeleteTransaction(t.id)} className="shrink-0 self-start text-xs font-bold text-red-600">
-                      Delete
+                  <div className="flex shrink-0 flex-col items-end gap-1 self-start">
+                    <button onClick={() => setViewingTx(t)} className="text-xs font-bold text-ink">
+                      View
                     </button>
-                  )}
+                    {isOwner && (
+                      <>
+                        <Link to={transactionEditPath(t)} className="text-xs font-bold text-accent">
+                          Edit
+                        </Link>
+                        <button onClick={() => handleDeleteTransaction(t.id)} className="text-xs font-bold text-red-600">
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </li>
               )
             })}
@@ -319,6 +346,60 @@ export function CustomerDetail() {
         </div>
       ))}
       {transactions.length === 0 && <p className="text-muted">No transactions yet.</p>}
+
+      <BottomSheet open={viewingTx !== null} onClose={() => setViewingTx(null)}>
+        {viewingTx && (
+          <div>
+            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">{historyTitle(viewingTx)}</h2>
+            <dl className="flex flex-col gap-3">
+              <div className="flex justify-between border-b border-borderMuted pb-3">
+                <dt className="text-[13px] font-semibold text-muted">Date &amp; time</dt>
+                <dd className="text-[13px] font-bold text-ink">{formatDate(viewingTx.created_at)}</dd>
+              </div>
+              {viewingTx.type !== 'payment' && (
+                <div className="flex justify-between border-b border-borderMuted pb-3">
+                  <dt className="text-[13px] font-semibold text-muted">Cylinders</dt>
+                  <dd className="text-[13px] font-bold text-ink">{viewingTx.qty}</dd>
+                </div>
+              )}
+              {viewingTx.type === 'sale' && (
+                <div className="flex justify-between border-b border-borderMuted pb-3">
+                  <dt className="text-[13px] font-semibold text-muted">Empties collected</dt>
+                  <dd className="text-[13px] font-bold text-ink">{viewingTx.empties}</dd>
+                </div>
+              )}
+              {viewingTx.type !== 'return' && (
+                <div className="flex justify-between border-b border-borderMuted pb-3">
+                  <dt className="text-[13px] font-semibold text-muted">Amount</dt>
+                  <dd className="text-[13px] font-bold text-ink">{formatCurrency(viewingTx.amount)}</dd>
+                </div>
+              )}
+              {(viewingTx.type === 'payment' || viewingTx.paid) && (
+                <div className="flex justify-between border-b border-borderMuted pb-3">
+                  <dt className="text-[13px] font-semibold text-muted">Payment method</dt>
+                  <dd className="text-[13px] font-bold text-ink">{viewingTx.method === 'upi' ? 'UPI' : 'Cash'}</dd>
+                </div>
+              )}
+              {viewingTx.type === 'sale' && (
+                <div className="flex justify-between border-b border-borderMuted pb-3">
+                  <dt className="text-[13px] font-semibold text-muted">Payment status</dt>
+                  <dd className="text-[13px] font-bold text-ink">{viewingTx.paid ? 'Paid' : 'On credit'}</dd>
+                </div>
+              )}
+              {viewingTx.note && (
+                <div className="flex justify-between border-b border-borderMuted pb-3">
+                  <dt className="text-[13px] font-semibold text-muted">Note</dt>
+                  <dd className="text-right text-[13px] font-bold text-ink">{viewingTx.note}</dd>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <dt className="text-[13px] font-semibold text-muted">Balance after</dt>
+                <dd className="text-[13px] font-bold text-ink">{formatCurrency(viewingTx.balanceAfter)}</dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </BottomSheet>
     </div>
   )
 }
