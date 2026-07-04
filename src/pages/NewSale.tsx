@@ -156,6 +156,7 @@ export function NewSale() {
             <input
               type="number"
               min="0"
+              step="0.01"
               value={priceEach}
               onChange={(e) => setPriceEach(e.target.value)}
               className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
