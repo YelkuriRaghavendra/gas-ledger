@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAgencySettings } from '../hooks/useAgencySettings'
+import { isValidPhone } from '../utils/validation'
 
 export function BusinessDetails() {
   const { data, loading, refresh } = useAgencySettings()
@@ -22,6 +23,14 @@ export function BusinessDetails() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!name.trim()) {
+      setError('Enter a business name')
+      return
+    }
+    if (phone.trim() && !isValidPhone(phone)) {
+      setError('Enter a valid 10-digit phone number')
+      return
+    }
     setSaving(true)
     setError(null)
     const { error } = await supabase
