@@ -7,6 +7,7 @@ export function CylinderPricing() {
   const { data: products, loading, refresh } = useProducts()
   const navigate = useNavigate()
   const [prices, setPrices] = useState<Record<number, string>>({})
+  const [capacities, setCapacities] = useState<Record<number, string>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -19,21 +20,38 @@ export function CylinderPricing() {
         }
         return next
       })
+      setCapacities((prev) => {
+        const next = { ...prev }
+        for (const p of products) {
+          if (next[p.id] === undefined) next[p.id] = p.godown_capacity !== null ? String(p.godown_capacity) : ''
+        }
+        return next
+      })
     }
   }, [products])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const updates = products.map((p) => ({ id: p.id, price: Number(prices[p.id]) }))
+    const updates = products.map((p) => ({
+      id: p.id,
+      price: Number(prices[p.id]),
+      capacityRaw: capacities[p.id] ?? '',
+    }))
     const invalid = updates.find((u) => !(u.price > 0))
     if (invalid) {
       setError('Price must be greater than zero')
       return
     }
+    const invalidCapacity = updates.find((u) => u.capacityRaw.trim() !== '' && !(Number(u.capacityRaw) > 0))
+    if (invalidCapacity) {
+      setError('Godown capacity must be greater than zero, or left blank')
+      return
+    }
     setSaving(true)
     setError(null)
     for (const u of updates) {
-      const { error } = await supabase.from('products').update({ price: u.price }).eq('id', u.id)
+      const godown_capacity = u.capacityRaw.trim() === '' ? null : Number(u.capacityRaw)
+      const { error } = await supabase.from('products').update({ price: u.price, godown_capacity }).eq('id', u.id)
       if (error) {
         setSaving(false)
         setError(error.message)
@@ -56,17 +74,31 @@ export function CylinderPricing() {
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         {products.map((p) => (
-          <label key={p.id} className="block text-xs font-semibold uppercase text-muted">
-            {p.name} price (₹)
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={prices[p.id] ?? ''}
-              onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
-            />
-          </label>
+          <div key={p.id} className="space-y-3">
+            <label className="block text-xs font-semibold uppercase text-muted">
+              {p.name} price (₹)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={prices[p.id] ?? ''}
+                onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
+              />
+            </label>
+            <label className="block text-xs font-semibold uppercase text-muted">
+              {p.name} godown capacity (empties)
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Not set"
+                value={capacities[p.id] ?? ''}
+                onChange={(e) => setCapacities((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-borderMuted bg-white px-3 py-2"
+              />
+            </label>
+          </div>
         ))}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
