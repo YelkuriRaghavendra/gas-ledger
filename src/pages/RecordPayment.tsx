@@ -31,6 +31,10 @@ export function RecordPayment() {
       setError('Amount must be greater than zero')
       return
     }
+    if (amountNum > currentlyDue) {
+      setError(`Amount can't exceed the ${formatCurrency(currentlyDue)} currently due.`)
+      return
+    }
     setSaving(true)
     setError(null)
     const { error } = await supabase.from('transactions').insert({
