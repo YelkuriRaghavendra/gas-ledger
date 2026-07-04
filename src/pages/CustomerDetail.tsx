@@ -3,6 +3,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalance } from '../hooks/useCustomerBalance'
+import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
+import { useProducts } from '../hooks/useProducts'
 import { useTransactions } from '../hooks/useTransactions'
 import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
@@ -13,7 +15,7 @@ import { BottomSheet } from '../components/BottomSheet'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon } from '../components/icons'
 import type { Transaction } from '../types/db'
 
-type HistoryEntry = Transaction & { balanceAfter: number }
+type HistoryEntry = Transaction & { balanceAfter: number; productName: string | null }
 
 interface HistoryGroup {
   key: string
@@ -24,9 +26,9 @@ interface HistoryGroup {
   collected: number
 }
 
-function historyTitle(t: Transaction) {
-  if (t.type === 'sale') return `${t.qty} cylinders sold`
-  if (t.type === 'return') return `${t.qty} empties returned`
+function historyTitle(t: Transaction, productName?: string | null) {
+  if (t.type === 'sale') return productName ? `${t.qty} × ${productName} sold` : `${t.qty} cylinders sold`
+  if (t.type === 'return') return productName ? `${t.qty} × ${productName} returned` : `${t.qty} empties returned`
   return 'Payment received'
 }
 
@@ -59,13 +61,14 @@ function dayKey(iso: string) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
 
-function buildHistoryGroups(transactions: Transaction[]): HistoryGroup[] {
+function buildHistoryGroups(transactions: Transaction[], productNameById: Map<number, string>): HistoryGroup[] {
   const chronological = [...transactions].reverse()
   let running = 0
   const withBalance: HistoryEntry[] = chronological.map((t) => {
     if (t.type === 'sale' && !t.paid) running += t.amount
     else if (t.type === 'payment') running -= t.amount
-    return { ...t, balanceAfter: running }
+    const productName = t.product_id !== null ? productNameById.get(t.product_id) ?? null : null
+    return { ...t, balanceAfter: running, productName }
   })
   const newestFirst = [...withBalance].reverse()
 
@@ -101,22 +104,33 @@ export function CustomerDetail() {
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
   const { data: balance, loading, error, refresh: refreshBalance } = useCustomerBalance(customerId)
+  const { data: productBalances, refresh: refreshProductBalances } = useCustomerProductBalances(customerId)
+  const { data: products } = useProducts()
   const { data: transactions, refresh: refreshTx } = useTransactions(customerId)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [startingEmpties, setStartingEmpties] = useState('')
+  const [startingEmptiesProductId, setStartingEmptiesProductId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
 
-  function startEdit() {
+  const productNameById = new Map(products.map((p) => [p.id, p.name]))
+
+  async function startEdit() {
     if (!balance) return
     setName(balance.name)
     setPhone(balance.phone ?? '')
     setAddress(balance.address ?? '')
     setStartingEmpties(String(balance.starting_empties_owed))
+    const { data } = await supabase
+      .from('customers')
+      .select('starting_empties_product_id')
+      .eq('id', customerId)
+      .single()
+    setStartingEmptiesProductId(data?.starting_empties_product_id ?? products[0]?.id ?? null)
     setEditing(true)
   }
 
@@ -130,7 +144,13 @@ export function CustomerDetail() {
     setActionError(null)
     const { error } = await supabase
       .from('customers')
-      .update({ name, phone, address, starting_empties_owed: Number(startingEmpties || 0) })
+      .update({
+        name,
+        phone,
+        address,
+        starting_empties_owed: Number(startingEmpties || 0),
+        starting_empties_product_id: startingEmptiesProductId,
+      })
       .eq('id', customerId)
     setSaving(false)
     if (error) {
@@ -139,6 +159,7 @@ export function CustomerDetail() {
     }
     setEditing(false)
     refreshBalance()
+    refreshProductBalances()
   }
 
   async function handleDeleteCustomer() {
@@ -162,12 +183,13 @@ export function CustomerDetail() {
     }
     refreshTx()
     refreshBalance()
+    refreshProductBalances()
   }
 
   if (loading) return <p className="p-4 text-muted">Loading…</p>
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
 
-  const historyGroups = buildHistoryGroups(transactions)
+  const historyGroups = buildHistoryGroups(transactions, productNameById)
 
   return (
     <div className="p-5 pb-10 pt-2">
@@ -198,14 +220,27 @@ export function CustomerDetail() {
             className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
           />
           <div>
-            <input
-              type="number"
-              min="0"
-              placeholder="Empties already owed"
-              value={startingEmpties}
-              onChange={(e) => setStartingEmpties(e.target.value)}
-              className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
-            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                placeholder="Empties already owed"
+                value={startingEmpties}
+                onChange={(e) => setStartingEmpties(e.target.value)}
+                className="w-full flex-1 rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+              />
+              <select
+                value={startingEmptiesProductId ?? ''}
+                onChange={(e) => setStartingEmptiesProductId(Number(e.target.value))}
+                className="w-32 shrink-0 appearance-none rounded-[14px] border-[1.5px] border-borderMuted px-2 py-2 font-bold text-ink"
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <p className="mt-1 text-xs text-muted">Starting empties-owed balance (not from a sale in this app)</p>
           </div>
           <div className="flex gap-2">
@@ -263,29 +298,34 @@ export function CustomerDetail() {
         )}
       </div>
 
-      <HeroCard>
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.5px] text-mutedOnDark">Empty cylinder balance</p>
-        <div className="flex items-center gap-[10px]">
-          <div className="flex-1 text-center">
-            <p className="font-display text-[26px] font-bold text-white">{balance.sold}</p>
-            <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Sold</p>
-          </div>
-          <span className="text-[22px] font-semibold text-[#6B6154]">−</span>
-          <div className="flex-1 text-center">
-            <p className="font-display text-[26px] font-bold text-[#5FCF97]">{balance.returned}</p>
-            <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Returned</p>
-          </div>
-          <span className="text-[22px] font-semibold text-[#6B6154]">=</span>
-          <div className="flex-1 rounded-[13px] bg-accent/[.18] px-1 py-2 text-center">
-            <p className="font-display text-[26px] font-bold text-[#FF8A4C]">{balance.empties_outstanding}</p>
-            <p className="mt-[2px] text-[11px] font-bold text-[#FF8A4C]/[.85]">Empties</p>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center justify-between border-t border-white/[.12] pt-[14px]">
-          <span className="text-[13px] font-semibold text-[#C9BBA8]">Amount due</span>
-          <span className="font-display text-xl font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
-        </div>
-      </HeroCard>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {productBalances.map((pb) => (
+          <HeroCard key={pb.product_id}>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.5px] text-mutedOnDark">{pb.product_name} balance</p>
+            <div className="flex items-center gap-[10px]">
+              <div className="flex-1 text-center">
+                <p className="font-display text-[26px] font-bold text-white">{pb.sold}</p>
+                <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Sold</p>
+              </div>
+              <span className="text-[22px] font-semibold text-[#6B6154]">−</span>
+              <div className="flex-1 text-center">
+                <p className="font-display text-[26px] font-bold text-[#5FCF97]">{pb.returned}</p>
+                <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Returned</p>
+              </div>
+              <span className="text-[22px] font-semibold text-[#6B6154]">=</span>
+              <div className="flex-1 rounded-[13px] bg-accent/[.18] px-1 py-2 text-center">
+                <p className="font-display text-[26px] font-bold text-[#FF8A4C]">{pb.empties_outstanding}</p>
+                <p className="mt-[2px] text-[11px] font-bold text-[#FF8A4C]/[.85]">Empties</p>
+              </div>
+            </div>
+          </HeroCard>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between rounded-2xl bg-ink px-4 py-[14px] text-white">
+        <span className="text-[13px] font-semibold text-[#C9BBA8]">Amount due</span>
+        <span className="font-display text-xl font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
+      </div>
 
       <div className="my-[18px] grid grid-cols-3 gap-2">
         <Link
@@ -331,7 +371,7 @@ export function CustomerDetail() {
                   </div>
                   <div className="flex-1 pt-px">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-bold text-ink">{historyTitle(t)}</p>
+                      <p className="text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
                       <p className="font-display text-sm font-bold" style={{ color: tint.color }}>
                         {historyAmount(t)}
                       </p>
@@ -366,7 +406,7 @@ export function CustomerDetail() {
       <BottomSheet open={viewingTx !== null} onClose={() => setViewingTx(null)}>
         {viewingTx && (
           <div>
-            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">{historyTitle(viewingTx)}</h2>
+            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">{historyTitle(viewingTx, viewingTx.productName)}</h2>
             <dl className="flex flex-col gap-3">
               <div className="flex justify-between border-b border-borderMuted pb-3">
                 <dt className="text-[13px] font-semibold text-muted">Date &amp; time</dt>

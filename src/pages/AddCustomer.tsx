@@ -1,17 +1,24 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useProducts } from '../hooks/useProducts'
 import { ChevronLeftIcon } from '../components/icons'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 
 export function AddCustomer() {
   const navigate = useNavigate()
+  const { data: products } = useProducts()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [startingEmpties, setStartingEmpties] = useState('')
+  const [startingEmptiesProductId, setStartingEmptiesProductId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (startingEmptiesProductId === null && products.length > 0) setStartingEmptiesProductId(products[0].id)
+  }, [products, startingEmptiesProductId])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -27,7 +34,13 @@ export function AddCustomer() {
     setError(null)
     const { data, error } = await supabase
       .from('customers')
-      .insert({ name, phone, address, starting_empties_owed: Number(startingEmpties || 0) })
+      .insert({
+        name,
+        phone,
+        address,
+        starting_empties_owed: Number(startingEmpties || 0),
+        starting_empties_product_id: startingEmptiesProductId,
+      })
       .select('id')
       .single()
     setSaving(false)
@@ -77,14 +90,27 @@ export function AddCustomer() {
         </div>
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Empties already owed (optional)</p>
-          <input
-            type="number"
-            min="0"
-            placeholder="0"
-            value={startingEmpties}
-            onChange={(e) => setStartingEmpties(e.target.value)}
-            className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
-          />
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="0"
+              placeholder="0"
+              value={startingEmpties}
+              onChange={(e) => setStartingEmpties(e.target.value)}
+              className="h-[52px] w-full flex-1 rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
+            />
+            <select
+              value={startingEmptiesProductId ?? ''}
+              onChange={(e) => setStartingEmptiesProductId(Number(e.target.value))}
+              className="h-[52px] w-32 shrink-0 appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-3 font-bold text-ink"
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <p className="mt-1 text-xs text-muted">If this customer already had cylinders from before you started using this app</p>
         </div>
 

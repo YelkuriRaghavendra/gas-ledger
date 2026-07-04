@@ -3,6 +3,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
+import { useProducts } from '../hooks/useProducts'
+import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useTransactions } from '../hooks/useTransactions'
 import { Stepper } from '../components/Stepper'
 import { ChevronLeftIcon } from '../components/icons'
@@ -13,8 +15,11 @@ export function LogReturn() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: customers } = useCustomerBalances()
+  const { data: products } = useProducts()
   const { data: transactions } = useTransactions(id ? Number(id) : 0)
   const [customerId, setCustomerId] = useState<number | null>(id ? Number(id) : null)
+  const [productId, setProductId] = useState<number | null>(null)
+  const { data: productBalances } = useCustomerProductBalances(customerId ?? 0)
   const [qty, setQty] = useState(1)
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
@@ -29,22 +34,33 @@ export function LogReturn() {
   }, [customers, customerId])
 
   useEffect(() => {
+    if (productId === null && products.length > 0 && !editing) setProductId(products[0].id)
+  }, [products, productId, editing])
+
+  useEffect(() => {
     if (!editing || loadedEdit) return
     const tx = transactions.find((t) => t.id === Number(txId))
     if (!tx) return
+    setProductId(tx.product_id)
     setQty(tx.qty)
     setOriginalQty(tx.qty)
     setDate(dateInputValue(tx.created_at))
     setLoadedEdit(true)
   }, [editing, loadedEdit, transactions, txId])
 
-  const customer = customers.find((c) => c.id === customerId)
-  const currentlyOwed = (customer?.empties_outstanding ?? 0) + originalQty
+  function handleProductChange(newProductId: number) {
+    setProductId(newProductId)
+    setQty(1)
+  }
+
+  const product = products.find((p) => p.id === productId)
+  const productBalance = productBalances.find((b) => b.product_id === productId)
+  const currentlyOwed = (productBalance?.empties_outstanding ?? 0) + originalQty
   const remaining = Math.max(0, currentlyOwed - qty)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!customerId || qty <= 0) {
+    if (!customerId || !productId || qty <= 0) {
       setError('Quantity must be greater than zero')
       return
     }
@@ -71,6 +87,7 @@ export function LogReturn() {
     const { error } = await supabase.from('transactions').insert({
       customer_id: customerId,
       type: 'return',
+      product_id: productId,
       qty,
       empties: 0,
       amount: 0,
@@ -107,6 +124,20 @@ export function LogReturn() {
           ))}
         </select>
 
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Product</p>
+        <select
+          value={productId ?? ''}
+          onChange={(e) => handleProductChange(Number(e.target.value))}
+          disabled={editing}
+          className="mb-5 h-[52px] w-full appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink disabled:opacity-60"
+        >
+          {products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+
         <div className="mb-5 flex items-center justify-between rounded-2xl bg-ink px-4 py-[14px] text-white">
           <span className="text-[13px] font-semibold text-mutedOnDark">Currently owed by customer</span>
           <span className="font-display font-bold text-accent">{currentlyOwed} empties</span>
@@ -121,7 +152,9 @@ export function LogReturn() {
           className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
         />
 
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Empty cylinders returned</p>
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">
+          {product ? `Empty ${product.name} cylinders returned` : 'Empty cylinders returned'}
+        </p>
         <div className="mb-5">
           <Stepper value={qty} onChange={setQty} min={1} />
         </div>

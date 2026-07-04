@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
+import { useAllCustomerProductBalances } from '../hooks/useAllCustomerProductBalances'
 import { useActivityFeed } from '../hooks/useActivityFeed'
 import { formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
@@ -10,12 +11,13 @@ import { InitialsBadge } from '../components/InitialsBadge'
 export function Home() {
   const { profile } = useAuth()
   const { data, loading, error } = useCustomerBalances()
+  const { data: productBalances } = useAllCustomerProductBalances()
   const { data: activity } = useActivityFeed(5)
 
   const totalDue = data.reduce((sum, c) => sum + c.amount_due, 0)
-  const totalSold = data.reduce((sum, c) => sum + c.sold, 0)
-  const totalReturned = data.reduce((sum, c) => sum + c.returned, 0)
-  const totalEmptiesOut = data.reduce((sum, c) => sum + c.empties_outstanding, 0)
+  const totalSold = productBalances.reduce((sum, pb) => sum + pb.sold, 0)
+  const totalReturned = productBalances.reduce((sum, pb) => sum + pb.returned, 0)
+  const totalEmptiesOut = productBalances.reduce((sum, pb) => sum + pb.empties_outstanding, 0)
   const customersWithDue = data.filter((c) => c.amount_due > 0).length
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -127,8 +129,9 @@ export function Home() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-ink">{entry.customer_name}</p>
                     <p className="mt-px text-xs font-medium text-[#9A8F80]">
-                      {entry.type === 'sale' && `${entry.qty} sold · ${entry.empties} empties in`}
-                      {entry.type === 'return' && 'Empties returned'}
+                      {entry.type === 'sale' &&
+                        `${entry.qty}${entry.product_name ? ` ${entry.product_name}` : ''} sold · ${entry.empties} empties in`}
+                      {entry.type === 'return' && `${entry.product_name ? `${entry.product_name} ` : ''}empties returned`}
                       {entry.type === 'payment' && 'Payment received'}
                     </p>
                   </div>

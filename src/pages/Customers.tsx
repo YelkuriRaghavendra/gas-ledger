@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
+import { useAllCustomerProductBalances } from '../hooks/useAllCustomerProductBalances'
 import { formatCurrency } from '../utils/format'
 import { Avatar } from '../components/Avatar'
 import { StatusPill } from '../components/StatusPill'
@@ -8,7 +9,16 @@ import { SearchIcon } from '../components/icons'
 
 export function Customers() {
   const { data, loading, error } = useCustomerBalances()
+  const { data: productBalances } = useAllCustomerProductBalances()
   const [search, setSearch] = useState('')
+
+  const emptiesByCustomer = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const pb of productBalances) {
+      map.set(pb.customer_id, (map.get(pb.customer_id) ?? 0) + pb.empties_outstanding)
+    }
+    return map
+  }, [productBalances])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -16,7 +26,7 @@ export function Customers() {
     return data.filter((c) => c.name.toLowerCase().includes(q) || (c.phone ?? '').includes(q))
   }, [data, search])
 
-  const totalEmptiesOut = data.reduce((sum, c) => sum + c.empties_outstanding, 0)
+  const totalEmptiesOut = productBalances.reduce((sum, pb) => sum + pb.empties_outstanding, 0)
 
   return (
     <div className="p-5 pb-[110px] pt-2">
@@ -53,7 +63,7 @@ export function Customers() {
                 <p className="mt-[2px] text-[12.5px] font-semibold text-[#9A8F80]">{c.phone}</p>
               </div>
               <div className="shrink-0 text-right">
-                <StatusPill owed={c.empties_outstanding} />
+                <StatusPill owed={emptiesByCustomer.get(c.id) ?? 0} />
                 <p className="mt-[5px] text-xs font-semibold text-[#B3A796]">{formatCurrency(c.amount_due)} due</p>
               </div>
             </Link>

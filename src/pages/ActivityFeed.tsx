@@ -27,8 +27,9 @@ export function ActivityFeed() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-ink">{entry.customer_name}</p>
                 <p className="mt-px text-xs font-medium text-[#9A8F80]">
-                  {entry.type === 'sale' && `${entry.qty} sold · ${entry.empties} empties in`}
-                  {entry.type === 'return' && 'Empties returned'}
+                  {entry.type === 'sale' &&
+                    `${entry.qty}${entry.product_name ? ` ${entry.product_name}` : ''} sold · ${entry.empties} empties in`}
+                  {entry.type === 'return' && `${entry.product_name ? `${entry.product_name} ` : ''}empties returned`}
                   {entry.type === 'payment' && 'Payment received'}
                 </p>
               </div>

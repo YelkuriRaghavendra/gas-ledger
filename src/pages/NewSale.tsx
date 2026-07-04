@@ -3,7 +3,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
-import { useAgencySettings } from '../hooks/useAgencySettings'
+import { useProducts } from '../hooks/useProducts'
+import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useTransactions } from '../hooks/useTransactions'
 import { Stepper } from '../components/Stepper'
 import { combineDateWithNow, dateInputValue, formatCurrency, todayInputValue } from '../utils/format'
@@ -15,9 +16,11 @@ export function NewSale() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: customers } = useCustomerBalances()
-  const { data: settings } = useAgencySettings()
+  const { data: products } = useProducts()
   const { data: transactions } = useTransactions(id ? Number(id) : 0)
   const [customerId, setCustomerId] = useState<number | null>(id ? Number(id) : null)
+  const [productId, setProductId] = useState<number | null>(null)
+  const { data: productBalances } = useCustomerProductBalances(customerId ?? 0)
   const [qty, setQty] = useState(1)
   const [empties, setEmpties] = useState(0)
   const [priceEach, setPriceEach] = useState('')
@@ -37,13 +40,21 @@ export function NewSale() {
   }, [customers, customerId])
 
   useEffect(() => {
-    if (settings && !priceEach && !editing) setPriceEach(String(settings.price_per_cylinder || ''))
-  }, [settings, priceEach, editing])
+    if (productId === null && products.length > 0 && !editing) setProductId(products[0].id)
+  }, [products, productId, editing])
+
+  useEffect(() => {
+    if (!editing) {
+      const product = products.find((p) => p.id === productId)
+      if (product && !priceEach) setPriceEach(String(product.price || ''))
+    }
+  }, [products, productId, priceEach, editing])
 
   useEffect(() => {
     if (!editing || loadedEdit) return
     const tx = transactions.find((t) => t.id === Number(txId))
     if (!tx) return
+    setProductId(tx.product_id)
     setQty(tx.qty)
     setEmpties(tx.empties)
     setOriginalEmpties(tx.empties)
@@ -55,8 +66,16 @@ export function NewSale() {
     setLoadedEdit(true)
   }, [editing, loadedEdit, transactions, txId])
 
-  const customer = customers.find((c) => c.id === customerId)
-  const currentlyOwed = (customer?.empties_outstanding ?? 0) + originalEmpties
+  function handleProductChange(newProductId: number) {
+    setProductId(newProductId)
+    setEmpties(0)
+    const product = products.find((p) => p.id === newProductId)
+    setPriceEach(product ? String(product.price || '') : '')
+  }
+
+  const product = products.find((p) => p.id === productId)
+  const productBalance = productBalances.find((b) => b.product_id === productId)
+  const currentlyOwed = (productBalance?.empties_outstanding ?? 0) + originalEmpties
   const maxEmptiesTakeable = currentlyOwed + qty
   const price = Number(priceEach || 0)
   const saleTotal = qty * price
@@ -64,7 +83,7 @@ export function NewSale() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!customerId || qty <= 0 || price <= 0) {
+    if (!customerId || !productId || qty <= 0 || price <= 0) {
       setError('Quantity and price must be greater than zero')
       return
     }
@@ -102,6 +121,7 @@ export function NewSale() {
     const { error } = await supabase.from('transactions').insert({
       customer_id: customerId,
       type: 'sale',
+      product_id: productId,
       qty,
       empties,
       amount: saleTotal,
@@ -141,6 +161,20 @@ export function NewSale() {
           ))}
         </select>
 
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Product</p>
+        <select
+          value={productId ?? ''}
+          onChange={(e) => handleProductChange(Number(e.target.value))}
+          disabled={editing}
+          className="mb-5 h-[52px] w-full appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink disabled:opacity-60"
+        >
+          {products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Date</p>
         <input
           type="date"
@@ -150,7 +184,9 @@ export function NewSale() {
           className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
         />
 
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">19 kg cylinders sold</p>
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">
+          {product ? `${product.name} cylinders sold` : 'Cylinders sold'}
+        </p>
         <div className="mb-5">
           <Stepper value={qty} onChange={setQty} min={1} />
         </div>
