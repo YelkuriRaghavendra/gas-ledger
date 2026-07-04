@@ -18,6 +18,7 @@ export function NewSale() {
   const [qty, setQty] = useState(1)
   const [empties, setEmpties] = useState(0)
   const [priceEach, setPriceEach] = useState('')
+  const [received, setReceived] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -39,16 +40,34 @@ export function NewSale() {
       setError('Quantity and price must be greater than zero')
       return
     }
+    if (empties > qty) {
+      setError("Empties taken can't exceed cylinders sold.")
+      return
+    }
     setSaving(true)
     setError(null)
-    const { error } = await supabase.from('transactions').insert({
+    const saleRow = {
       customer_id: customerId,
-      type: 'sale',
+      type: 'sale' as const,
       qty,
       empties,
       amount: saleTotal,
       created_by: session?.user.id,
-    })
+    }
+    const rows = received
+      ? [
+          saleRow,
+          {
+            customer_id: customerId,
+            type: 'payment' as const,
+            qty: 0,
+            empties: 0,
+            amount: saleTotal,
+            created_by: session?.user.id,
+          },
+        ]
+      : [saleRow]
+    const { error } = await supabase.from('transactions').insert(rows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -98,6 +117,28 @@ export function NewSale() {
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Empties taken</p>
             <Stepper value={empties} onChange={setEmpties} min={0} variant="secondary" />
           </div>
+        </div>
+
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Payment</p>
+        <div className="mb-5 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setReceived(false)}
+            className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
+              !received ? 'border-accent bg-accent text-white' : 'border-borderMuted bg-white text-ink'
+            }`}
+          >
+            On credit
+          </button>
+          <button
+            type="button"
+            onClick={() => setReceived(true)}
+            className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
+              received ? 'border-accent bg-accent text-white' : 'border-borderMuted bg-white text-ink'
+            }`}
+          >
+            Received now
+          </button>
         </div>
 
         <div className="mb-6 rounded-2xl border border-[#F3D9C6] bg-[#FBEDE4] p-4">
