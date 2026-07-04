@@ -22,6 +22,8 @@ This spec covers Phase 1 only. Phases 2 and 3 have their own specs and depend on
 
 ## Data model
 
+**Migration numbering across the three phases:** the latest migration on disk is `005_starting_empties.sql`. This spec's migration is `supabase/migrations/006_products.sql`. Phase 2's migration is `007_purchases_and_godown.sql` and Phase 3's is `008_reporting_views.sql` — both fixed numbers now that this phase claims `006`, so all three specs agree.
+
 **New `products` table:**
 
 ```sql

@@ -12,7 +12,7 @@ Phase 3 (reporting/insights) is not covered here and has its own spec.
 
 ## Data model
 
-**New migration file:** `supabase/migrations/006_purchases_and_godown.sql`
+**New migration file:** `supabase/migrations/007_purchases_and_godown.sql` (Phase 1's migration claims `006_products.sql`, so this phase's migration is `007`, per the numbering note in the Phase 1 spec).
 
 **New `purchases` table.** A purchase from the supplier is structurally the same swap as a sale to a customer — the agency receives full cylinders and hands back empties, optionally settling payment immediately or on credit — so the table shape mirrors `transactions` directly rather than inventing new field names:
 
