@@ -30,6 +30,10 @@ export function LogReturn() {
       setError('Quantity must be greater than zero')
       return
     }
+    if (qty > currentlyOwed) {
+      setError(`Can't return more than the ${currentlyOwed} empties outstanding.`)
+      return
+    }
     setSaving(true)
     setError(null)
     const { error } = await supabase.from('transactions').insert({
