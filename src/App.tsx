@@ -15,6 +15,9 @@ import { Account } from './pages/Account'
 import { BusinessDetails } from './pages/BusinessDetails'
 import { CylinderPricing } from './pages/CylinderPricing'
 import { ExportLedger } from './pages/ExportLedger'
+import { Purchases } from './pages/Purchases'
+import { RecordPurchase } from './pages/RecordPurchase'
+import { Godown } from './pages/Godown'
 
 export default function App() {
   const location = useLocation()
@@ -44,6 +47,10 @@ export default function App() {
           <Route path="/account/business" element={<BusinessDetails />} />
           <Route path="/account/pricing" element={<CylinderPricing />} />
           <Route path="/account/export" element={<ExportLedger />} />
+          <Route path="/purchases" element={<Purchases />} />
+          <Route path="/purchases/new" element={<RecordPurchase />} />
+          <Route path="/purchases/:txId/edit" element={<RecordPurchase />} />
+          <Route path="/godown" element={<Godown />} />
         </Route>
       </Routes>
       {!hideNav && <BottomNav />}
