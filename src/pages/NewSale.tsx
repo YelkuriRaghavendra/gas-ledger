@@ -57,6 +57,7 @@ export function NewSale() {
 
   const customer = customers.find((c) => c.id === customerId)
   const currentlyOwed = (customer?.empties_outstanding ?? 0) + originalEmpties
+  const maxEmptiesTakeable = currentlyOwed + qty
   const price = Number(priceEach || 0)
   const saleTotal = qty * price
   const newEmptiesOwed = qty - empties
@@ -67,8 +68,8 @@ export function NewSale() {
       setError('Quantity and price must be greater than zero')
       return
     }
-    if (empties > currentlyOwed) {
-      setError(`Can't collect more than the ${currentlyOwed} empties outstanding.`)
+    if (empties > maxEmptiesTakeable) {
+      setError(`Can't collect more than ${maxEmptiesTakeable} empties (${currentlyOwed} outstanding + ${qty} from this sale).`)
       return
     }
     setSaving(true)
