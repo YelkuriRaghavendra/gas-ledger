@@ -9,6 +9,7 @@ export function AddCustomer() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
+  const [startingEmpties, setStartingEmpties] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,7 +25,11 @@ export function AddCustomer() {
     }
     setSaving(true)
     setError(null)
-    const { data, error } = await supabase.from('customers').insert({ name, phone, address }).select('id').single()
+    const { data, error } = await supabase
+      .from('customers')
+      .insert({ name, phone, address, starting_empties_owed: Number(startingEmpties || 0) })
+      .select('id')
+      .single()
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -69,6 +74,18 @@ export function AddCustomer() {
             onChange={(e) => setAddress(e.target.value)}
             className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
           />
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Empties already owed (optional)</p>
+          <input
+            type="number"
+            min="0"
+            placeholder="0"
+            value={startingEmpties}
+            onChange={(e) => setStartingEmpties(e.target.value)}
+            className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
+          />
+          <p className="mt-1 text-xs text-muted">If this customer already had cylinders from before you started using this app</p>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

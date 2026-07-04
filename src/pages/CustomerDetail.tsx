@@ -106,6 +106,7 @@ export function CustomerDetail() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
+  const [startingEmpties, setStartingEmpties] = useState('')
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
@@ -115,6 +116,7 @@ export function CustomerDetail() {
     setName(balance.name)
     setPhone(balance.phone ?? '')
     setAddress(balance.address ?? '')
+    setStartingEmpties(String(balance.starting_empties_owed))
     setEditing(true)
   }
 
@@ -126,7 +128,10 @@ export function CustomerDetail() {
     }
     setSaving(true)
     setActionError(null)
-    const { error } = await supabase.from('customers').update({ name, phone, address }).eq('id', customerId)
+    const { error } = await supabase
+      .from('customers')
+      .update({ name, phone, address, starting_empties_owed: Number(startingEmpties || 0) })
+      .eq('id', customerId)
     setSaving(false)
     if (error) {
       setActionError(error.message)
@@ -192,6 +197,17 @@ export function CustomerDetail() {
             onChange={(e) => setAddress(e.target.value)}
             className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
           />
+          <div>
+            <input
+              type="number"
+              min="0"
+              placeholder="Empties already owed"
+              value={startingEmpties}
+              onChange={(e) => setStartingEmpties(e.target.value)}
+              className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+            />
+            <p className="mt-1 text-xs text-muted">Starting empties-owed balance (not from a sale in this app)</p>
+          </div>
           <div className="flex gap-2">
             <button type="submit" disabled={saving} className="flex-1 rounded-[14px] bg-accent py-2 font-bold text-white">
               {saving ? 'Saving…' : 'Save'}

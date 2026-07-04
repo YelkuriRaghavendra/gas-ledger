@@ -14,6 +14,7 @@ export interface Customer {
   name: string
   phone: string | null
   address: string | null
+  starting_empties_owed: number
   created_at: string
 }
 
@@ -36,6 +37,7 @@ export interface CustomerBalance {
   name: string
   phone: string | null
   address: string | null
+  starting_empties_owed: number
   sold: number
   returned: number
   empties_outstanding: number
