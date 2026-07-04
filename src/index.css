@@ -5,7 +5,10 @@
 body {
   margin: 0;
   font-family: 'Manrope', system-ui, sans-serif;
-  background-color: #DED6C9;
+  background-color: #F4EFE6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 h1,
