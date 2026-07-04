@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ChevronLeftIcon } from '../components/icons'
+import { isValidPhone } from '../utils/validation'
 
 export function AddCustomer() {
   const navigate = useNavigate()
@@ -15,6 +16,10 @@ export function AddCustomer() {
     e.preventDefault()
     if (!name.trim()) {
       setError('Enter a name')
+      return
+    }
+    if (phone.trim() && !isValidPhone(phone)) {
+      setError('Enter a valid 10-digit phone number')
       return
     }
     setSaving(true)
