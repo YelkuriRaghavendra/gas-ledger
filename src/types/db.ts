@@ -9,12 +9,20 @@ export interface Profile {
 export type TransactionType = 'sale' | 'return' | 'payment'
 export type PaymentMethod = 'cash' | 'upi'
 
+export interface Product {
+  id: number
+  name: string
+  price: number
+  created_at: string
+}
+
 export interface Customer {
   id: number
   name: string
   phone: string | null
   address: string | null
   starting_empties_owed: number
+  starting_empties_product_id: number
   created_at: string
 }
 
@@ -22,6 +30,7 @@ export interface Transaction {
   id: number
   customer_id: number
   type: TransactionType
+  product_id: number | null
   qty: number
   empties: number
   amount: number
@@ -38,10 +47,16 @@ export interface CustomerBalance {
   phone: string | null
   address: string | null
   starting_empties_owed: number
+  amount_due: number
+}
+
+export interface CustomerProductBalance {
+  customer_id: number
+  product_id: number
+  product_name: string
   sold: number
   returned: number
   empties_outstanding: number
-  amount_due: number
 }
 
 export interface ActivityEntry {
@@ -49,6 +64,8 @@ export interface ActivityEntry {
   customer_id: number
   customer_name: string
   type: TransactionType
+  product_id: number | null
+  product_name: string | null
   qty: number
   empties: number
   amount: number
