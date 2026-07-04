@@ -17,8 +17,8 @@ export function CylinderPricing() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const priceNum = Number(price)
-    if (priceNum < 0) {
-      setError('Price cannot be negative')
+    if (priceNum <= 0) {
+      setError('Price must be greater than zero')
       return
     }
     setSaving(true)
