@@ -6,10 +6,22 @@ import { useCustomerBalance } from '../hooks/useCustomerBalance'
 import { useTransactions } from '../hooks/useTransactions'
 import { formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
+import { isValidPhone } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
 import { HeroCard } from '../components/HeroCard'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon } from '../components/icons'
 import type { Transaction } from '../types/db'
+
+type HistoryEntry = Transaction & { balanceAfter: number }
+
+interface HistoryGroup {
+  key: string
+  label: string
+  entries: HistoryEntry[]
+  sales: number
+  returns: number
+  collected: number
+}
 
 function historyTitle(t: Transaction) {
   if (t.type === 'sale') return `${t.qty} cylinders sold`
@@ -28,6 +40,45 @@ function historyAmount(t: Transaction) {
   if (t.type === 'sale') return `+${t.qty}`
   if (t.type === 'return') return `−${t.qty}`
   return formatCurrency(t.amount)
+}
+
+function dayKey(iso: string) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+
+function buildHistoryGroups(transactions: Transaction[]): HistoryGroup[] {
+  const chronological = [...transactions].reverse()
+  let running = 0
+  const withBalance: HistoryEntry[] = chronological.map((t) => {
+    if (t.type === 'sale') running += t.amount
+    else if (t.type === 'payment') running -= t.amount
+    return { ...t, balanceAfter: running }
+  })
+  const newestFirst = [...withBalance].reverse()
+
+  const groups: HistoryGroup[] = []
+  for (const t of newestFirst) {
+    const key = dayKey(t.created_at)
+    let group = groups.find((g) => g.key === key)
+    if (!group) {
+      group = { key, label: formatRelativeDate(t.created_at), entries: [], sales: 0, returns: 0, collected: 0 }
+      groups.push(group)
+    }
+    group.entries.push(t)
+    if (t.type === 'sale') group.sales += 1
+    if (t.type === 'return') group.returns += 1
+    if (t.type === 'payment') group.collected += t.amount
+  }
+  return groups
+}
+
+function digestLine(group: HistoryGroup) {
+  const parts: string[] = []
+  if (group.sales > 0) parts.push(`${group.sales} sale${group.sales > 1 ? 's' : ''}`)
+  if (group.returns > 0) parts.push(`${group.returns} return${group.returns > 1 ? 's' : ''}`)
+  if (group.collected > 0) parts.push(`${formatCurrency(group.collected)} collected`)
+  return parts.join(' · ')
 }
 
 export function CustomerDetail() {
@@ -55,6 +106,10 @@ export function CustomerDetail() {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
+    if (phone.trim() && !isValidPhone(phone)) {
+      setActionError('Enter a valid 10-digit phone number')
+      return
+    }
     setSaving(true)
     setActionError(null)
     const { error } = await supabase.from('customers').update({ name, phone, address }).eq('id', customerId)
@@ -92,6 +147,8 @@ export function CustomerDetail() {
 
   if (loading) return <p className="p-4 text-muted">Loading…</p>
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
+
+  const historyGroups = buildHistoryGroups(transactions)
 
   return (
     <div className="p-5 pb-10 pt-2">
@@ -223,36 +280,45 @@ export function CustomerDetail() {
       </div>
 
       <h2 className="mb-3 font-display text-base font-semibold text-ink">History</h2>
-      <ul className="flex flex-col gap-0">
-        {transactions.map((t) => {
-          const tint = getActivityTint(t.type)
-          return (
-            <li key={t.id} className="flex gap-[14px] pb-[18px]">
-              <div
-                className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] text-[15px]"
-                style={{ backgroundColor: tint.bg, color: tint.color }}
-              >
-                {getActivityIcon(t.type)}
-              </div>
-              <div className="flex-1 pt-px">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-sm font-bold text-ink">{historyTitle(t)}</p>
-                  <p className="font-display text-sm font-bold" style={{ color: tint.color }}>
-                    {historyAmount(t)}
-                  </p>
-                </div>
-                <p className="mt-[2px] text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
-              </div>
-              {isOwner && (
-                <button onClick={() => handleDeleteTransaction(t.id)} className="shrink-0 self-start text-xs font-bold text-red-600">
-                  Delete
-                </button>
-              )}
-            </li>
-          )
-        })}
-        {transactions.length === 0 && <p className="text-muted">No transactions yet.</p>}
-      </ul>
+      {historyGroups.map((group) => (
+        <div key={group.key} className="mb-5">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-[0.5px] text-muted">{group.label}</p>
+            {digestLine(group) && <p className="text-xs font-medium text-[#9A8F80]">{digestLine(group)}</p>}
+          </div>
+          <ul className="flex flex-col gap-0">
+            {group.entries.map((t) => {
+              const tint = getActivityTint(t.type)
+              return (
+                <li key={t.id} className="flex gap-[14px] pb-[18px]">
+                  <div
+                    className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] text-[15px]"
+                    style={{ backgroundColor: tint.bg, color: tint.color }}
+                  >
+                    {getActivityIcon(t.type)}
+                  </div>
+                  <div className="flex-1 pt-px">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-bold text-ink">{historyTitle(t)}</p>
+                      <p className="font-display text-sm font-bold" style={{ color: tint.color }}>
+                        {historyAmount(t)}
+                      </p>
+                    </div>
+                    <p className="mt-[2px] text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
+                    <p className="mt-[1px] text-xs font-semibold text-muted">Balance: {formatCurrency(t.balanceAfter)}</p>
+                  </div>
+                  {isOwner && (
+                    <button onClick={() => handleDeleteTransaction(t.id)} className="shrink-0 self-start text-xs font-bold text-red-600">
+                      Delete
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+      {transactions.length === 0 && <p className="text-muted">No transactions yet.</p>}
     </div>
   )
 }
