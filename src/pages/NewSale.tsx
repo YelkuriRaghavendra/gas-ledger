@@ -28,6 +28,7 @@ export function NewSale() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loadedEdit, setLoadedEdit] = useState(false)
+  const [originalEmpties, setOriginalEmpties] = useState(0)
 
   const editing = Boolean(txId)
 
@@ -45,6 +46,7 @@ export function NewSale() {
     if (!tx) return
     setQty(tx.qty)
     setEmpties(tx.empties)
+    setOriginalEmpties(tx.empties)
     setPriceEach(tx.qty > 0 ? String(tx.amount / tx.qty) : String(tx.amount))
     setDate(dateInputValue(tx.created_at))
     setReceived(tx.paid)
@@ -53,6 +55,8 @@ export function NewSale() {
     setLoadedEdit(true)
   }, [editing, loadedEdit, transactions, txId])
 
+  const customer = customers.find((c) => c.id === customerId)
+  const currentlyOwed = (customer?.empties_outstanding ?? 0) + originalEmpties
   const price = Number(priceEach || 0)
   const saleTotal = qty * price
   const newEmptiesOwed = qty - empties
@@ -63,8 +67,8 @@ export function NewSale() {
       setError('Quantity and price must be greater than zero')
       return
     }
-    if (empties > qty) {
-      setError("Empties taken can't exceed cylinders sold.")
+    if (empties > currentlyOwed) {
+      setError(`Can't collect more than the ${currentlyOwed} empties outstanding.`)
       return
     }
     setSaving(true)
@@ -148,6 +152,11 @@ export function NewSale() {
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">19 kg cylinders sold</p>
         <div className="mb-5">
           <Stepper value={qty} onChange={setQty} min={1} />
+        </div>
+
+        <div className="mb-5 flex items-center justify-between rounded-2xl bg-ink px-4 py-[14px] text-white">
+          <span className="text-[13px] font-semibold text-mutedOnDark">Currently owed by customer</span>
+          <span className="font-display font-bold text-accent">{currentlyOwed} empties</span>
         </div>
 
         <div className="mb-5 flex gap-3">
