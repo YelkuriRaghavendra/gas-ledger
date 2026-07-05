@@ -203,12 +203,21 @@ export function NewSale() {
             </div>
           </div>
 
-          <div className="mb-4">
-            <p className={fieldLabel}>{product ? `${product.name} sold` : 'Cylinders sold'}</p>
-            <Stepper value={qty} onChange={setQty} min={1} />
+          <div className="flex gap-3">
+            <div className="min-w-0 flex-1">
+              <p className={fieldLabel}>{product ? `${product.name} sold` : 'Sold'}</p>
+              <Stepper value={qty} onChange={setQty} min={1} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={fieldLabel}>Empties taken</p>
+              <Stepper value={empties} onChange={setEmpties} min={0} variant="secondary" />
+            </div>
           </div>
+          <p className="mb-4 mt-2 text-[12px] font-semibold text-muted">
+            Customer owes <span className="font-bold text-[#C23B22]">{currentlyOwed}</span> empties
+          </p>
 
-          <div className="mb-4">
+          <div>
             <p className={fieldLabel}>Price each (₹)</p>
             <input
               type="number"
@@ -218,14 +227,6 @@ export function NewSale() {
               onChange={(e) => setPriceEach(e.target.value)}
               className={fieldInput}
             />
-          </div>
-
-          <div>
-            <p className={fieldLabel}>Empties taken</p>
-            <Stepper value={empties} onChange={setEmpties} min={0} variant="secondary" />
-            <p className="mt-2 text-[12px] font-semibold text-muted">
-              Customer owes <span className="font-bold text-[#C23B22]">{currentlyOwed}</span> empties
-            </p>
           </div>
 
           <div className="mt-4">

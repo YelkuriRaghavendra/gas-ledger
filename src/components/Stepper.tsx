@@ -32,7 +32,7 @@ export function Stepper({ value, onChange, min = 0, variant = 'primary' }: Stepp
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="flex h-[44px] w-[44px] items-center justify-center rounded-[11px] bg-surface text-[24px] font-semibold leading-none text-ink shadow-card active:scale-95"
+        className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[11px] bg-surface text-[24px] font-semibold leading-none text-ink shadow-card active:scale-95"
       >
         −
       </button>
@@ -47,7 +47,7 @@ export function Stepper({ value, onChange, min = 0, variant = 'primary' }: Stepp
       <button
         type="button"
         onClick={() => onChange(value + 1)}
-        className={`flex h-[44px] w-[44px] items-center justify-center rounded-[11px] ${plusBg} text-[24px] font-semibold leading-none text-white active:scale-95`}
+        className={`flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[11px] ${plusBg} text-[24px] font-semibold leading-none text-white active:scale-95`}
       >
         +
       </button>
