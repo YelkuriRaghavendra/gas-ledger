@@ -25,43 +25,14 @@ export function Stepper({ value, onChange, min = 0, variant = 'primary' }: Stepp
     if (text === '') setText(String(value))
   }
 
-  if (variant === 'secondary') {
-    return (
-      <div className="flex h-[52px] items-center justify-between rounded-[14px] border-[1.5px] border-borderMuted bg-white px-2 py-[6px]">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(min, value - 1))}
-          className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] text-[22px] leading-none"
-          style={{ backgroundColor: '#EAF4EE', color: '#2E8B57' }}
-        >
-          −
-        </button>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={text}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onBlur={handleBlur}
-          className="w-16 border-none bg-transparent text-center font-display text-xl font-bold text-ink focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={() => onChange(value + 1)}
-          className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] text-[22px] leading-none"
-          style={{ backgroundColor: '#EAF4EE', color: '#2E8B57' }}
-        >
-          +
-        </button>
-      </div>
-    )
-  }
+  const plusBg = variant === 'secondary' ? 'bg-[#2E8B57]' : 'bg-accent'
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border-[1.5px] border-borderMuted bg-white px-[10px] py-2">
+    <div className="flex items-center justify-between rounded-[14px] bg-cream p-[6px]">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-[#F1E7D6] text-[26px] font-semibold leading-none text-ink"
+        className="flex h-[44px] w-[44px] items-center justify-center rounded-[11px] bg-surface text-[24px] font-semibold leading-none text-ink shadow-card active:scale-95"
       >
         −
       </button>
@@ -71,12 +42,12 @@ export function Stepper({ value, onChange, min = 0, variant = 'primary' }: Stepp
         value={text}
         onChange={(e) => handleTextChange(e.target.value)}
         onBlur={handleBlur}
-        className="w-20 border-none bg-transparent text-center font-display text-[32px] font-bold text-ink focus:outline-none"
+        className="min-w-0 flex-1 border-none bg-transparent text-center font-display text-[26px] font-bold text-ink focus:outline-none"
       />
       <button
         type="button"
         onClick={() => onChange(value + 1)}
-        className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-accent text-[26px] font-semibold leading-none text-white"
+        className={`flex h-[44px] w-[44px] items-center justify-center rounded-[11px] ${plusBg} text-[24px] font-semibold leading-none text-white active:scale-95`}
       >
         +
       </button>
