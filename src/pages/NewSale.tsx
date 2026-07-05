@@ -253,7 +253,7 @@ export function NewSale() {
                     <span className="text-[13px] font-bold text-accent">+ Add to sale</span>
                   </button>
                 ) : (
-                  <div className="rounded-[16px] border border-borderMuted p-4">
+                  <div className="rounded-[16px] bg-cream p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
@@ -279,11 +279,11 @@ export function NewSale() {
                     <div className="mt-3 flex gap-3">
                       <div className="min-w-0 flex-1">
                         <p className={fieldLabel}>Sold</p>
-                        <Stepper value={qtyByProduct[p.id] ?? 0} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} />
+                        <Stepper value={qtyByProduct[p.id] ?? 0} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} tone="surface" size="sm" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={fieldLabel}>Empties taken</p>
-                        <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" />
+                        <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" tone="surface" size="sm" />
                       </div>
                     </div>
                     <div className="mt-3">
@@ -294,7 +294,7 @@ export function NewSale() {
                         step="0.01"
                         value={priceByProduct[p.id] ?? ''}
                         onChange={(e) => setPrice(p.id, e.target.value)}
-                        className={fieldInput}
+                        className={`${fieldInput} !bg-surface`}
                       />
                     </div>
                     <p className="mt-2 text-[12px] font-semibold text-muted">
