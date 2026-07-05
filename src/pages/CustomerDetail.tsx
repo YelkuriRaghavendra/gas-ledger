@@ -200,24 +200,24 @@ export function CustomerDetail() {
       {actionError && <p className="mb-4 text-sm text-red-600">{actionError}</p>}
 
       {editing ? (
-        <form onSubmit={handleSave} className="mb-[18px] space-y-3 rounded-2xl border border-[#EFE7D8] bg-white p-4">
+        <form onSubmit={handleSave} className="mb-[18px] space-y-3 rounded-[20px] bg-surface p-[18px] shadow-card">
           <input
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <input
             inputMode="numeric"
             maxLength={10}
             value={phone}
             onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <div>
             <div className="flex gap-2">
@@ -243,14 +243,18 @@ export function CustomerDetail() {
             </div>
             <p className="mt-1 text-xs text-muted">Starting empties-owed balance (not from a sale in this app)</p>
           </div>
-          <div className="flex gap-2">
-            <button type="submit" disabled={saving} className="flex-1 rounded-[14px] bg-accent py-2 font-bold text-white">
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={saving}
+              className="h-[48px] flex-1 rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
+            >
               {saving ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="flex-1 rounded-[14px] border-[1.5px] border-borderMuted py-2 font-bold text-ink"
+              className="h-[48px] flex-1 rounded-[14px] border-[1.5px] border-borderMuted bg-surface font-bold text-ink"
             >
               Cancel
             </button>
@@ -280,7 +284,7 @@ export function CustomerDetail() {
         {balance.phone && (
           <a
             href={`tel:${balance.phone}`}
-            className="flex flex-1 items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-borderMuted bg-white py-[11px] text-[13.5px] font-bold text-ink"
+            className="flex flex-1 items-center justify-center gap-[7px] rounded-[14px] bg-surface py-[12px] text-[13.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
           >
             <PhoneIcon size={16} /> Call
           </a>
@@ -290,7 +294,7 @@ export function CustomerDetail() {
             href={`https://maps.google.com/?q=${encodeURIComponent(balance.address)}`}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-[7px] overflow-hidden rounded-[13px] border-[1.5px] border-borderMuted bg-white py-[11px] text-[12.5px] font-semibold text-muted"
+            className="flex flex-1 items-center justify-center gap-[7px] overflow-hidden rounded-[14px] bg-surface py-[12px] text-[12.5px] font-semibold text-muted shadow-card transition active:scale-[0.98]"
           >
             <MapPinIcon size={16} />
             <span className="truncate">{balance.address}</span>
@@ -322,49 +326,49 @@ export function CustomerDetail() {
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-between rounded-2xl bg-ink px-4 py-[14px] text-white">
+      <div className="mt-3 flex items-center justify-between rounded-[18px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
         <span className="text-[13px] font-semibold text-[#C9BBA8]">Amount due</span>
-        <span className="font-display text-xl font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
+        <span className="font-display text-[22px] font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
       </div>
 
-      <div className="my-[18px] grid grid-cols-3 gap-2">
+      <div className="my-[18px] grid grid-cols-3 gap-3">
         <Link
           to={`/customers/${customerId}/sale`}
-          className="flex flex-col items-center gap-[5px] rounded-[13px] bg-accent py-3 text-[13px] font-bold text-white"
+          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-gradient-to-br from-accentSoft to-accent py-[14px] text-[13px] font-bold text-white shadow-glow transition active:scale-[0.97]"
         >
-          <PlusIcon size={18} strokeWidth={2.2} />
+          <PlusIcon size={20} strokeWidth={2.3} />
           Sale
         </Link>
         <Link
           to={`/customers/${customerId}/return`}
-          className="flex flex-col items-center gap-[5px] rounded-[13px] border-[1.5px] border-borderMuted bg-white py-3 text-[13px] font-bold text-ink"
+          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-surface py-[14px] text-[13px] font-bold text-ink shadow-card transition active:scale-[0.97]"
         >
-          <ReturnIcon size={18} strokeWidth={2.2} />
+          <ReturnIcon size={20} color="#2E8B57" strokeWidth={2.2} />
           Return
         </Link>
         <Link
           to={`/customers/${customerId}/payment`}
-          className="flex flex-col items-center gap-[5px] rounded-[13px] border-[1.5px] border-borderMuted bg-white py-3 text-[13px] font-bold text-ink"
+          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-surface py-[14px] text-[13px] font-bold text-ink shadow-card transition active:scale-[0.97]"
         >
-          <CreditCardIcon size={18} strokeWidth={2.2} />
+          <CreditCardIcon size={20} color="#3B6EA5" strokeWidth={2.2} />
           Payment
         </Link>
       </div>
 
-      <h2 className="mb-3 font-display text-base font-semibold text-ink">History</h2>
+      <h2 className="mb-3 font-display text-[18px] font-bold tracking-[-0.3px] text-ink">History</h2>
       {historyGroups.map((group) => (
         <div key={group.key} className="mb-5">
-          <div className="mb-2 flex items-baseline justify-between gap-2">
+          <div className="mb-2 flex items-baseline justify-between gap-2 px-1">
             <p className="text-xs font-bold uppercase tracking-[0.5px] text-muted">{group.label}</p>
-            {digestLine(group) && <p className="text-xs font-medium text-[#9A8F80]">{digestLine(group)}</p>}
+            {digestLine(group) && <p className="text-xs font-medium text-subtle">{digestLine(group)}</p>}
           </div>
-          <ul className="flex flex-col gap-0">
+          <ul className="flex flex-col gap-3 rounded-[18px] bg-surface p-[14px] shadow-card">
             {group.entries.map((t) => {
               const tint = getActivityTint(t.type)
               return (
-                <li key={t.id} className="flex gap-[14px] pb-[18px]">
+                <li key={t.id} className="flex gap-[13px]">
                   <div
-                    className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] text-[15px]"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-lg"
                     style={{ backgroundColor: tint.bg, color: tint.color }}
                   >
                     {getActivityIcon(t.type)}

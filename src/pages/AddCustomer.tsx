@@ -65,7 +65,7 @@ export function AddCustomer() {
             placeholder="Business or person"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
+            className="h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface px-4 font-semibold text-ink shadow-card"
           />
         </div>
         <div>
@@ -76,7 +76,7 @@ export function AddCustomer() {
             maxLength={10}
             value={phone}
             onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
-            className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
+            className="h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface px-4 font-semibold text-ink shadow-card"
           />
         </div>
         <div>
@@ -85,7 +85,7 @@ export function AddCustomer() {
             placeholder="Locality / area"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-4 font-semibold text-ink"
+            className="h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface px-4 font-semibold text-ink shadow-card"
           />
         </div>
         <div>
@@ -118,7 +118,7 @@ export function AddCustomer() {
         <button
           type="submit"
           disabled={saving}
-          className="h-[54px] w-full rounded-[14px] bg-ink font-bold text-white disabled:opacity-50"
+          className="h-[54px] w-full rounded-[16px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Add customer'}
         </button>
