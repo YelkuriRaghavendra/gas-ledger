@@ -21,14 +21,14 @@ function SegmentedControl<T extends string | number>({
   onChange: (v: T) => void
 }) {
   return (
-    <div className="inline-flex rounded-full bg-white p-1">
+    <div className="inline-flex rounded-full bg-surface p-1 shadow-card">
       {options.map((opt) => (
         <button
           key={String(opt.value)}
           type="button"
           onClick={() => onChange(opt.value)}
           className={`rounded-full px-4 py-[7px] text-[13px] font-bold transition-colors ${
-            value === opt.value ? 'bg-accent text-white' : 'text-muted'
+            value === opt.value ? 'bg-gradient-to-br from-accentSoft to-accent text-white' : 'text-muted'
           }`}
         >
           {opt.label}
@@ -108,7 +108,7 @@ export function Reports() {
 
   return (
     <div className="p-5 pb-[110px] pt-2">
-      <h1 className="mb-4 font-display text-2xl font-bold tracking-[-0.4px] text-ink">Reports</h1>
+      <h1 className="mb-5 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Reports</h1>
 
       <div className="mb-4">
         <SegmentedControl
@@ -168,7 +168,7 @@ export function Reports() {
             </div>
           </HeroCard>
 
-          <div className="mt-[14px] rounded-[20px] border border-[#EFE7D8] bg-white p-5">
+          <div className="mt-[14px] rounded-[20px] bg-surface p-5 shadow-card">
             <h2 className="mb-3 font-display text-[17px] font-semibold text-ink">By product</h2>
             <div className="flex flex-col gap-3">
               {products.map((p) => {
@@ -222,7 +222,7 @@ export function Reports() {
             )}
           </div>
 
-          <div className="mt-[14px] rounded-[20px] border border-[#EFE7D8] bg-white p-5">
+          <div className="mt-[14px] rounded-[20px] bg-surface p-5 shadow-card">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-[17px] font-semibold text-ink">Revenue trend</h2>
               <SegmentedControl
@@ -244,7 +244,7 @@ export function Reports() {
                   {trend.data.map((d) => {
                     const pct = Math.max(4, (d.revenue / maxTrendRevenue) * 100)
                     return (
-                      <div key={d.day} className="flex-1 rounded-t-md bg-accent" style={{ height: `${pct}%` }} />
+                      <div key={d.day} className="flex-1 rounded-t-md bg-gradient-to-t from-accent to-accentSoft" style={{ height: `${pct}%` }} />
                     )
                   })}
                 </div>
