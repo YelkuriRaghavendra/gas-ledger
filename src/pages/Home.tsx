@@ -39,14 +39,6 @@ export function Home() {
     }
   })
 
-  const alerts: { tone: 'danger' | 'warn'; text: string }[] = []
-  for (const p of productRows) {
-    if (p.full <= 0) alerts.push({ tone: 'danger', text: `Out of ${p.name} stock — reorder now` })
-    else if (p.full <= 5) alerts.push({ tone: 'warn', text: `Low ${p.name} stock · ${p.full} left` })
-    if (p.capacity && p.empty >= p.capacity * 0.8)
-      alerts.push({ tone: 'warn', text: `Godown almost full of ${p.name} empties — send to plant` })
-  }
-
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
@@ -88,27 +80,6 @@ export function Home() {
             </Link>
           </HeroCard>
 
-          {alerts.length > 0 && (
-            <div className="mt-4 flex flex-col gap-2">
-              {alerts.map((a, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-[10px] rounded-[14px] px-[14px] py-3 text-[13px] font-bold"
-                  style={
-                    a.tone === 'danger'
-                      ? { backgroundColor: '#FBE9E4', color: '#C23B22' }
-                      : { backgroundColor: '#FBF0DD', color: '#9A6A1A' }
-                  }
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                    <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-                  </svg>
-                  {a.text}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Per-product inventory — the core of a two-product agency at a glance */}
           <div className="mb-3 mt-6 flex items-baseline justify-between">
             <h2 className="font-display text-[18px] font-bold tracking-[-0.3px] text-ink">Cylinders</h2>
@@ -116,31 +87,22 @@ export function Home() {
               Godown ›
             </Link>
           </div>
-          <div className="flex flex-col gap-[11px]">
+          <div className="grid grid-cols-2 gap-3">
             {productRows.map((p) => (
-              <div key={p.id} className="rounded-[20px] bg-surface p-[16px] shadow-card">
-                <div className="mb-[14px] flex items-center gap-2">
-                  <span className="rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
-                    {p.name}
-                  </span>
-                </div>
-                <div className="flex items-stretch">
+              <div key={p.id} className="rounded-[18px] bg-surface p-4 shadow-card">
+                <span className="inline-block rounded-lg bg-ink px-[9px] py-[3px] font-display text-[12px] font-bold text-white">
+                  {p.name}
+                </span>
+                <p className="mt-[14px] font-display text-[30px] font-bold leading-none text-[#F26B2C]">{p.emptiesOut}</p>
+                <p className="mt-[4px] text-[11px] font-semibold text-subtle">empties with customers</p>
+                <div className="mt-[14px] flex gap-2 border-t border-borderMuted pt-[12px]">
                   <div className="flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">With customers</p>
-                    <p className="mt-[3px] font-display text-[24px] font-bold text-[#FF8A4C]">{p.emptiesOut}</p>
-                    <p className="text-[11px] font-semibold text-subtle">empties out</p>
+                    <p className="font-display text-[17px] font-bold text-ink">{p.full}</p>
+                    <p className="text-[10.5px] font-semibold text-subtle">full</p>
                   </div>
-                  <div className="mx-2 w-px bg-borderMuted" />
                   <div className="flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">Godown full</p>
-                    <p className="mt-[3px] font-display text-[24px] font-bold text-ink">{p.full}</p>
-                    <p className="text-[11px] font-semibold text-subtle">ready to sell</p>
-                  </div>
-                  <div className="mx-2 w-px bg-borderMuted" />
-                  <div className="flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">Godown empty</p>
-                    <p className="mt-[3px] font-display text-[24px] font-bold text-[#2E8B57]">{p.empty}</p>
-                    <p className="text-[11px] font-semibold text-subtle">to return</p>
+                    <p className="font-display text-[17px] font-bold text-[#2E8B57]">{p.empty}</p>
+                    <p className="text-[10.5px] font-semibold text-subtle">empty</p>
                   </div>
                 </div>
               </div>
