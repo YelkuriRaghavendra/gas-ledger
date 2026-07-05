@@ -35,8 +35,17 @@ export function Home() {
       emptiesOut: emptiesOutByProduct.get(p.id) ?? 0,
       full: g?.full_cylinders ?? 0,
       empty: g?.empty_cylinders ?? 0,
+      capacity: g?.godown_capacity ?? null,
     }
   })
+
+  const alerts: { tone: 'danger' | 'warn'; text: string }[] = []
+  for (const p of productRows) {
+    if (p.full <= 0) alerts.push({ tone: 'danger', text: `Out of ${p.name} stock — reorder now` })
+    else if (p.full <= 5) alerts.push({ tone: 'warn', text: `Low ${p.name} stock · ${p.full} left` })
+    if (p.capacity && p.empty >= p.capacity * 0.8)
+      alerts.push({ tone: 'warn', text: `Godown almost full of ${p.name} empties — send to plant` })
+  }
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -78,6 +87,27 @@ export function Home() {
               from {customersWithDue} customer{customersWithDue === 1 ? '' : 's'} ›
             </Link>
           </HeroCard>
+
+          {alerts.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2">
+              {alerts.map((a, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-[10px] rounded-[14px] px-[14px] py-3 text-[13px] font-bold"
+                  style={
+                    a.tone === 'danger'
+                      ? { backgroundColor: '#FBE9E4', color: '#C23B22' }
+                      : { backgroundColor: '#FBF0DD', color: '#9A6A1A' }
+                  }
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                    <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                  </svg>
+                  {a.text}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Per-product inventory — the core of a two-product agency at a glance */}
           <div className="mb-3 mt-6 flex items-baseline justify-between">
