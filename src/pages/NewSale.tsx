@@ -19,20 +19,23 @@ export function NewSale() {
   const { data: products } = useProducts()
   const { data: transactions } = useTransactions(id ? Number(id) : 0)
   const [customerId, setCustomerId] = useState<number | null>(id ? Number(id) : null)
-  const [productId, setProductId] = useState<number | null>(null)
   const { data: productBalances } = useCustomerProductBalances(customerId ?? 0)
-  const [qty, setQty] = useState(1)
-  const [empties, setEmpties] = useState(0)
-  const [priceEach, setPriceEach] = useState('')
+
+  // Per-product line entry: a sale can include any product with qty > 0.
+  const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
+  const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({})
+  const [emptiesByProduct, setEmptiesByProduct] = useState<Record<number, number>>({})
+
   const [received, setReceived] = useState(false)
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [note, setNote] = useState('')
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [loadedEdit, setLoadedEdit] = useState(false)
-  const [originalEmpties, setOriginalEmpties] = useState(0)
 
+  const [editProductId, setEditProductId] = useState<number | null>(null)
+  const [originalEmpties, setOriginalEmpties] = useState(0)
+  const [loadedEdit, setLoadedEdit] = useState(false)
   const editing = Boolean(txId)
 
   useEffect(() => {
@@ -40,25 +43,23 @@ export function NewSale() {
   }, [customers, customerId])
 
   useEffect(() => {
-    if (productId === null && products.length > 0 && !editing) setProductId(products[0].id)
-  }, [products, productId, editing])
-
-  useEffect(() => {
-    if (!editing) {
-      const product = products.find((p) => p.id === productId)
-      if (product && !priceEach) setPriceEach(String(product.price || ''))
-    }
-  }, [products, productId, priceEach, editing])
+    if (editing) return
+    setPriceByProduct((prev) => {
+      const next = { ...prev }
+      for (const p of products) if (next[p.id] === undefined) next[p.id] = String(p.price || '')
+      return next
+    })
+  }, [products, editing])
 
   useEffect(() => {
     if (!editing || loadedEdit) return
     const tx = transactions.find((t) => t.id === Number(txId))
-    if (!tx) return
-    setProductId(tx.product_id)
-    setQty(tx.qty)
-    setEmpties(tx.empties)
+    if (!tx || tx.product_id === null) return
+    setEditProductId(tx.product_id)
+    setQtyByProduct({ [tx.product_id]: tx.qty })
+    setEmptiesByProduct({ [tx.product_id]: tx.empties })
+    setPriceByProduct({ [tx.product_id]: tx.qty > 0 ? String(tx.amount / tx.qty) : String(tx.amount) })
     setOriginalEmpties(tx.empties)
-    setPriceEach(tx.qty > 0 ? String(tx.amount / tx.qty) : String(tx.amount))
     setDate(dateInputValue(tx.created_at))
     setReceived(tx.paid)
     setMethod(tx.method ?? 'cash')
@@ -66,43 +67,66 @@ export function NewSale() {
     setLoadedEdit(true)
   }, [editing, loadedEdit, transactions, txId])
 
-  function handleProductChange(newProductId: number) {
-    setProductId(newProductId)
-    setEmpties(0)
-    const product = products.find((p) => p.id === newProductId)
-    setPriceEach(product ? String(product.price || '') : '')
+  const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
+
+  const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
+  const setEmpties = (pid: number, v: number) => setEmptiesByProduct((s) => ({ ...s, [pid]: v }))
+  const setPrice = (pid: number, v: string) => setPriceByProduct((s) => ({ ...s, [pid]: v }))
+
+  function ownedFor(pid: number) {
+    const bal = productBalances.find((b) => b.product_id === pid)?.empties_outstanding ?? 0
+    return editing && pid === editProductId ? bal + originalEmpties : bal
   }
 
-  const product = products.find((p) => p.id === productId)
-  const productBalance = productBalances.find((b) => b.product_id === productId)
-  const currentlyOwed = (productBalance?.empties_outstanding ?? 0) + originalEmpties
-  const maxEmptiesTakeable = currentlyOwed + qty
-  const price = Number(priceEach || 0)
-  const saleTotal = qty * price
-  const newEmptiesOwed = qty - empties
+  const saleTotal = shownProducts.reduce(
+    (sum, p) => sum + (qtyByProduct[p.id] ?? 0) * Number(priceByProduct[p.id] || 0),
+    0,
+  )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!customerId || !productId || qty <= 0 || price <= 0) {
-      setError('Quantity and price must be greater than zero')
+    if (!customerId) {
+      setError('Select a customer')
       return
     }
-    if (empties > maxEmptiesTakeable) {
-      setError(`Can't collect more than ${maxEmptiesTakeable} empties (${currentlyOwed} outstanding + ${qty} from this sale).`)
+    const lines = shownProducts
+      .map((p) => ({
+        productId: p.id,
+        name: p.name,
+        qty: qtyByProduct[p.id] ?? 0,
+        price: Number(priceByProduct[p.id] || 0),
+        empties: emptiesByProduct[p.id] ?? 0,
+      }))
+      .filter((l) => l.qty > 0)
+
+    if (lines.length === 0) {
+      setError('Enter a quantity for at least one product')
       return
     }
+    for (const l of lines) {
+      if (l.price <= 0) {
+        setError(`Enter a price for ${l.name}`)
+        return
+      }
+      const cap = ownedFor(l.productId) + l.qty
+      if (l.empties > cap) {
+        setError(`Empties taken for ${l.name} can't exceed ${cap} (${ownedFor(l.productId)} owed + ${l.qty} this sale).`)
+        return
+      }
+    }
+
     setSaving(true)
     setError(null)
-
     const timestamp = combineDateWithNow(date)
 
-    if (editing) {
+    if (editing && editProductId !== null) {
+      const l = lines[0]
       const { error } = await supabase
         .from('transactions')
         .update({
-          qty,
-          empties,
-          amount: saleTotal,
+          qty: l.qty,
+          empties: l.empties,
+          amount: l.qty * l.price,
           paid: received,
           method: received ? method : null,
           note: note.trim() || null,
@@ -118,19 +142,20 @@ export function NewSale() {
       return
     }
 
-    const { error } = await supabase.from('transactions').insert({
+    const rows = lines.map((l) => ({
       customer_id: customerId,
-      type: 'sale',
-      product_id: productId,
-      qty,
-      empties,
-      amount: saleTotal,
+      type: 'sale' as const,
+      product_id: l.productId,
+      qty: l.qty,
+      empties: l.empties,
+      amount: l.qty * l.price,
       paid: received,
       method: received ? method : null,
       note: note.trim() || null,
       created_by: session?.user.id,
       created_at: timestamp,
-    })
+    }))
+    const { error } = await supabase.from('transactions').insert(rows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -140,11 +165,10 @@ export function NewSale() {
   }
 
   const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
-  const fieldInput =
-    'h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink'
+  const fieldInput = 'h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink'
   const segBtn = (active: boolean) =>
     `flex-1 rounded-[12px] py-[11px] text-[13.5px] font-bold transition ${
-      active ? 'bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'bg-cream text-muted'
+      active ? 'bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'text-muted'
     }`
 
   return (
@@ -156,40 +180,21 @@ export function NewSale() {
 
       <form onSubmit={handleSubmit}>
         <div className="rounded-[24px] bg-surface p-5 shadow-card">
-          <div className="mb-4">
-            <p className={fieldLabel}>Customer</p>
-            <select
-              value={customerId ?? ''}
-              onChange={(e) => setCustomerId(Number(e.target.value))}
-              disabled={editing}
-              className={`${fieldInput} appearance-none disabled:opacity-60`}
-            >
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div className="mb-4 flex gap-3">
             <div className="flex-1">
-              <p className={fieldLabel}>Product</p>
-              <div className="flex gap-1 rounded-[14px] bg-cream p-[5px]">
-                {products.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={editing}
-                    onClick={() => handleProductChange(p.id)}
-                    className={`flex-1 rounded-[11px] py-[11px] font-display text-[13px] font-bold transition disabled:opacity-60 ${
-                      productId === p.id ? 'bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'text-muted'
-                    }`}
-                  >
-                    {p.name}
-                  </button>
+              <p className={fieldLabel}>Customer</p>
+              <select
+                value={customerId ?? ''}
+                onChange={(e) => setCustomerId(Number(e.target.value))}
+                disabled={editing}
+                className={`${fieldInput} appearance-none disabled:opacity-60`}
+              >
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
             <div className="flex-1">
               <p className={fieldLabel}>Date</p>
@@ -203,33 +208,43 @@ export function NewSale() {
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <div className="min-w-0 flex-1">
-              <p className={fieldLabel}>{product ? `${product.name} sold` : 'Sold'}</p>
-              <Stepper value={qty} onChange={setQty} min={1} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className={fieldLabel}>Empties taken</p>
-              <Stepper value={empties} onChange={setEmpties} min={0} variant="secondary" />
-            </div>
-          </div>
-          <p className="mb-4 mt-2 text-[12px] font-semibold text-muted">
-            Customer owes <span className="font-bold text-[#C23B22]">{currentlyOwed}</span> empties
-          </p>
+          {!editing && (
+            <p className="mb-3 text-[12px] font-semibold text-subtle">Set a quantity for each size you're selling.</p>
+          )}
 
-          <div>
-            <p className={fieldLabel}>Price each (₹)</p>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={priceEach}
-              onChange={(e) => setPriceEach(e.target.value)}
-              className={fieldInput}
-            />
-          </div>
+          {shownProducts.map((p, i) => (
+            <div key={p.id} className={i > 0 ? 'mt-5 border-t border-borderMuted pt-5' : ''}>
+              <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
+                {p.name}
+              </span>
+              <div className="mt-3 flex gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className={fieldLabel}>Sold</p>
+                  <Stepper value={qtyByProduct[p.id] ?? 0} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={fieldLabel}>Empties taken</p>
+                  <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className={fieldLabel}>Price each (₹)</p>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={priceByProduct[p.id] ?? ''}
+                  onChange={(e) => setPrice(p.id, e.target.value)}
+                  className={fieldInput}
+                />
+              </div>
+              <p className="mt-2 text-[12px] font-semibold text-muted">
+                Customer owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span> {p.name} empties
+              </p>
+            </div>
+          ))}
 
-          <div className="mt-4">
+          <div className="mt-5 border-t border-borderMuted pt-4">
             <p className={fieldLabel}>Payment</p>
             <div className="flex gap-2 rounded-[14px] bg-cream p-[5px]">
               <button type="button" onClick={() => setReceived(false)} className={segBtn(!received)}>
@@ -267,17 +282,9 @@ export function NewSale() {
           )}
         </div>
 
-        <div className="mt-4 rounded-[20px] bg-gradient-to-br from-[#FBEDE4] to-[#F7DFC9] p-5">
-          <div className="flex items-end justify-between">
-            <span className="text-[13px] font-bold uppercase tracking-[0.5px] text-[#9A6A4A]">Sale total</span>
-            <span className="font-display text-[30px] font-bold leading-none text-ink">{formatCurrency(saleTotal)}</span>
-          </div>
-          <div className="mt-[14px] flex items-center justify-between border-t border-[#F0D6C2] pt-[12px]">
-            <span className="text-[13px] font-semibold text-[#9A6A4A]">New empties owed</span>
-            <span className="font-display text-[16px] font-bold text-[#C23B22]">
-              {newEmptiesOwed >= 0 ? `+${newEmptiesOwed}` : newEmptiesOwed} cylinders
-            </span>
-          </div>
+        <div className="mt-4 flex items-end justify-between rounded-[20px] bg-gradient-to-br from-[#FBEDE4] to-[#F7DFC9] p-5">
+          <span className="text-[13px] font-bold uppercase tracking-[0.5px] text-[#9A6A4A]">Sale total</span>
+          <span className="font-display text-[30px] font-bold leading-none text-ink">{formatCurrency(saleTotal)}</span>
         </div>
 
         {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
