@@ -10,7 +10,6 @@ import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
-import { HeroCard } from '../components/HeroCard'
 import { BottomSheet } from '../components/BottomSheet'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon } from '../components/icons'
 import type { Transaction } from '../types/db'
@@ -302,27 +301,27 @@ export function CustomerDetail() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3">
         {productBalances.map((pb) => (
-          <HeroCard key={pb.product_id}>
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.5px] text-mutedOnDark">{pb.product_name} balance</p>
-            <div className="flex items-center gap-[10px]">
-              <div className="flex-1 text-center">
-                <p className="font-display text-[26px] font-bold text-white">{pb.sold}</p>
-                <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Sold</p>
+          <div key={pb.product_id} className="rounded-[18px] bg-surface p-4 shadow-card">
+            <span className="inline-block rounded-lg bg-ink px-[9px] py-[3px] font-display text-[12px] font-bold text-white">
+              {pb.product_name}
+            </span>
+            <p className="mt-[14px] font-display text-[30px] font-bold leading-none text-[#F26B2C]">
+              {pb.empties_outstanding}
+            </p>
+            <p className="mt-[4px] text-[11px] font-semibold text-subtle">empties owed</p>
+            <div className="mt-[14px] flex gap-2 border-t border-borderMuted pt-[12px]">
+              <div className="flex-1">
+                <p className="font-display text-[17px] font-bold text-ink">{pb.sold}</p>
+                <p className="text-[10.5px] font-semibold text-subtle">sold</p>
               </div>
-              <span className="text-[22px] font-semibold text-[#6B6154]">−</span>
-              <div className="flex-1 text-center">
-                <p className="font-display text-[26px] font-bold text-[#5FCF97]">{pb.returned}</p>
-                <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Returned</p>
-              </div>
-              <span className="text-[22px] font-semibold text-[#6B6154]">=</span>
-              <div className="flex-1 rounded-[13px] bg-accent/[.18] px-1 py-2 text-center">
-                <p className="font-display text-[26px] font-bold text-[#FF8A4C]">{pb.empties_outstanding}</p>
-                <p className="mt-[2px] text-[11px] font-bold text-[#FF8A4C]/[.85]">Empties</p>
+              <div className="flex-1">
+                <p className="font-display text-[17px] font-bold text-[#2E8B57]">{pb.returned}</p>
+                <p className="text-[10.5px] font-semibold text-subtle">returned</p>
               </div>
             </div>
-          </HeroCard>
+          </div>
         ))}
       </div>
 
