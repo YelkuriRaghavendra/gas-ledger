@@ -15,3 +15,33 @@ h1,
 h2 {
   font-family: 'Space Grotesk', system-ui, sans-serif;
 }
+
+@layer base {
+  /* Consistent, polished focus treatment for every text field and select
+     across the app — subtle accent ring instead of the browser default. */
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='tel'],
+  input[type='date'],
+  input[type='search'],
+  select,
+  textarea {
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  input[type='text']:focus,
+  input[type='email']:focus,
+  input[type='password']:focus,
+  input[type='number']:focus,
+  input[type='tel']:focus,
+  input[type='date']:focus,
+  input[type='search']:focus,
+  select:focus,
+  textarea:focus {
+    border-color: #E4571B;
+    box-shadow: 0 0 0 3px rgba(228, 87, 27, 0.13);
+  }
+}

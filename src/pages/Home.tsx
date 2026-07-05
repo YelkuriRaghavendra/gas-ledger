@@ -2,23 +2,41 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { useAllCustomerProductBalances } from '../hooks/useAllCustomerProductBalances'
+import { useGodownStock } from '../hooks/useGodownStock'
+import { useProducts } from '../hooks/useProducts'
 import { useActivityFeed } from '../hooks/useActivityFeed'
 import { formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { HeroCard } from '../components/HeroCard'
 import { InitialsBadge } from '../components/InitialsBadge'
+import { PlusIcon, ReturnIcon, CreditCardIcon } from '../components/icons'
 
 export function Home() {
   const { profile } = useAuth()
   const { data, loading, error } = useCustomerBalances()
   const { data: productBalances } = useAllCustomerProductBalances()
-  const { data: activity } = useActivityFeed(5)
+  const { data: godown } = useGodownStock()
+  const { data: products } = useProducts()
+  const { data: activity } = useActivityFeed(4)
 
   const totalDue = data.reduce((sum, c) => sum + c.amount_due, 0)
-  const totalSold = productBalances.reduce((sum, pb) => sum + pb.sold, 0)
-  const totalReturned = productBalances.reduce((sum, pb) => sum + pb.returned, 0)
-  const totalEmptiesOut = productBalances.reduce((sum, pb) => sum + pb.empties_outstanding, 0)
   const customersWithDue = data.filter((c) => c.amount_due > 0).length
+
+  const emptiesOutByProduct = new Map<number, number>()
+  for (const pb of productBalances) {
+    emptiesOutByProduct.set(pb.product_id, (emptiesOutByProduct.get(pb.product_id) ?? 0) + pb.empties_outstanding)
+  }
+
+  const productRows = products.map((p) => {
+    const g = godown.find((x) => x.product_id === p.id)
+    return {
+      id: p.id,
+      name: p.name,
+      emptiesOut: emptiesOutByProduct.get(p.id) ?? 0,
+      full: g?.full_cylinders ?? 0,
+      empty: g?.empty_cylinders ?? 0,
+    }
+  })
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -56,50 +74,71 @@ export function Home() {
             <p className="relative mt-[6px] font-display text-[44px] font-bold leading-none tracking-[-1px] text-white">
               {formatCurrency(totalDue)}
             </p>
-            <p className="relative mt-[9px] text-[12.5px] font-semibold text-mutedOnDark">
-              outstanding from {customersWithDue} customer{customersWithDue === 1 ? '' : 's'}
-            </p>
-            <div className="relative mt-5 flex items-center gap-4 rounded-2xl bg-white/[.06] px-4 py-[14px] backdrop-blur-sm">
-              <div className="flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.4px] text-mutedOnDark">Sold</p>
-                <p className="mt-[2px] font-display text-[20px] font-bold text-white">{totalSold}</p>
-              </div>
-              <div className="h-9 w-px bg-white/[.12]" />
-              <div className="flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.4px] text-mutedOnDark">Returned</p>
-                <p className="mt-[2px] font-display text-[20px] font-bold text-[#5FCF97]">{totalReturned}</p>
-              </div>
-              <div className="h-9 w-px bg-white/[.12]" />
-              <div className="flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.4px] text-mutedOnDark">Empties out</p>
-                <p className="mt-[2px] font-display text-[20px] font-bold text-[#FF8A4C]">{totalEmptiesOut}</p>
-              </div>
-            </div>
+            <Link to="/customers" className="relative mt-[9px] inline-flex items-center gap-1 text-[12.5px] font-semibold text-mutedOnDark">
+              from {customersWithDue} customer{customersWithDue === 1 ? '' : 's'} ›
+            </Link>
           </HeroCard>
 
-          <div className="my-4 grid grid-cols-2 gap-3">
+          {/* Per-product inventory — the core of a two-product agency at a glance */}
+          <div className="mb-3 mt-6 flex items-baseline justify-between">
+            <h2 className="font-display text-[18px] font-bold tracking-[-0.3px] text-ink">Cylinders</h2>
+            <Link to="/godown" className="text-[13px] font-bold text-accent">
+              Godown ›
+            </Link>
+          </div>
+          <div className="flex flex-col gap-[11px]">
+            {productRows.map((p) => (
+              <div key={p.id} className="rounded-[20px] bg-surface p-[16px] shadow-card">
+                <div className="mb-[14px] flex items-center gap-2">
+                  <span className="rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
+                    {p.name}
+                  </span>
+                </div>
+                <div className="flex items-stretch">
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">With customers</p>
+                    <p className="mt-[3px] font-display text-[24px] font-bold text-[#FF8A4C]">{p.emptiesOut}</p>
+                    <p className="text-[11px] font-semibold text-subtle">empties out</p>
+                  </div>
+                  <div className="mx-2 w-px bg-borderMuted" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">Godown full</p>
+                    <p className="mt-[3px] font-display text-[24px] font-bold text-ink">{p.full}</p>
+                    <p className="text-[11px] font-semibold text-subtle">ready to sell</p>
+                  </div>
+                  <div className="mx-2 w-px bg-borderMuted" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">Godown empty</p>
+                    <p className="mt-[3px] font-display text-[24px] font-bold text-[#2E8B57]">{p.empty}</p>
+                    <p className="text-[11px] font-semibold text-subtle">to return</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Quick actions — the daily customer-facing jobs */}
+          <div className="mb-3 mt-6 grid grid-cols-3 gap-3">
             <Link
               to="/sale"
-              className="group flex flex-col items-start gap-3 rounded-[20px] bg-gradient-to-br from-accentSoft to-accent p-[18px] text-white shadow-glow transition active:scale-[0.98]"
+              className="flex flex-col items-center gap-2 rounded-[18px] bg-gradient-to-br from-accentSoft to-accent py-[15px] text-white shadow-glow transition active:scale-[0.97]"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[.18]">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round">
-                  <path d="M5 12h14M12 5v14" />
-                </svg>
-              </span>
-              <span className="text-[15px] font-bold tracking-[-0.2px]">New sale</span>
+              <PlusIcon size={22} color="#fff" strokeWidth={2.4} />
+              <span className="text-[13px] font-bold">Sale</span>
             </Link>
             <Link
               to="/return"
-              className="group flex flex-col items-start gap-3 rounded-[20px] bg-surface p-[18px] text-ink shadow-card transition active:scale-[0.98]"
+              className="flex flex-col items-center gap-2 rounded-[18px] bg-surface py-[15px] text-ink shadow-card transition active:scale-[0.97]"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: '#EAF4EE' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 14 4 9l5-5" />
-                  <path d="M4 9h11a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H9" />
-                </svg>
-              </span>
-              <span className="text-[15px] font-bold tracking-[-0.2px]">Log return</span>
+              <ReturnIcon size={22} color="#2E8B57" strokeWidth={2.2} />
+              <span className="text-[13px] font-bold">Return</span>
+            </Link>
+            <Link
+              to="/payment"
+              className="flex flex-col items-center gap-2 rounded-[18px] bg-surface py-[15px] text-ink shadow-card transition active:scale-[0.97]"
+            >
+              <CreditCardIcon size={22} color="#3B6EA5" strokeWidth={2.2} />
+              <span className="text-[13px] font-bold">Payment</span>
             </Link>
           </div>
 
