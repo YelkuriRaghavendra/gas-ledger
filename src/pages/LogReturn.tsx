@@ -102,73 +102,84 @@ export function LogReturn() {
     navigate(`/customers/${customerId}`)
   }
 
+  const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
+  const fieldInput = 'h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink'
+
   return (
-    <div className="p-5 pb-10 pt-2">
-      <Link to={customerId ? `/customers/${customerId}` : '/'} className="mb-[10px] inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+    <div className="p-5 pb-10 pt-3">
+      <Link to={customerId ? `/customers/${customerId}` : '/'} className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
-      <h1 className="mb-[22px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit return' : 'Log empty return'}</h1>
+      <h1 className="mb-[18px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit return' : 'Log empty return'}</h1>
 
       <form onSubmit={handleSubmit}>
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Customer</p>
-        <select
-          value={customerId ?? ''}
-          onChange={(e) => setCustomerId(Number(e.target.value))}
-          disabled={editing}
-          className="mb-5 h-[52px] w-full appearance-none rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink disabled:opacity-60"
-        >
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <div className="rounded-[24px] bg-surface p-5 shadow-card">
+          <div className="mb-4">
+            <p className={fieldLabel}>Customer</p>
+            <select
+              value={customerId ?? ''}
+              onChange={(e) => setCustomerId(Number(e.target.value))}
+              disabled={editing}
+              className={`${fieldInput} appearance-none disabled:opacity-60`}
+            >
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Product</p>
-        <select
-          value={productId ?? ''}
-          onChange={(e) => handleProductChange(Number(e.target.value))}
-          disabled={editing}
-          className="mb-5 h-[52px] w-full appearance-none rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink disabled:opacity-60"
-        >
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          <div className="mb-4 flex gap-3">
+            <div className="flex-1">
+              <p className={fieldLabel}>Product</p>
+              <div className="flex gap-1 rounded-[14px] bg-cream p-[5px]">
+                {products.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={editing}
+                    onClick={() => handleProductChange(p.id)}
+                    className={`flex-1 rounded-[11px] py-[11px] font-display text-[13px] font-bold transition disabled:opacity-60 ${
+                      productId === p.id ? 'bg-[#2E8B57] text-white shadow-[0_10px_22px_-10px_rgba(46,139,87,0.6)]' : 'text-muted'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className={fieldLabel}>Date</p>
+              <input
+                type="date"
+                value={date}
+                max={todayInputValue()}
+                onChange={(e) => setDate(e.target.value)}
+                className={fieldInput}
+              />
+            </div>
+          </div>
 
-        <div className="mb-5 flex items-center justify-between rounded-[18px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
-          <span className="text-[13px] font-semibold text-mutedOnDark">Currently owed by customer</span>
-          <span className="font-display text-[17px] font-bold text-[#FF8A4C]">{currentlyOwed} empties</span>
+          <div>
+            <p className={fieldLabel}>{product ? `Empty ${product.name} returned` : 'Empty cylinders returned'}</p>
+            <Stepper value={qty} onChange={setQty} min={1} variant="secondary" />
+            <p className="mt-2 text-[12px] font-semibold text-muted">
+              Customer owes <span className="font-bold text-[#C23B22]">{currentlyOwed}</span> empties
+            </p>
+          </div>
         </div>
 
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Date</p>
-        <input
-          type="date"
-          value={date}
-          max={todayInputValue()}
-          onChange={(e) => setDate(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink"
-        />
-
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">
-          {product ? `Empty ${product.name} cylinders returned` : 'Empty cylinders returned'}
-        </p>
-        <div className="mb-5">
-          <Stepper value={qty} onChange={setQty} min={1} />
+        <div className="mt-4 flex items-end justify-between rounded-[20px] bg-gradient-to-br from-[#EAF4EE] to-[#D9EDE1] p-5">
+          <span className="text-[13px] font-bold uppercase tracking-[0.5px] text-[#3E7A57]">Remaining after return</span>
+          <span className="font-display text-[30px] font-bold leading-none text-[#2E8B57]">{remaining}</span>
         </div>
 
-        <div className="mb-6 flex items-center justify-between rounded-[18px] bg-[#EAF4EE] p-[18px]">
-          <p className="text-[13px] font-semibold text-[#3E7A57]">Remaining after return</p>
-          <p className="font-display text-[22px] font-bold text-[#2E8B57]">{remaining} empties</p>
-        </div>
-
-        {error && <p className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
+        {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={saving}
-          className="h-[54px] w-full rounded-[16px] bg-[#2E8B57] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
+          className="mt-4 h-[56px] w-full rounded-[16px] bg-[#2E8B57] text-[15px] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save return'}
         </button>
