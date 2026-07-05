@@ -38,8 +38,9 @@ export function NewSale() {
   const [loadedEdit, setLoadedEdit] = useState(false)
   const editing = Boolean(txId)
 
+  // Each size starts as a slim row; tapping "+ Add to sale" expands it into a
+  // full entry line. In edit mode the single line is always expanded.
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
-
   const expand = (pid: number) => setExpanded((s) => new Set(s).add(pid))
   const collapse = (pid: number) => {
     setExpanded((s) => {
@@ -201,9 +202,8 @@ export function NewSale() {
       <h1 className="mb-[18px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit sale' : 'Record a sale'}</h1>
 
       <form onSubmit={handleSubmit}>
-        {/* Customer + Date */}
-        <div className="rounded-[20px] bg-surface p-4 shadow-card">
-          <div className="flex gap-3">
+        <div className="rounded-[24px] bg-surface p-5 shadow-card">
+          <div className="mb-4 flex gap-3">
             <div className="flex-1">
               <p className={fieldLabel}>Customer</p>
               <select
@@ -230,98 +230,93 @@ export function NewSale() {
               />
             </div>
           </div>
-        </div>
 
-        {!editing && (
-          <p className="mb-2 mt-4 px-1 text-[12px] font-semibold text-subtle">Add each size you're selling.</p>
-        )}
+          {!editing && (
+            <p className="mb-3 text-[12px] font-semibold text-subtle">Set a quantity for each size you're selling.</p>
+          )}
 
-        {/* Product rows */}
-        <div className="mt-3 space-y-[10px]">
-          {shownProducts.map((p) => {
+          {shownProducts.map((p, i) => {
             const isOpen = editing || expanded.has(p.id)
             const qty = qtyByProduct[p.id] ?? 0
             const lineTotal = qty * Number(priceByProduct[p.id] || 0)
-
-            if (!isOpen) {
-              return (
-                <button
-                  type="button"
-                  key={p.id}
-                  onClick={() => expand(p.id)}
-                  className="flex w-full items-center justify-between rounded-[16px] bg-surface px-4 py-[15px] shadow-card"
-                >
-                  <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
-                    {p.name}
-                  </span>
-                  <span className="text-[13px] font-bold text-accent">+ Add to sale</span>
-                </button>
-              )
-            }
-
             return (
-              <div key={p.id} className="rounded-[20px] bg-surface p-4 shadow-card">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+              <div key={p.id} className={i > 0 ? 'mt-5 border-t border-borderMuted pt-5' : ''}>
+                {!isOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => expand(p.id)}
+                    className="flex w-full items-center justify-between rounded-[14px] bg-cream px-4 py-[13px]"
+                  >
                     <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
                       {p.name}
                     </span>
-                    {qty > 0 && (
-                      <span className="text-[11px] font-bold text-muted">
-                        ×{qty} · {formatCurrency(lineTotal)}
-                      </span>
-                    )}
-                  </div>
-                  {!editing && (
-                    <button
-                      type="button"
-                      onClick={() => collapse(p.id)}
-                      className="text-[12px] font-bold text-muted"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <div className="mt-3 flex gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className={fieldLabel}>Sold</p>
-                    <Stepper value={qtyByProduct[p.id] ?? 0} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={fieldLabel}>Empties taken</p>
-                    <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <p className={fieldLabel}>Price each (₹)</p>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={priceByProduct[p.id] ?? ''}
-                    onChange={(e) => setPrice(p.id, e.target.value)}
-                    className={fieldInput}
-                  />
-                </div>
-                <p className="mt-2 text-[12px] font-semibold text-muted">
-                  Customer owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span> {p.name} empties
-                </p>
+                    <span className="text-[13px] font-bold text-accent">+ Add to sale</span>
+                  </button>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
+                          {p.name}
+                        </span>
+                        {qty > 0 && (
+                          <span className="text-[11px] font-bold text-muted">
+                            ×{qty} · {formatCurrency(lineTotal)}
+                          </span>
+                        )}
+                      </div>
+                      {!editing && (
+                        <button
+                          type="button"
+                          onClick={() => collapse(p.id)}
+                          className="px-1 text-[13px] font-bold text-muted active:scale-95"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-3 flex gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className={fieldLabel}>Sold</p>
+                        <Stepper value={qtyByProduct[p.id] ?? 0} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={fieldLabel}>Empties taken</p>
+                        <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <p className={fieldLabel}>Price each (₹)</p>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={priceByProduct[p.id] ?? ''}
+                        onChange={(e) => setPrice(p.id, e.target.value)}
+                        className={fieldInput}
+                      />
+                    </div>
+                    <p className="mt-2 text-[12px] font-semibold text-muted">
+                      Customer owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span> {p.name} empties
+                    </p>
+                  </>
+                )}
               </div>
             )
           })}
-        </div>
 
-        {/* Payment */}
-        <div className="mt-4 rounded-[20px] bg-surface p-4 shadow-card">
-          <p className={fieldLabel}>Payment</p>
-          <div className="flex gap-2 rounded-[14px] bg-cream p-[5px]">
-            <button type="button" onClick={() => setReceived(false)} className={segBtn(!received)}>
-              On credit
-            </button>
-            <button type="button" onClick={() => setReceived(true)} className={segBtn(received)}>
-              Received now
-            </button>
+          <div className="mt-5 border-t border-borderMuted pt-4">
+            <p className={fieldLabel}>Payment</p>
+            <div className="flex gap-2 rounded-[14px] bg-cream p-[5px]">
+              <button type="button" onClick={() => setReceived(false)} className={segBtn(!received)}>
+                On credit
+              </button>
+              <button type="button" onClick={() => setReceived(true)} className={segBtn(received)}>
+                Received now
+              </button>
+            </div>
           </div>
+
           {received && (
             <>
               <div className="mt-4">
