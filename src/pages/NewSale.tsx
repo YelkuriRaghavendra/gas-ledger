@@ -240,7 +240,7 @@ export function NewSale() {
             const qty = qtyByProduct[p.id] ?? 0
             const lineTotal = qty * Number(priceByProduct[p.id] || 0)
             return (
-              <div key={p.id} className={i > 0 ? 'mt-5 border-t border-borderMuted pt-5' : ''}>
+              <div key={p.id} className={i > 0 ? 'mt-[10px]' : ''}>
                 {!isOpen ? (
                   <button
                     type="button"
