@@ -232,7 +232,7 @@ export function NewSale() {
           </div>
 
           {!editing && (
-            <p className="mb-3 text-[12px] font-semibold text-subtle">Set a quantity for each size you're selling.</p>
+            <p className="mb-3 text-[12px] font-semibold text-subtle">Tap a size to add it to the sale.</p>
           )}
 
           {shownProducts.map((p, i) => {
@@ -269,9 +269,10 @@ export function NewSale() {
                         <button
                           type="button"
                           onClick={() => collapse(p.id)}
-                          className="px-1 text-[13px] font-bold text-muted active:scale-95"
+                          aria-label={`Remove ${p.name}`}
+                          className="-mr-1 flex h-9 w-9 items-center justify-center rounded-full text-[22px] font-bold leading-none text-muted active:scale-95"
                         >
-                          Remove
+                          ×
                         </button>
                       )}
                     </div>
