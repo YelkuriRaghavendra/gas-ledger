@@ -134,7 +134,7 @@ export function RecordPurchase() {
       <Link to="/purchases" className="mb-[10px] inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
-      <h1 className="mb-[22px] font-display text-2xl font-bold tracking-[-0.4px] text-ink">
+      <h1 className="mb-[22px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">
         {editing ? 'Edit purchase' : 'Record a purchase'}
       </h1>
 
@@ -144,7 +144,7 @@ export function RecordPurchase() {
           value={productId ?? ''}
           onChange={(e) => handleProductChange(Number(e.target.value))}
           disabled={editing}
-          className="mb-5 h-[52px] w-full appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink disabled:opacity-60"
+          className="mb-5 h-[52px] w-full appearance-none rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink disabled:opacity-60"
         >
           {products.map((p) => (
             <option key={p.id} value={p.id}>
@@ -159,7 +159,7 @@ export function RecordPurchase() {
           value={date}
           max={todayInputValue()}
           onChange={(e) => setDate(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
+          className="mb-5 h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink"
         />
 
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">
@@ -178,7 +178,7 @@ export function RecordPurchase() {
               step="0.01"
               value={priceEach}
               onChange={(e) => setPriceEach(e.target.value)}
-              className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
+              className="h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink"
             />
           </div>
           <div className="flex-1">
@@ -193,7 +193,7 @@ export function RecordPurchase() {
             type="button"
             onClick={() => setReceived(false)}
             className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-              !received ? 'border-accent bg-accent text-white' : 'border-borderMuted bg-white text-ink'
+              !received ? 'border-accent bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'border-borderMuted bg-surface text-ink'
             }`}
           >
             On credit
@@ -202,7 +202,7 @@ export function RecordPurchase() {
             type="button"
             onClick={() => setReceived(true)}
             className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-              received ? 'border-accent bg-accent text-white' : 'border-borderMuted bg-white text-ink'
+              received ? 'border-accent bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'border-borderMuted bg-surface text-ink'
             }`}
           >
             Received now
@@ -217,7 +217,7 @@ export function RecordPurchase() {
                 type="button"
                 onClick={() => setMethod('cash')}
                 className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-                  method === 'cash' ? 'border-accent bg-accent text-white' : 'border-borderMuted bg-white text-ink'
+                  method === 'cash' ? 'border-accent bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'border-borderMuted bg-surface text-ink'
                 }`}
               >
                 Cash
@@ -226,7 +226,7 @@ export function RecordPurchase() {
                 type="button"
                 onClick={() => setMethod('upi')}
                 className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-                  method === 'upi' ? 'border-accent bg-accent text-white' : 'border-borderMuted bg-white text-ink'
+                  method === 'upi' ? 'border-accent bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'border-borderMuted bg-surface text-ink'
                 }`}
               >
                 UPI
@@ -238,23 +238,23 @@ export function RecordPurchase() {
               placeholder="e.g. Paid via GPay"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-semibold text-ink"
+              className="mb-5 h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-semibold text-ink"
             />
           </>
         )}
 
-        <div className="mb-6 rounded-2xl border border-[#F3D9C6] bg-[#FBEDE4] p-4">
-          <div className="flex justify-between">
+        <div className="mb-6 rounded-[18px] bg-[#FBEDE4] p-[18px]">
+          <div className="flex items-center justify-between">
             <span className="text-[13px] font-semibold text-[#9A6A4A]">Purchase total</span>
-            <span className="font-display text-lg font-bold text-ink">{formatCurrency(purchaseTotal)}</span>
+            <span className="font-display text-[22px] font-bold text-ink">{formatCurrency(purchaseTotal)}</span>
           </div>
         </div>
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={saving}
-          className="h-[54px] w-full rounded-[14px] bg-accent font-bold text-white shadow-[0_12px_26px_-10px_rgba(228,87,27,0.7)] disabled:opacity-50"
+          className="h-[54px] w-full rounded-[16px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save purchase'}
         </button>

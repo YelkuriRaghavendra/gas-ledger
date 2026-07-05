@@ -107,7 +107,7 @@ export function LogReturn() {
       <Link to={customerId ? `/customers/${customerId}` : '/'} className="mb-[10px] inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
-      <h1 className="mb-[22px] font-display text-2xl font-bold tracking-[-0.4px] text-ink">{editing ? 'Edit return' : 'Log empty return'}</h1>
+      <h1 className="mb-[22px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit return' : 'Log empty return'}</h1>
 
       <form onSubmit={handleSubmit}>
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Customer</p>
@@ -115,7 +115,7 @@ export function LogReturn() {
           value={customerId ?? ''}
           onChange={(e) => setCustomerId(Number(e.target.value))}
           disabled={editing}
-          className="mb-5 h-[52px] w-full appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink disabled:opacity-60"
+          className="mb-5 h-[52px] w-full appearance-none rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink disabled:opacity-60"
         >
           {customers.map((c) => (
             <option key={c.id} value={c.id}>
@@ -129,7 +129,7 @@ export function LogReturn() {
           value={productId ?? ''}
           onChange={(e) => handleProductChange(Number(e.target.value))}
           disabled={editing}
-          className="mb-5 h-[52px] w-full appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink disabled:opacity-60"
+          className="mb-5 h-[52px] w-full appearance-none rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink disabled:opacity-60"
         >
           {products.map((p) => (
             <option key={p.id} value={p.id}>
@@ -138,9 +138,9 @@ export function LogReturn() {
           ))}
         </select>
 
-        <div className="mb-5 flex items-center justify-between rounded-2xl bg-ink px-4 py-[14px] text-white">
+        <div className="mb-5 flex items-center justify-between rounded-[18px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
           <span className="text-[13px] font-semibold text-mutedOnDark">Currently owed by customer</span>
-          <span className="font-display font-bold text-accent">{currentlyOwed} empties</span>
+          <span className="font-display text-[17px] font-bold text-[#FF8A4C]">{currentlyOwed} empties</span>
         </div>
 
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Date</p>
@@ -149,7 +149,7 @@ export function LogReturn() {
           value={date}
           max={todayInputValue()}
           onChange={(e) => setDate(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
+          className="mb-5 h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink"
         />
 
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">
@@ -159,16 +159,16 @@ export function LogReturn() {
           <Stepper value={qty} onChange={setQty} min={1} />
         </div>
 
-        <div className="mb-6 flex justify-between rounded-2xl bg-green-50 p-4">
-          <p className="text-green-800">Remaining after return</p>
-          <p className="font-display font-bold text-green-800">{remaining} empties</p>
+        <div className="mb-6 flex items-center justify-between rounded-[18px] bg-[#EAF4EE] p-[18px]">
+          <p className="text-[13px] font-semibold text-[#3E7A57]">Remaining after return</p>
+          <p className="font-display text-[22px] font-bold text-[#2E8B57]">{remaining} empties</p>
         </div>
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={saving}
-          className="h-[54px] w-full rounded-[14px] bg-green-600 font-bold text-white disabled:opacity-50"
+          className="h-[54px] w-full rounded-[16px] bg-[#2E8B57] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save return'}
         </button>
