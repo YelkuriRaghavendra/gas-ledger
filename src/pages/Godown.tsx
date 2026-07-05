@@ -2,12 +2,7 @@ import { Link } from 'react-router-dom'
 import { useGodownStock } from '../hooks/useGodownStock'
 import { useEmptiesNetRate } from '../hooks/useEmptiesNetRate'
 import { predictDaysUntilFull } from '../utils/godownPrediction'
-import { HeroCard } from '../components/HeroCard'
 import { ChevronLeftIcon } from '../components/icons'
-
-function figureClass(value: number) {
-  return value < 0 ? 'text-red-600' : 'text-white'
-}
 
 export function Godown() {
   const { data: stock, loading } = useGodownStock()
@@ -16,55 +11,65 @@ export function Godown() {
   if (loading) return <p className="p-4 text-muted">Loading…</p>
 
   return (
-    <div className="p-5 pb-10 pt-2">
-      <Link to="/account" className="mb-[10px] inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+    <div className="p-5 pb-10 pt-3">
+      <Link to="/account" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
-      <h1 className="mb-[22px] font-display text-2xl font-bold tracking-[-0.4px] text-ink">Godown inventory</h1>
+      <h1 className="mb-[22px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Godown inventory</h1>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3">
         {stock.map((s) => {
           const netRate = rates.find((r) => r.product_id === s.product_id)?.net_rate_per_day ?? 0
           const prediction =
             s.godown_capacity !== null ? predictDaysUntilFull(s.godown_capacity, s.empty_cylinders, netRate) : null
 
           return (
-            <HeroCard key={s.product_id}>
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.5px] text-mutedOnDark">{s.product_name}</p>
-              <div className="flex items-center gap-[10px]">
-                <div className="flex-1 text-center">
-                  <p className={`font-display text-[26px] font-bold ${figureClass(s.full_cylinders)}`}>{s.full_cylinders}</p>
-                  <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Full cylinders</p>
+            <div key={s.product_id} className="rounded-[18px] bg-surface p-[18px] shadow-card">
+              <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
+                {s.product_name}
+              </span>
+              <div className="mt-4 flex items-stretch">
+                <div className="flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">Full</p>
+                  <p className={`mt-[3px] font-display text-[30px] font-bold leading-none ${s.full_cylinders < 0 ? 'text-red-600' : 'text-ink'}`}>
+                    {s.full_cylinders}
+                  </p>
+                  <p className="mt-[3px] text-[11px] font-semibold text-subtle">ready to sell</p>
                 </div>
-                <div className="flex-1 rounded-[13px] bg-accent/[.18] px-1 py-2 text-center">
-                  <p className={`font-display text-[26px] font-bold ${s.empty_cylinders < 0 ? 'text-red-600' : 'text-[#FF8A4C]'}`}>
+                <div className="mx-2 w-px bg-borderMuted" />
+                <div className="flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">Empty</p>
+                  <p className={`mt-[3px] font-display text-[30px] font-bold leading-none ${s.empty_cylinders < 0 ? 'text-red-600' : 'text-[#2E8B57]'}`}>
                     {s.empty_cylinders}
                   </p>
-                  <p className="mt-[2px] text-[11px] font-bold text-[#FF8A4C]/[.85]">Empty cylinders</p>
+                  <p className="mt-[3px] text-[11px] font-semibold text-subtle">to return to plant</p>
                 </div>
               </div>
 
               {prediction && (
-                <div className="mt-4 border-t border-white/10 pt-3">
+                <div className="mt-4 border-t border-borderMuted pt-3">
                   {prediction.kind === 'not_approaching' && (
-                    <p className="text-[13px] font-semibold text-mutedOnDark">Not approaching capacity</p>
+                    <p className="text-[13px] font-semibold text-subtle">Not approaching capacity</p>
                   )}
                   {prediction.kind === 'at_capacity' && (
-                    <p className="text-[13px] font-bold text-red-600">Godown is already at or over capacity</p>
+                    <p className="text-[13px] font-bold text-[#C23B22]">Godown is already at or over capacity</p>
                   )}
                   {prediction.kind === 'days_until_full' && (
-                    <p className="text-[13px] font-semibold text-mutedOnDark">
-                      <span className="font-display font-bold text-accent">~{prediction.days} days</span> until full at
-                      current pace
+                    <p className="text-[13px] font-semibold text-muted">
+                      <span className="font-display font-bold text-accent">~{prediction.days} days</span> until full at current pace
                     </p>
                   )}
                 </div>
               )}
-            </HeroCard>
+            </div>
           )
         })}
       </div>
-      {stock.length === 0 && <p className="text-muted">No products yet.</p>}
+      {stock.length === 0 && (
+        <p className="rounded-[18px] bg-surface px-4 py-8 text-center text-sm font-medium text-subtle shadow-card">
+          No products yet
+        </p>
+      )}
     </div>
   )
 }

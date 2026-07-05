@@ -100,7 +100,7 @@ export function RecordPayment() {
       <Link to={customerId ? `/customers/${customerId}` : '/'} className="mb-[10px] inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
-      <h1 className="mb-[22px] font-display text-2xl font-bold tracking-[-0.4px] text-ink">{editing ? 'Edit payment' : 'Record payment'}</h1>
+      <h1 className="mb-[22px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit payment' : 'Record payment'}</h1>
 
       <form onSubmit={handleSubmit}>
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Customer</p>
@@ -108,7 +108,7 @@ export function RecordPayment() {
           value={customerId ?? ''}
           onChange={(e) => setCustomerId(Number(e.target.value))}
           disabled={editing}
-          className="mb-5 h-[52px] w-full appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink disabled:opacity-60"
+          className="mb-5 h-[52px] w-full appearance-none rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink disabled:opacity-60"
         >
           {customers.map((c) => (
             <option key={c.id} value={c.id}>
@@ -117,9 +117,9 @@ export function RecordPayment() {
           ))}
         </select>
 
-        <div className="mb-5 flex items-center justify-between rounded-2xl bg-ink px-4 py-[14px] text-white">
+        <div className="mb-5 flex items-center justify-between rounded-[18px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
           <span className="text-[13px] font-semibold text-mutedOnDark">Currently due</span>
-          <span className="font-display font-bold text-accent">{formatCurrency(currentlyDue)}</span>
+          <span className="font-display text-[17px] font-bold text-[#FF8A4C]">{formatCurrency(currentlyDue)}</span>
         </div>
 
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Date</p>
@@ -128,7 +128,7 @@ export function RecordPayment() {
           value={date}
           max={todayInputValue()}
           onChange={(e) => setDate(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
+          className="mb-5 h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-bold text-ink"
         />
 
         <div className="mb-2 flex items-center justify-between">
@@ -148,7 +148,7 @@ export function RecordPayment() {
           required
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] text-lg font-bold text-ink"
+          className="mb-5 h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] text-lg font-bold text-ink"
         />
 
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Payment method</p>
@@ -157,7 +157,7 @@ export function RecordPayment() {
             type="button"
             onClick={() => setMethod('cash')}
             className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-              method === 'cash' ? 'border-blue-600 bg-blue-600 text-white' : 'border-borderMuted bg-white text-ink'
+              method === 'cash' ? 'border-blue-600 bg-blue-600 text-white shadow-[0_10px_22px_-10px_rgba(59,110,165,0.6)]' : 'border-borderMuted bg-surface text-ink'
             }`}
           >
             Cash
@@ -166,7 +166,7 @@ export function RecordPayment() {
             type="button"
             onClick={() => setMethod('upi')}
             className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-              method === 'upi' ? 'border-blue-600 bg-blue-600 text-white' : 'border-borderMuted bg-white text-ink'
+              method === 'upi' ? 'border-blue-600 bg-blue-600 text-white shadow-[0_10px_22px_-10px_rgba(59,110,165,0.6)]' : 'border-borderMuted bg-surface text-ink'
             }`}
           >
             UPI
@@ -178,19 +178,19 @@ export function RecordPayment() {
           placeholder="e.g. Paid via GPay"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-semibold text-ink"
+          className="mb-5 h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface shadow-card px-[14px] font-semibold text-ink"
         />
 
-        <div className="mb-6 flex justify-between rounded-2xl bg-blue-50 p-4">
-          <p className="text-blue-800">Balance after payment</p>
-          <p className="font-display font-bold text-blue-800">{formatCurrency(balanceAfter)}</p>
+        <div className="mb-6 flex items-center justify-between rounded-[18px] bg-[#E8EEF6] p-[18px]">
+          <p className="text-[13px] font-semibold text-[#4A6B96]">Balance after payment</p>
+          <p className="font-display text-[22px] font-bold text-[#3B6EA5]">{formatCurrency(balanceAfter)}</p>
         </div>
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={saving}
-          className="h-[54px] w-full rounded-[14px] bg-blue-600 font-bold text-white disabled:opacity-50"
+          className="h-[54px] w-full rounded-[16px] bg-[#3B6EA5] font-bold text-white shadow-[0_12px_26px_-10px_rgba(59,110,165,0.65)] transition active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save payment'}
         </button>
