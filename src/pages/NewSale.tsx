@@ -253,7 +253,7 @@ export function NewSale() {
                     <span className="text-[13px] font-bold text-accent">+ Add to sale</span>
                   </button>
                 ) : (
-                  <>
+                  <div className="rounded-[16px] border border-borderMuted p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
@@ -300,7 +300,7 @@ export function NewSale() {
                     <p className="mt-2 text-[12px] font-semibold text-muted">
                       Customer owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span> {p.name} empties
                     </p>
-                  </>
+                  </div>
                 )}
               </div>
             )
