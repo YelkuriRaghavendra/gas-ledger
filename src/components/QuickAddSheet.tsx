@@ -52,7 +52,7 @@ const items = [
 
 export function QuickAddSheet({ open, onClose, onNavigate }: QuickAddSheetProps) {
   return (
-    <BottomSheet open={open} onClose={onClose}>
+    <BottomSheet open={open} onClose={onClose} slideUp>
       <h2 className="mb-4 font-display text-[19px] font-bold text-ink">Quick add</h2>
       <div className="flex flex-col gap-[11px]">
         {items.map(({ path, label, description, iconBg, Icon, iconColor }) => (
