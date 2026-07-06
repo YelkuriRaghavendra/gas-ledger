@@ -18,15 +18,17 @@ export function LogReturn() {
   const { data: products } = useProducts()
   const { data: transactions } = useTransactions(id ? Number(id) : 0)
   const [customerId, setCustomerId] = useState<number | null>(id ? Number(id) : null)
-  const [productId, setProductId] = useState<number | null>(null)
   const { data: productBalances } = useCustomerProductBalances(customerId ?? 0)
-  const [qty, setQty] = useState(1)
+
+  // A return can cover any number of sizes at once: qty of empties returned per product.
+  const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [loadedEdit, setLoadedEdit] = useState(false)
-  const [originalQty, setOriginalQty] = useState(0)
 
+  const [editProductId, setEditProductId] = useState<number | null>(null)
+  const [originalQty, setOriginalQty] = useState(0)
+  const [loadedEdit, setLoadedEdit] = useState(false)
   const editing = Boolean(txId)
 
   useEffect(() => {
@@ -34,47 +36,59 @@ export function LogReturn() {
   }, [customers, customerId])
 
   useEffect(() => {
-    if (productId === null && products.length > 0 && !editing) setProductId(products[0].id)
-  }, [products, productId, editing])
-
-  useEffect(() => {
     if (!editing || loadedEdit) return
     const tx = transactions.find((t) => t.id === Number(txId))
-    if (!tx) return
-    setProductId(tx.product_id)
-    setQty(tx.qty)
+    if (!tx || tx.product_id === null) return
+    setEditProductId(tx.product_id)
+    setQtyByProduct({ [tx.product_id]: tx.qty })
     setOriginalQty(tx.qty)
     setDate(dateInputValue(tx.created_at))
     setLoadedEdit(true)
   }, [editing, loadedEdit, transactions, txId])
 
-  function handleProductChange(newProductId: number) {
-    setProductId(newProductId)
-    setQty(1)
+  const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
+
+  const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
+
+  function ownedFor(pid: number) {
+    const bal = productBalances.find((b) => b.product_id === pid)?.empties_outstanding ?? 0
+    return editing && pid === editProductId ? bal + originalQty : bal
   }
 
-  const product = products.find((p) => p.id === productId)
-  const productBalance = productBalances.find((b) => b.product_id === productId)
-  const currentlyOwed = (productBalance?.empties_outstanding ?? 0) + originalQty
-  const remaining = Math.max(0, currentlyOwed - qty)
+  const totalOwed = shownProducts.reduce((sum, p) => sum + ownedFor(p.id), 0)
+  const totalReturning = shownProducts.reduce((sum, p) => sum + (qtyByProduct[p.id] ?? 0), 0)
+  const remaining = Math.max(0, totalOwed - totalReturning)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!customerId || !productId || qty <= 0) {
-      setError('Quantity must be greater than zero')
+    if (!customerId) {
+      setError('Select a customer')
       return
     }
-    if (qty > currentlyOwed) {
-      setError(`Can't return more than the ${currentlyOwed} empties outstanding.`)
+    const lines = shownProducts
+      .map((p) => ({ productId: p.id, name: p.name, qty: qtyByProduct[p.id] ?? 0 }))
+      .filter((l) => l.qty > 0)
+
+    if (lines.length === 0) {
+      setError('Enter a quantity for at least one size')
       return
     }
+    for (const l of lines) {
+      if (l.qty > ownedFor(l.productId)) {
+        setError(`Can't return more than the ${ownedFor(l.productId)} ${l.name} empties outstanding.`)
+        return
+      }
+    }
+
     setSaving(true)
     setError(null)
-
     const timestamp = combineDateWithNow(date)
 
-    if (editing) {
-      const { error } = await supabase.from('transactions').update({ qty, created_at: timestamp }).eq('id', Number(txId))
+    if (editing && editProductId !== null) {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ qty: lines[0].qty, created_at: timestamp })
+        .eq('id', Number(txId))
       setSaving(false)
       if (error) {
         setError(error.message)
@@ -84,16 +98,17 @@ export function LogReturn() {
       return
     }
 
-    const { error } = await supabase.from('transactions').insert({
+    const rows = lines.map((l) => ({
       customer_id: customerId,
-      type: 'return',
-      product_id: productId,
-      qty,
+      type: 'return' as const,
+      product_id: l.productId,
+      qty: l.qty,
       empties: 0,
       amount: 0,
       created_by: session?.user.id,
       created_at: timestamp,
-    })
+    }))
+    const { error } = await supabase.from('transactions').insert(rows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -130,43 +145,37 @@ export function LogReturn() {
             </select>
           </div>
 
-          <div className="mb-4 flex gap-3">
-            <div className="flex-1">
-              <p className={fieldLabel}>Product</p>
-              <div className="flex gap-1 rounded-[14px] bg-cream p-[5px]">
-                {products.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={editing}
-                    onClick={() => handleProductChange(p.id)}
-                    className={`flex-1 rounded-[11px] py-[11px] font-display text-[13px] font-bold transition disabled:opacity-60 ${
-                      productId === p.id ? 'bg-[#2E8B57] text-white shadow-[0_10px_22px_-10px_rgba(46,139,87,0.6)]' : 'text-muted'
-                    }`}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1">
-              <p className={fieldLabel}>Date</p>
-              <input
-                type="date"
-                value={date}
-                max={todayInputValue()}
-                onChange={(e) => setDate(e.target.value)}
-                className={fieldInput}
-              />
-            </div>
+          <div className="mb-4">
+            <p className={fieldLabel}>Date</p>
+            <input
+              type="date"
+              value={date}
+              max={todayInputValue()}
+              onChange={(e) => setDate(e.target.value)}
+              className={fieldInput}
+            />
           </div>
 
-          <div>
-            <p className={fieldLabel}>{product ? `Empty ${product.name} returned` : 'Empty cylinders returned'}</p>
-            <Stepper value={qty} onChange={setQty} min={1} variant="secondary" />
-            <p className="mt-2 text-[12px] font-semibold text-muted">
-              Customer owes <span className="font-bold text-[#C23B22]">{currentlyOwed}</span> empties
-            </p>
+          {!editing && (
+            <p className="mb-3 text-[12px] font-semibold text-subtle">Enter empties returned for each size.</p>
+          )}
+
+          <div className="flex gap-3">
+            {shownProducts.map((p) => (
+              <div key={p.id} className="min-w-0 flex-1">
+                <p className={fieldLabel}>{p.name}</p>
+                <Stepper
+                  value={qtyByProduct[p.id] ?? 0}
+                  onChange={(v) => setQty(p.id, v)}
+                  min={editing ? 1 : 0}
+                  variant="secondary"
+                  size="sm"
+                />
+                <p className="mt-2 text-[11px] font-semibold text-muted">
+                  Owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span>
+                </p>
+              </div>
+            ))}
           </div>
         </div>
 

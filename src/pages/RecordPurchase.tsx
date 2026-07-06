@@ -3,103 +3,98 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useProducts } from '../hooks/useProducts'
-import { useGodownStock } from '../hooks/useGodownStock'
 import { usePurchases } from '../hooks/usePurchases'
 import { Stepper } from '../components/Stepper'
 import { combineDateWithNow, dateInputValue, formatCurrency, todayInputValue } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
-import type { PaymentMethod } from '../types/db'
 
 export function RecordPurchase() {
   const { txId } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: products } = useProducts()
-  const { data: godownStock } = useGodownStock()
   const { data: purchases } = usePurchases()
-  const [productId, setProductId] = useState<number | null>(null)
-  const [qty, setQty] = useState(1)
-  const [emptiesGiven, setEmptiesGiven] = useState(0)
-  const [priceEach, setPriceEach] = useState('')
-  const [received, setReceived] = useState(false)
-  const [method, setMethod] = useState<PaymentMethod>('cash')
-  const [note, setNote] = useState('')
+
+  // A single bill can buy any number of sizes: qty received + price each per product.
+  const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
+  const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({})
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [loadedEdit, setLoadedEdit] = useState(false)
-  const [originalEmptiesGiven, setOriginalEmptiesGiven] = useState(0)
 
+  const [editProductId, setEditProductId] = useState<number | null>(null)
+  const [loadedEdit, setLoadedEdit] = useState(false)
   const editing = Boolean(txId)
 
+  // Prefill each size's price from the product default. Return prev unchanged
+  // when nothing is added so the effect never triggers a redundant re-render.
   useEffect(() => {
-    if (productId === null && products.length > 0 && !editing) setProductId(products[0].id)
-  }, [products, productId, editing])
-
-  useEffect(() => {
-    if (!editing) {
-      const product = products.find((p) => p.id === productId)
-      if (product && !priceEach) setPriceEach(String(product.price || ''))
-    }
-  }, [products, productId, priceEach, editing])
+    if (editing) return
+    setPriceByProduct((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const p of products) {
+        if (next[p.id] === undefined) {
+          next[p.id] = String(p.price || '')
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [products, editing])
 
   useEffect(() => {
     if (!editing || loadedEdit) return
     const purchase = purchases.find((p) => p.id === Number(txId))
     if (!purchase) return
-    setProductId(purchase.product_id)
-    setQty(purchase.qty)
-    setEmptiesGiven(purchase.empties_given)
-    setOriginalEmptiesGiven(purchase.empties_given)
-    setPriceEach(purchase.qty > 0 ? String(purchase.amount / purchase.qty) : String(purchase.amount))
+    setEditProductId(purchase.product_id)
+    setQtyByProduct({ [purchase.product_id]: purchase.qty })
+    setPriceByProduct({ [purchase.product_id]: purchase.qty > 0 ? String(purchase.amount / purchase.qty) : String(purchase.amount) })
     setDate(dateInputValue(purchase.created_at))
-    setReceived(purchase.paid)
-    setMethod(purchase.method ?? 'cash')
-    setNote(purchase.note ?? '')
     setLoadedEdit(true)
   }, [editing, loadedEdit, purchases, txId])
 
-  function handleProductChange(newProductId: number) {
-    setProductId(newProductId)
-    setEmptiesGiven(0)
-    const product = products.find((p) => p.id === newProductId)
-    setPriceEach(product ? String(product.price || '') : '')
-  }
+  const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
 
-  const product = products.find((p) => p.id === productId)
-  const stock = godownStock.find((g) => g.product_id === productId)
-  const currentEmptyStock = (stock?.empty_cylinders ?? 0) + originalEmptiesGiven
-  const maxEmptiesGivable = Math.max(0, currentEmptyStock)
-  const price = Number(priceEach || 0)
-  const purchaseTotal = qty * price
+  const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
+  const setPrice = (pid: number, v: string) => setPriceByProduct((s) => ({ ...s, [pid]: v }))
+
+  const purchaseTotal = shownProducts.reduce(
+    (sum, p) => sum + (qtyByProduct[p.id] ?? 0) * Number(priceByProduct[p.id] || 0),
+    0,
+  )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!productId || qty <= 0 || price <= 0) {
-      setError('Quantity and price must be greater than zero')
+    const lines = shownProducts
+      .map((p) => ({
+        productId: p.id,
+        name: p.name,
+        qty: qtyByProduct[p.id] ?? 0,
+        price: Number(priceByProduct[p.id] || 0),
+      }))
+      .filter((l) => l.qty > 0)
+
+    if (lines.length === 0) {
+      setError('Enter a quantity for at least one product')
       return
     }
-    if (emptiesGiven > maxEmptiesGivable) {
-      setError(`Can't give more than ${maxEmptiesGivable} empties (current godown stock).`)
-      return
+    for (const l of lines) {
+      if (l.price <= 0) {
+        setError(`Enter a price for ${l.name}`)
+        return
+      }
     }
+
     setSaving(true)
     setError(null)
-
     const timestamp = combineDateWithNow(date)
 
-    if (editing) {
+    if (editing && editProductId !== null) {
+      const l = lines[0]
       const { error } = await supabase
         .from('purchases')
-        .update({
-          qty,
-          empties_given: emptiesGiven,
-          amount: purchaseTotal,
-          paid: received,
-          method: received ? method : null,
-          note: note.trim() || null,
-          created_at: timestamp,
-        })
+        .update({ qty: l.qty, empties_given: l.qty, amount: l.qty * l.price, created_at: timestamp })
         .eq('id', Number(txId))
       setSaving(false)
       if (error) {
@@ -110,17 +105,18 @@ export function RecordPurchase() {
       return
     }
 
-    const { error } = await supabase.from('purchases').insert({
-      product_id: productId,
-      qty,
-      empties_given: emptiesGiven,
-      amount: purchaseTotal,
-      paid: received,
-      method: received ? method : null,
-      note: note.trim() || null,
+    // empties_given auto-matches the full cylinders bought (one empty per full).
+    const rows = lines.map((l) => ({
+      product_id: l.productId,
+      qty: l.qty,
+      empties_given: l.qty,
+      amount: l.qty * l.price,
+      paid: false,
+      method: null,
       created_by: session?.user.id,
       created_at: timestamp,
-    })
+    }))
+    const { error } = await supabase.from('purchases').insert(rows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -131,10 +127,6 @@ export function RecordPurchase() {
 
   const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
   const fieldInput = 'h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink'
-  const segBtn = (active: boolean) =>
-    `flex-1 rounded-[12px] py-[11px] text-[13.5px] font-bold transition ${
-      active ? 'bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'text-muted'
-    }`
 
   return (
     <div className="p-5 pb-10 pt-3">
@@ -147,96 +139,56 @@ export function RecordPurchase() {
 
       <form onSubmit={handleSubmit}>
         <div className="rounded-[24px] bg-surface p-5 shadow-card">
-          <div className="mb-4 flex gap-3">
-            <div className="flex-1">
-              <p className={fieldLabel}>Product</p>
-              <div className="flex gap-1 rounded-[14px] bg-cream p-[5px]">
-                {products.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={editing}
-                    onClick={() => handleProductChange(p.id)}
-                    className={`flex-1 rounded-[11px] py-[11px] font-display text-[13px] font-bold transition disabled:opacity-60 ${
-                      productId === p.id ? 'bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow' : 'text-muted'
-                    }`}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1">
-              <p className={fieldLabel}>Date</p>
-              <input
-                type="date"
-                value={date}
-                max={todayInputValue()}
-                onChange={(e) => setDate(e.target.value)}
-                className={fieldInput}
-              />
-            </div>
-          </div>
-
-          <div className="mb-4 flex gap-3">
-            <div className="min-w-0 flex-1">
-              <p className={fieldLabel}>{product ? `${product.name} received` : 'Received'}</p>
-              <Stepper value={qty} onChange={setQty} min={1} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className={fieldLabel}>Empties given</p>
-              <Stepper value={emptiesGiven} onChange={setEmptiesGiven} min={0} variant="secondary" />
-            </div>
-          </div>
-
           <div className="mb-4">
-            <p className={fieldLabel}>Price each (₹)</p>
+            <p className={fieldLabel}>Date</p>
             <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={priceEach}
-              onChange={(e) => setPriceEach(e.target.value)}
+              type="date"
+              value={date}
+              max={todayInputValue()}
+              onChange={(e) => setDate(e.target.value)}
               className={fieldInput}
             />
           </div>
 
-          <div>
-            <p className={fieldLabel}>Payment</p>
-            <div className="flex gap-2 rounded-[14px] bg-cream p-[5px]">
-              <button type="button" onClick={() => setReceived(false)} className={segBtn(!received)}>
-                On credit
-              </button>
-              <button type="button" onClick={() => setReceived(true)} className={segBtn(received)}>
-                Paid now
-              </button>
-            </div>
-          </div>
-
-          {received && (
-            <>
-              <div className="mt-4">
-                <p className={fieldLabel}>Payment method</p>
-                <div className="flex gap-2 rounded-[14px] bg-cream p-[5px]">
-                  <button type="button" onClick={() => setMethod('cash')} className={segBtn(method === 'cash')}>
-                    Cash
-                  </button>
-                  <button type="button" onClick={() => setMethod('upi')} className={segBtn(method === 'upi')}>
-                    UPI
-                  </button>
-                </div>
-              </div>
-              <div className="mt-4">
-                <p className={fieldLabel}>Note (optional)</p>
-                <input
-                  placeholder="e.g. Paid via GPay"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className={`${fieldInput} font-semibold`}
-                />
-              </div>
-            </>
+          {!editing && (
+            <p className="mb-3 text-[12px] font-semibold text-subtle">Enter quantity and price for each size bought.</p>
           )}
+
+          <div className="space-y-3">
+            {shownProducts.map((p) => {
+              const qty = qtyByProduct[p.id] ?? 0
+              const lineTotal = qty * Number(priceByProduct[p.id] || 0)
+              return (
+                <div key={p.id} className="rounded-[16px] bg-cream p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
+                      {p.name}
+                    </span>
+                    {qty > 0 && (
+                      <span className="text-[11px] font-bold text-muted">×{qty} · {formatCurrency(lineTotal)}</span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className={fieldLabel}>Received</p>
+                      <Stepper value={qty} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} tone="surface" size="sm" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={fieldLabel}>Price each (₹)</p>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={priceByProduct[p.id] ?? ''}
+                        onChange={(e) => setPrice(p.id, e.target.value)}
+                        className={`${fieldInput} !bg-surface`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         <div className="mt-4 flex items-end justify-between rounded-[20px] bg-gradient-to-br from-[#FBEDE4] to-[#F7DFC9] p-5">
