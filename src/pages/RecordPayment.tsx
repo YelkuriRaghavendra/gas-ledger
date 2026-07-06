@@ -95,102 +95,111 @@ export function RecordPayment() {
     navigate(`/customers/${customerId}`)
   }
 
+  const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
+  const fieldInput = 'h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink'
+  const segBtn = (active: boolean) =>
+    `flex-1 rounded-[12px] py-[11px] text-[13.5px] font-bold transition ${
+      active ? 'bg-[#3B6EA5] text-white shadow-[0_10px_22px_-10px_rgba(59,110,165,0.6)]' : 'text-muted'
+    }`
+
   return (
-    <div className="p-5 pb-10 pt-2">
-      <Link to={customerId ? `/customers/${customerId}` : '/'} className="mb-[10px] inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+    <div className="p-5 pb-10 pt-3">
+      <Link to={customerId ? `/customers/${customerId}` : '/'} className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
-      <h1 className="mb-[22px] font-display text-2xl font-bold tracking-[-0.4px] text-ink">{editing ? 'Edit payment' : 'Record payment'}</h1>
+      <h1 className="mb-[18px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit payment' : 'Record payment'}</h1>
 
       <form onSubmit={handleSubmit}>
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Customer</p>
-        <select
-          value={customerId ?? ''}
-          onChange={(e) => setCustomerId(Number(e.target.value))}
-          disabled={editing}
-          className="mb-5 h-[52px] w-full appearance-none rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink disabled:opacity-60"
-        >
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <div className="rounded-[24px] bg-surface p-5 shadow-card">
+          <div className="mb-4 flex gap-3">
+            <div className="flex-1">
+              <p className={fieldLabel}>Customer</p>
+              <select
+                value={customerId ?? ''}
+                onChange={(e) => setCustomerId(Number(e.target.value))}
+                disabled={editing}
+                className={`${fieldInput} appearance-none disabled:opacity-60`}
+              >
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1">
+              <p className={fieldLabel}>Date</p>
+              <input
+                type="date"
+                value={date}
+                max={todayInputValue()}
+                onChange={(e) => setDate(e.target.value)}
+                className={fieldInput}
+              />
+            </div>
+          </div>
 
-        <div className="mb-5 flex items-center justify-between rounded-2xl bg-ink px-4 py-[14px] text-white">
-          <span className="text-[13px] font-semibold text-mutedOnDark">Currently due</span>
-          <span className="font-display font-bold text-accent">{formatCurrency(currentlyDue)}</span>
+          <div className="mb-4">
+            <div className="mb-[7px] flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Amount received (₹)</p>
+              <button
+                type="button"
+                onClick={() => setAmount(String(currentlyDue))}
+                className="rounded-full bg-[#E8EEF6] px-[10px] py-[3px] text-[11px] font-bold text-[#3B6EA5]"
+              >
+                Pay full · {formatCurrency(currentlyDue)}
+              </button>
+            </div>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className={`${fieldInput} text-lg`}
+            />
+          </div>
+
+          <div className="mb-4">
+            <p className={fieldLabel}>Payment method</p>
+            <div className="flex gap-2 rounded-[14px] bg-cream p-[5px]">
+              <button type="button" onClick={() => setMethod('cash')} className={segBtn(method === 'cash')}>
+                Cash
+              </button>
+              <button type="button" onClick={() => setMethod('upi')} className={segBtn(method === 'upi')}>
+                UPI
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className={fieldLabel}>Note (optional)</p>
+            <input
+              placeholder="e.g. Paid via GPay"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className={`${fieldInput} font-semibold`}
+            />
+          </div>
         </div>
 
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Date</p>
-        <input
-          type="date"
-          value={date}
-          max={todayInputValue()}
-          onChange={(e) => setDate(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-bold text-ink"
-        />
-
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-bold uppercase tracking-[0.5px] text-muted">Amount received (₹)</p>
-          <button
-            type="button"
-            onClick={() => setAmount(String(currentlyDue))}
-            className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700"
-          >
-            Pay full
-          </button>
-        </div>
-        <input
-          type="number"
-          min="0.01"
-          step="0.01"
-          required
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] text-lg font-bold text-ink"
-        />
-
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Payment method</p>
-        <div className="mb-5 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setMethod('cash')}
-            className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-              method === 'cash' ? 'border-blue-600 bg-blue-600 text-white' : 'border-borderMuted bg-white text-ink'
-            }`}
-          >
-            Cash
-          </button>
-          <button
-            type="button"
-            onClick={() => setMethod('upi')}
-            className={`flex-1 rounded-[14px] border-[1.5px] py-3 text-sm font-bold ${
-              method === 'upi' ? 'border-blue-600 bg-blue-600 text-white' : 'border-borderMuted bg-white text-ink'
-            }`}
-          >
-            UPI
-          </button>
+        <div className="mt-4 rounded-[20px] bg-gradient-to-br from-[#E8EEF6] to-[#DCE6F2] p-5">
+          <div className="flex items-end justify-between">
+            <span className="text-[13px] font-bold uppercase tracking-[0.5px] text-[#4A6B96]">Balance after payment</span>
+            <span className="font-display text-[30px] font-bold leading-none text-[#3B6EA5]">{formatCurrency(balanceAfter)}</span>
+          </div>
+          <div className="mt-[14px] flex items-center justify-between border-t border-[#CFDBEC] pt-[12px]">
+            <span className="text-[13px] font-semibold text-[#4A6B96]">Currently due</span>
+            <span className="font-display text-[15px] font-bold text-[#3B6EA5]">{formatCurrency(currentlyDue)}</span>
+          </div>
         </div>
 
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.5px] text-muted">Note (optional)</p>
-        <input
-          placeholder="e.g. Paid via GPay"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="mb-5 h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white px-[14px] font-semibold text-ink"
-        />
-
-        <div className="mb-6 flex justify-between rounded-2xl bg-blue-50 p-4">
-          <p className="text-blue-800">Balance after payment</p>
-          <p className="font-display font-bold text-blue-800">{formatCurrency(balanceAfter)}</p>
-        </div>
-
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={saving}
-          className="h-[54px] w-full rounded-[14px] bg-blue-600 font-bold text-white disabled:opacity-50"
+          className="mt-4 h-[56px] w-full rounded-[16px] bg-[#3B6EA5] text-[15px] font-bold text-white shadow-[0_12px_26px_-10px_rgba(59,110,165,0.65)] transition active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save payment'}
         </button>

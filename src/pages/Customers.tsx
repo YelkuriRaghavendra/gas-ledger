@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
+import { useAllCustomerProductBalances } from '../hooks/useAllCustomerProductBalances'
 import { formatCurrency } from '../utils/format'
 import { Avatar } from '../components/Avatar'
 import { StatusPill } from '../components/StatusPill'
@@ -8,7 +9,16 @@ import { SearchIcon } from '../components/icons'
 
 export function Customers() {
   const { data, loading, error } = useCustomerBalances()
+  const { data: productBalances } = useAllCustomerProductBalances()
   const [search, setSearch] = useState('')
+
+  const emptiesByCustomer = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const pb of productBalances) {
+      map.set(pb.customer_id, (map.get(pb.customer_id) ?? 0) + pb.empties_outstanding)
+    }
+    return map
+  }, [productBalances])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -16,24 +26,30 @@ export function Customers() {
     return data.filter((c) => c.name.toLowerCase().includes(q) || (c.phone ?? '').includes(q))
   }, [data, search])
 
-  const totalEmptiesOut = data.reduce((sum, c) => sum + c.empties_outstanding, 0)
+  const totalEmptiesOut = productBalances.reduce((sum, pb) => sum + pb.empties_outstanding, 0)
 
   return (
-    <div className="p-5 pb-[110px] pt-2">
-      <h1 className="mb-1 font-display text-2xl font-bold tracking-[-0.4px] text-ink">Customers</h1>
-      <p className="mb-4 text-[13px] font-semibold text-muted">
-        {data.length} accounts · {totalEmptiesOut} empties outstanding
-      </p>
+    <div className="p-5 pb-[110px] pt-3">
+      <h1 className="font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Customers</h1>
+      <div className="mb-5 mt-2 flex gap-2">
+        <span className="rounded-full bg-surface px-[13px] py-[6px] text-xs font-bold text-ink shadow-card">
+          {data.length} account{data.length === 1 ? '' : 's'}
+        </span>
+        <span className="rounded-full bg-surface px-[13px] py-[6px] text-xs font-bold text-[#C23B22] shadow-card">
+          {totalEmptiesOut} empties out
+        </span>
+      </div>
 
       <div className="relative mb-[18px]">
         <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2">
           <SearchIcon size={18} />
         </span>
         <input
+          type="search"
           placeholder="Search name or phone"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white pl-11 pr-4 font-semibold text-ink"
+          className="h-[52px] w-full rounded-[16px] border-[1.5px] border-borderMuted bg-surface pl-11 pr-4 font-semibold text-ink shadow-card"
         />
       </div>
 
@@ -45,21 +61,25 @@ export function Customers() {
           <li key={c.id}>
             <Link
               to={`/customers/${c.id}`}
-              className="flex items-center gap-[13px] rounded-[18px] border border-[#EFE7D8] bg-white p-[14px]"
+              className="flex items-center gap-[13px] rounded-[20px] bg-surface p-[15px] shadow-card transition active:scale-[0.99]"
             >
-              <Avatar id={c.id} name={c.name} size={46} />
+              <Avatar id={c.id} name={c.name} size={48} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-bold text-ink">{c.name}</p>
-                <p className="mt-[2px] text-[12.5px] font-semibold text-[#9A8F80]">{c.phone}</p>
+                <p className="truncate text-[15.5px] font-bold text-ink">{c.name}</p>
+                <p className="mt-[2px] text-[12.5px] font-semibold text-subtle">{c.phone || 'No phone'}</p>
               </div>
-              <div className="shrink-0 text-right">
-                <StatusPill owed={c.empties_outstanding} />
-                <p className="mt-[5px] text-xs font-semibold text-[#B3A796]">{formatCurrency(c.amount_due)} due</p>
+              <div className="flex shrink-0 flex-col items-end gap-[6px]">
+                <StatusPill owed={emptiesByCustomer.get(c.id) ?? 0} />
+                <p className="text-xs font-bold text-subtle">{formatCurrency(c.amount_due)} due</p>
               </div>
             </Link>
           </li>
         ))}
-        {!loading && filtered.length === 0 && <p className="text-muted">No customers found.</p>}
+        {!loading && filtered.length === 0 && (
+          <li className="rounded-[20px] bg-surface px-4 py-10 text-center text-sm font-medium text-subtle shadow-card">
+            {search ? 'No customers match your search' : 'No customers yet'}
+          </li>
+        )}
       </ul>
     </div>
   )

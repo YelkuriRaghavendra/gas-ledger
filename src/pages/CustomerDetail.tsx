@@ -3,17 +3,18 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalance } from '../hooks/useCustomerBalance'
+import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
+import { useProducts } from '../hooks/useProducts'
 import { useTransactions } from '../hooks/useTransactions'
 import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
-import { HeroCard } from '../components/HeroCard'
 import { BottomSheet } from '../components/BottomSheet'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon } from '../components/icons'
 import type { Transaction } from '../types/db'
 
-type HistoryEntry = Transaction & { balanceAfter: number }
+type HistoryEntry = Transaction & { balanceAfter: number; productName: string | null }
 
 interface HistoryGroup {
   key: string
@@ -24,9 +25,9 @@ interface HistoryGroup {
   collected: number
 }
 
-function historyTitle(t: Transaction) {
-  if (t.type === 'sale') return `${t.qty} cylinders sold`
-  if (t.type === 'return') return `${t.qty} empties returned`
+function historyTitle(t: Transaction, productName?: string | null) {
+  if (t.type === 'sale') return productName ? `${t.qty} × ${productName} sold` : `${t.qty} cylinders sold`
+  if (t.type === 'return') return productName ? `${t.qty} × ${productName} returned` : `${t.qty} empties returned`
   return 'Payment received'
 }
 
@@ -59,13 +60,14 @@ function dayKey(iso: string) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
 
-function buildHistoryGroups(transactions: Transaction[]): HistoryGroup[] {
+function buildHistoryGroups(transactions: Transaction[], productNameById: Map<number, string>): HistoryGroup[] {
   const chronological = [...transactions].reverse()
   let running = 0
   const withBalance: HistoryEntry[] = chronological.map((t) => {
     if (t.type === 'sale' && !t.paid) running += t.amount
     else if (t.type === 'payment') running -= t.amount
-    return { ...t, balanceAfter: running }
+    const productName = t.product_id !== null ? productNameById.get(t.product_id) ?? null : null
+    return { ...t, balanceAfter: running, productName }
   })
   const newestFirst = [...withBalance].reverse()
 
@@ -101,22 +103,33 @@ export function CustomerDetail() {
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
   const { data: balance, loading, error, refresh: refreshBalance } = useCustomerBalance(customerId)
+  const { data: productBalances, refresh: refreshProductBalances } = useCustomerProductBalances(customerId)
+  const { data: products } = useProducts()
   const { data: transactions, refresh: refreshTx } = useTransactions(customerId)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [startingEmpties, setStartingEmpties] = useState('')
+  const [startingEmptiesProductId, setStartingEmptiesProductId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
 
-  function startEdit() {
+  const productNameById = new Map(products.map((p) => [p.id, p.name]))
+
+  async function startEdit() {
     if (!balance) return
     setName(balance.name)
     setPhone(balance.phone ?? '')
     setAddress(balance.address ?? '')
     setStartingEmpties(String(balance.starting_empties_owed))
+    const { data } = await supabase
+      .from('customers')
+      .select('starting_empties_product_id')
+      .eq('id', customerId)
+      .single()
+    setStartingEmptiesProductId(data?.starting_empties_product_id ?? products[0]?.id ?? null)
     setEditing(true)
   }
 
@@ -130,7 +143,13 @@ export function CustomerDetail() {
     setActionError(null)
     const { error } = await supabase
       .from('customers')
-      .update({ name, phone, address, starting_empties_owed: Number(startingEmpties || 0) })
+      .update({
+        name,
+        phone,
+        address,
+        starting_empties_owed: Number(startingEmpties || 0),
+        starting_empties_product_id: startingEmptiesProductId,
+      })
       .eq('id', customerId)
     setSaving(false)
     if (error) {
@@ -139,6 +158,7 @@ export function CustomerDetail() {
     }
     setEditing(false)
     refreshBalance()
+    refreshProductBalances()
   }
 
   async function handleDeleteCustomer() {
@@ -162,12 +182,13 @@ export function CustomerDetail() {
     }
     refreshTx()
     refreshBalance()
+    refreshProductBalances()
   }
 
   if (loading) return <p className="p-4 text-muted">Loading…</p>
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
 
-  const historyGroups = buildHistoryGroups(transactions)
+  const historyGroups = buildHistoryGroups(transactions, productNameById)
 
   return (
     <div className="p-5 pb-10 pt-2">
@@ -178,44 +199,61 @@ export function CustomerDetail() {
       {actionError && <p className="mb-4 text-sm text-red-600">{actionError}</p>}
 
       {editing ? (
-        <form onSubmit={handleSave} className="mb-[18px] space-y-3 rounded-2xl border border-[#EFE7D8] bg-white p-4">
+        <form onSubmit={handleSave} className="mb-[18px] space-y-3 rounded-[20px] bg-surface p-[18px] shadow-card">
           <input
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <input
             inputMode="numeric"
             maxLength={10}
             value={phone}
             onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <div>
-            <input
-              type="number"
-              min="0"
-              placeholder="Empties already owed"
-              value={startingEmpties}
-              onChange={(e) => setStartingEmpties(e.target.value)}
-              className="w-full rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
-            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                placeholder="Empties already owed"
+                value={startingEmpties}
+                onChange={(e) => setStartingEmpties(e.target.value)}
+                className="w-full flex-1 rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
+              />
+              <select
+                value={startingEmptiesProductId ?? ''}
+                onChange={(e) => setStartingEmptiesProductId(Number(e.target.value))}
+                className="w-32 shrink-0 appearance-none rounded-[14px] border-[1.5px] border-borderMuted px-2 py-2 font-bold text-ink"
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <p className="mt-1 text-xs text-muted">Starting empties-owed balance (not from a sale in this app)</p>
           </div>
-          <div className="flex gap-2">
-            <button type="submit" disabled={saving} className="flex-1 rounded-[14px] bg-accent py-2 font-bold text-white">
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={saving}
+              className="h-[48px] flex-1 rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
+            >
               {saving ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="flex-1 rounded-[14px] border-[1.5px] border-borderMuted py-2 font-bold text-ink"
+              className="h-[48px] flex-1 rounded-[14px] border-[1.5px] border-borderMuted bg-surface font-bold text-ink"
             >
               Cancel
             </button>
@@ -245,7 +283,7 @@ export function CustomerDetail() {
         {balance.phone && (
           <a
             href={`tel:${balance.phone}`}
-            className="flex flex-1 items-center justify-center gap-[7px] rounded-[13px] border-[1.5px] border-borderMuted bg-white py-[11px] text-[13.5px] font-bold text-ink"
+            className="flex flex-1 items-center justify-center gap-[7px] rounded-[14px] bg-surface py-[12px] text-[13.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
           >
             <PhoneIcon size={16} /> Call
           </a>
@@ -255,7 +293,7 @@ export function CustomerDetail() {
             href={`https://maps.google.com/?q=${encodeURIComponent(balance.address)}`}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-[7px] overflow-hidden rounded-[13px] border-[1.5px] border-borderMuted bg-white py-[11px] text-[12.5px] font-semibold text-muted"
+            className="flex flex-1 items-center justify-center gap-[7px] overflow-hidden rounded-[14px] bg-surface py-[12px] text-[12.5px] font-semibold text-muted shadow-card transition active:scale-[0.98]"
           >
             <MapPinIcon size={16} />
             <span className="truncate">{balance.address}</span>
@@ -263,98 +301,99 @@ export function CustomerDetail() {
         )}
       </div>
 
-      <HeroCard>
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.5px] text-mutedOnDark">Empty cylinder balance</p>
-        <div className="flex items-center gap-[10px]">
-          <div className="flex-1 text-center">
-            <p className="font-display text-[26px] font-bold text-white">{balance.sold}</p>
-            <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Sold</p>
+      <div className="grid grid-cols-2 gap-3">
+        {productBalances.map((pb) => (
+          <div key={pb.product_id} className="rounded-[18px] bg-surface p-4 shadow-card">
+            <span className="inline-block rounded-lg bg-ink px-[9px] py-[3px] font-display text-[12px] font-bold text-white">
+              {pb.product_name}
+            </span>
+            <p className="mt-[14px] font-display text-[30px] font-bold leading-none text-[#F26B2C]">
+              {pb.empties_outstanding}
+            </p>
+            <p className="mt-[4px] text-[11px] font-semibold text-subtle">empties owed</p>
+            <div className="mt-[14px] flex gap-2 border-t border-borderMuted pt-[12px]">
+              <div className="flex-1">
+                <p className="font-display text-[17px] font-bold text-ink">{pb.sold}</p>
+                <p className="text-[10.5px] font-semibold text-subtle">sold</p>
+              </div>
+              <div className="flex-1">
+                <p className="font-display text-[17px] font-bold text-[#2E8B57]">{pb.returned}</p>
+                <p className="text-[10.5px] font-semibold text-subtle">returned</p>
+              </div>
+            </div>
           </div>
-          <span className="text-[22px] font-semibold text-[#6B6154]">−</span>
-          <div className="flex-1 text-center">
-            <p className="font-display text-[26px] font-bold text-[#5FCF97]">{balance.returned}</p>
-            <p className="mt-[2px] text-[11px] font-semibold text-mutedOnDark">Returned</p>
-          </div>
-          <span className="text-[22px] font-semibold text-[#6B6154]">=</span>
-          <div className="flex-1 rounded-[13px] bg-accent/[.18] px-1 py-2 text-center">
-            <p className="font-display text-[26px] font-bold text-[#FF8A4C]">{balance.empties_outstanding}</p>
-            <p className="mt-[2px] text-[11px] font-bold text-[#FF8A4C]/[.85]">Empties</p>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center justify-between border-t border-white/[.12] pt-[14px]">
-          <span className="text-[13px] font-semibold text-[#C9BBA8]">Amount due</span>
-          <span className="font-display text-xl font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
-        </div>
-      </HeroCard>
+        ))}
+      </div>
 
-      <div className="my-[18px] grid grid-cols-3 gap-2">
+      <div className="mt-3 flex items-center justify-between rounded-[18px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
+        <span className="text-[13px] font-semibold text-[#C9BBA8]">Amount due</span>
+        <span className="font-display text-[22px] font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
+      </div>
+
+      <div className="my-[18px] grid grid-cols-3 gap-3">
         <Link
           to={`/customers/${customerId}/sale`}
-          className="flex flex-col items-center gap-[5px] rounded-[13px] bg-accent py-3 text-[13px] font-bold text-white"
+          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-gradient-to-br from-accentSoft to-accent py-[14px] text-[13px] font-bold text-white shadow-glow transition active:scale-[0.97]"
         >
-          <PlusIcon size={18} strokeWidth={2.2} />
+          <PlusIcon size={20} strokeWidth={2.3} />
           Sale
         </Link>
         <Link
           to={`/customers/${customerId}/return`}
-          className="flex flex-col items-center gap-[5px] rounded-[13px] border-[1.5px] border-borderMuted bg-white py-3 text-[13px] font-bold text-ink"
+          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-surface py-[14px] text-[13px] font-bold text-ink shadow-card transition active:scale-[0.97]"
         >
-          <ReturnIcon size={18} strokeWidth={2.2} />
+          <ReturnIcon size={20} color="#2E8B57" strokeWidth={2.2} />
           Return
         </Link>
         <Link
           to={`/customers/${customerId}/payment`}
-          className="flex flex-col items-center gap-[5px] rounded-[13px] border-[1.5px] border-borderMuted bg-white py-3 text-[13px] font-bold text-ink"
+          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-surface py-[14px] text-[13px] font-bold text-ink shadow-card transition active:scale-[0.97]"
         >
-          <CreditCardIcon size={18} strokeWidth={2.2} />
+          <CreditCardIcon size={20} color="#3B6EA5" strokeWidth={2.2} />
           Payment
         </Link>
       </div>
 
-      <h2 className="mb-3 font-display text-base font-semibold text-ink">History</h2>
+      <h2 className="mb-3 font-display text-[18px] font-bold tracking-[-0.3px] text-ink">History</h2>
       {historyGroups.map((group) => (
         <div key={group.key} className="mb-5">
-          <div className="mb-2 flex items-baseline justify-between gap-2">
+          <div className="mb-2 flex items-baseline justify-between gap-2 px-1">
             <p className="text-xs font-bold uppercase tracking-[0.5px] text-muted">{group.label}</p>
-            {digestLine(group) && <p className="text-xs font-medium text-[#9A8F80]">{digestLine(group)}</p>}
+            {digestLine(group) && <p className="text-xs font-medium text-subtle">{digestLine(group)}</p>}
           </div>
-          <ul className="flex flex-col gap-0">
+          <ul className="flex flex-col gap-1 rounded-[18px] bg-surface p-2 shadow-card">
             {group.entries.map((t) => {
               const tint = getActivityTint(t.type)
               return (
-                <li key={t.id} className="flex gap-[14px] pb-[18px]">
-                  <div
-                    className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] text-[15px]"
-                    style={{ backgroundColor: tint.bg, color: tint.color }}
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => setViewingTx(t)}
+                    className="flex w-full items-center gap-[13px] rounded-[14px] p-2 text-left transition active:bg-cream"
                   >
-                    {getActivityIcon(t.type)}
-                  </div>
-                  <div className="flex-1 pt-px">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-bold text-ink">{historyTitle(t)}</p>
-                      <p className="font-display text-sm font-bold" style={{ color: tint.color }}>
-                        {historyAmount(t)}
-                      </p>
+                    <div
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-lg"
+                      style={{ backgroundColor: tint.bg, color: tint.color }}
+                    >
+                      {getActivityIcon(t.type)}
                     </div>
-                    <p className="mt-[2px] text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
-                    {t.note && <p className="mt-[1px] text-xs italic text-muted">{t.note}</p>}
-                    <p className="mt-[1px] text-xs font-semibold text-muted">Balance: {formatCurrency(t.balanceAfter)}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1 self-start">
-                    <button onClick={() => setViewingTx(t)} className="text-xs font-bold text-ink">
-                      View
-                    </button>
-                    {isOwner && (
-                      <>
-                        <Link to={transactionEditPath(t)} className="text-xs font-bold text-accent">
-                          Edit
-                        </Link>
-                        <button onClick={() => handleDeleteTransaction(t.id)} className="text-xs font-bold text-red-600">
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
+                        <p className="shrink-0 font-display text-sm font-bold" style={{ color: tint.color }}>
+                          {historyAmount(t)}
+                        </p>
+                      </div>
+                      <div className="mt-[2px] flex items-baseline justify-between gap-2">
+                        <p className="truncate text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
+                        <p className="shrink-0 text-xs font-semibold text-muted">Bal {formatCurrency(t.balanceAfter)}</p>
+                      </div>
+                      {t.note && <p className="mt-[1px] truncate text-xs italic text-muted">{t.note}</p>}
+                    </div>
+                    <span className="shrink-0 rotate-180">
+                      <ChevronLeftIcon size={16} color="#B7AC9B" />
+                    </span>
+                  </button>
                 </li>
               )
             })}
@@ -366,7 +405,7 @@ export function CustomerDetail() {
       <BottomSheet open={viewingTx !== null} onClose={() => setViewingTx(null)}>
         {viewingTx && (
           <div>
-            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">{historyTitle(viewingTx)}</h2>
+            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">{historyTitle(viewingTx, viewingTx.productName)}</h2>
             <dl className="flex flex-col gap-3">
               <div className="flex justify-between border-b border-borderMuted pb-3">
                 <dt className="text-[13px] font-semibold text-muted">Date &amp; time</dt>
@@ -413,6 +452,27 @@ export function CustomerDetail() {
                 <dd className="text-[13px] font-bold text-ink">{formatCurrency(viewingTx.balanceAfter)}</dd>
               </div>
             </dl>
+            {isOwner && (
+              <div className="mt-5 flex gap-2">
+                <Link
+                  to={transactionEditPath(viewingTx)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = viewingTx.id
+                    setViewingTx(null)
+                    handleDeleteTransaction(id)
+                  }}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] border-[1.5px] border-borderMuted bg-surface font-bold text-red-600 transition active:scale-[0.99]"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
           </div>
         )}
       </BottomSheet>

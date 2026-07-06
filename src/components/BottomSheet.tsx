@@ -9,12 +9,24 @@ interface BottomSheetProps {
 export function BottomSheet({ open, onClose, children }: BottomSheetProps) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(20,16,12,0.42)]" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-[rgba(20,16,12,0.42)]"
+      style={{ animation: 'backdropFadeIn 0.25s ease-out' }}
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-md rounded-t-[26px] bg-cream px-5 pb-[30px] pt-[10px]"
+        className="relative w-full max-w-md rounded-[22px] bg-cream p-5"
+        style={{ animation: 'sheetPop 0.25s ease-out' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-[18px] mt-[6px] h-[5px] w-10 rounded-[3px] bg-[#D8CDBA]" />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface text-[20px] font-bold leading-none text-muted shadow-card active:scale-95"
+        >
+          ×
+        </button>
         {children}
       </div>
     </div>
