@@ -361,43 +361,39 @@ export function CustomerDetail() {
             <p className="text-xs font-bold uppercase tracking-[0.5px] text-muted">{group.label}</p>
             {digestLine(group) && <p className="text-xs font-medium text-subtle">{digestLine(group)}</p>}
           </div>
-          <ul className="flex flex-col gap-3 rounded-[18px] bg-surface p-[14px] shadow-card">
+          <ul className="flex flex-col gap-1 rounded-[18px] bg-surface p-2 shadow-card">
             {group.entries.map((t) => {
               const tint = getActivityTint(t.type)
               return (
-                <li key={t.id} className="flex gap-[13px]">
-                  <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-lg"
-                    style={{ backgroundColor: tint.bg, color: tint.color }}
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => setViewingTx(t)}
+                    className="flex w-full items-center gap-[13px] rounded-[14px] p-2 text-left transition active:bg-cream"
                   >
-                    {getActivityIcon(t.type)}
-                  </div>
-                  <div className="flex-1 pt-px">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
-                      <p className="font-display text-sm font-bold" style={{ color: tint.color }}>
-                        {historyAmount(t)}
-                      </p>
+                    <div
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-lg"
+                      style={{ backgroundColor: tint.bg, color: tint.color }}
+                    >
+                      {getActivityIcon(t.type)}
                     </div>
-                    <p className="mt-[2px] text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
-                    {t.note && <p className="mt-[1px] text-xs italic text-muted">{t.note}</p>}
-                    <p className="mt-[1px] text-xs font-semibold text-muted">Balance: {formatCurrency(t.balanceAfter)}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1 self-start">
-                    <button onClick={() => setViewingTx(t)} className="text-xs font-bold text-ink">
-                      View
-                    </button>
-                    {isOwner && (
-                      <>
-                        <Link to={transactionEditPath(t)} className="text-xs font-bold text-accent">
-                          Edit
-                        </Link>
-                        <button onClick={() => handleDeleteTransaction(t.id)} className="text-xs font-bold text-red-600">
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
+                        <p className="shrink-0 font-display text-sm font-bold" style={{ color: tint.color }}>
+                          {historyAmount(t)}
+                        </p>
+                      </div>
+                      <div className="mt-[2px] flex items-baseline justify-between gap-2">
+                        <p className="truncate text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
+                        <p className="shrink-0 text-xs font-semibold text-muted">Bal {formatCurrency(t.balanceAfter)}</p>
+                      </div>
+                      {t.note && <p className="mt-[1px] truncate text-xs italic text-muted">{t.note}</p>}
+                    </div>
+                    <span className="shrink-0 rotate-180">
+                      <ChevronLeftIcon size={16} color="#B7AC9B" />
+                    </span>
+                  </button>
                 </li>
               )
             })}
@@ -456,6 +452,27 @@ export function CustomerDetail() {
                 <dd className="text-[13px] font-bold text-ink">{formatCurrency(viewingTx.balanceAfter)}</dd>
               </div>
             </dl>
+            {isOwner && (
+              <div className="mt-5 flex gap-2">
+                <Link
+                  to={transactionEditPath(viewingTx)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = viewingTx.id
+                    setViewingTx(null)
+                    handleDeleteTransaction(id)
+                  }}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] border-[1.5px] border-borderMuted bg-surface font-bold text-red-600 transition active:scale-[0.99]"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
           </div>
         )}
       </BottomSheet>
