@@ -6,12 +6,13 @@ import { useCustomerBalance } from '../hooks/useCustomerBalance'
 import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useProducts } from '../hooks/useProducts'
 import { useTransactions } from '../hooks/useTransactions'
+import { useAgencySettings } from '../hooks/useAgencySettings'
 import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
 import { BottomSheet } from '../components/BottomSheet'
-import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon } from '../components/icons'
+import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon, DownloadIcon, ShareIcon } from '../components/icons'
 import type { Transaction } from '../types/db'
 
 type HistoryEntry = Transaction & { balanceAfter: number; productName: string | null }
@@ -96,6 +97,132 @@ function digestLine(group: HistoryGroup) {
   return parts.join(' · ')
 }
 
+function formatHistoryText(
+  customerName: string,
+  phone: string | null,
+  amountDue: number,
+  productBalances: { product_name: string; empties_outstanding: number; sold: number; returned: number }[],
+  groups: HistoryGroup[],
+  agency: { name: string; phone: string | null; address: string | null } | null,
+) {
+  let text = ''
+  if (agency) {
+    text += `*${agency.name}*\n`
+    if (agency.phone) text += `${agency.phone}\n`
+    if (agency.address) text += `${agency.address}\n`
+    text += `\n`
+  }
+  text += `*Customer statement — ${customerName}*\n`
+  if (phone) text += `Phone: ${phone}\n`
+  text += `\n*Balances:*\n`
+  for (const pb of productBalances) {
+    text += `  ${pb.product_name}: ${pb.empties_outstanding} empties owed (${pb.sold} sold, ${pb.returned} returned)\n`
+  }
+  text += `\n*Amount due: ${formatCurrency(amountDue)}*\n`
+
+  const recentEntries = groups.flatMap((g) => g.entries).slice(0, 8)
+  if (recentEntries.length > 0) {
+    text += `\n*Recent transactions:*\n`
+    for (const t of recentEntries) {
+      const d = new Date(t.created_at)
+      const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+      const title = historyTitle(t, t.productName)
+      if (t.type === 'return') {
+        text += `  ${dateStr} — ${title}\n`
+      } else if (t.type === 'sale') {
+        const pay = t.paid ? (t.method === 'upi' ? 'Paid, UPI' : 'Paid, Cash') : 'Credit'
+        text += `  ${dateStr} — ${title} ${formatCurrency(t.amount)} (${pay})\n`
+      } else {
+        const method = t.method === 'upi' ? 'UPI' : 'Cash'
+        text += `  ${dateStr} — ${title} ${formatCurrency(t.amount)} (${method})\n`
+      }
+    }
+  }
+
+  const now = new Date()
+  text += `\nGenerated on ${now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+  return text
+}
+
+function esc(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function generatePdfHtml(
+  customerName: string,
+  phone: string | null,
+  address: string | null,
+  amountDue: number,
+  groups: HistoryGroup[],
+  agency: { name: string; phone: string | null; address: string | null } | null,
+) {
+  const rows = groups
+    .flatMap((g) =>
+      g.entries.map(
+        (t, i) => {
+          const bg = i % 2 === 0 ? '#FAFAF7' : '#fff'
+          const typeLabel = t.type === 'sale' ? 'Sale' : t.type === 'return' ? 'Return' : 'Payment'
+          const typeBg = t.type === 'sale' ? '#FFF3ED' : t.type === 'return' ? '#EDF7F1' : '#EDF2F7'
+          const typeColor = t.type === 'sale' ? '#C24B1A' : t.type === 'return' ? '#1D7A4A' : '#3B6EA5'
+          return `<tr style="background:${bg}">
+            <td style="padding:10px 12px;font-size:12px;color:#6B5E50">${esc(formatDate(t.created_at))}</td>
+            <td style="padding:10px 12px">
+              <span style="display:inline-block;background:${typeBg};color:${typeColor};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.3px">${typeLabel}</span>
+              <span style="margin-left:8px;font-size:13px;font-weight:600;color:#1F1813">${esc(historyTitle(t, t.productName))}</span>
+            </td>
+            <td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:600;color:#1F1813">${t.type !== 'return' ? formatCurrency(t.amount) : '—'}</td>
+            <td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:600;color:#6B5E50">${formatCurrency(t.balanceAfter)}</td>
+          </tr>`
+        },
+      ),
+    )
+    .join('')
+
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(customerName)} — Statement</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;max-width:640px;margin:0 auto;padding:32px 24px;color:#1F1813;background:#fff}
+  @media print{body{padding:16px}@page{margin:12mm 10mm}}
+</style></head><body>
+<div style="text-align:center;margin-bottom:20px;padding-bottom:18px;border-bottom:2px solid #1F1813">
+  <div style="font-size:20px;font-weight:800;color:#1F1813;letter-spacing:-0.3px">${esc(agency?.name || 'Cylinder Tracker')}</div>
+  ${agency?.phone ? `<div style="font-size:13px;color:#6B5E50;margin-top:4px">${esc(agency.phone)}</div>` : ''}
+  ${agency?.address ? `<div style="font-size:13px;color:#6B5E50;margin-top:2px">${esc(agency.address)}</div>` : ''}
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+  <div>
+    <div style="font-size:18px;font-weight:700;color:#1F1813">${esc(customerName)}</div>
+    ${phone ? `<div style="font-size:13px;color:#6B5E50;margin-top:3px">${esc(phone)}</div>` : ''}
+    ${address ? `<div style="font-size:13px;color:#6B5E50;margin-top:2px">${esc(address)}</div>` : ''}
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Amount due</div>
+    <div style="font-size:26px;font-weight:800;color:#E4571B;line-height:1.1">${formatCurrency(amountDue)}</div>
+  </div>
+</div>
+
+<table style="width:100%;border-collapse:collapse">
+  <thead>
+    <tr style="border-bottom:2px solid #E0D8CC">
+      <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Date</th>
+      <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Description</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Amount</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Balance</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div style="margin-top:24px;padding-top:16px;border-top:1px solid #E0D8CC;text-align:center">
+  <span style="font-size:11px;color:#B0A898">${dateStr}</span>
+</div>
+</body></html>`
+}
+
 export function CustomerDetail() {
   const { id } = useParams()
   const customerId = Number(id)
@@ -106,6 +233,7 @@ export function CustomerDetail() {
   const { data: productBalances, refresh: refreshProductBalances } = useCustomerProductBalances(customerId)
   const { data: products } = useProducts()
   const { data: transactions, refresh: refreshTx } = useTransactions(customerId)
+  const { data: agencySettings } = useAgencySettings()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -141,24 +269,29 @@ export function CustomerDetail() {
     }
     setSaving(true)
     setActionError(null)
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('customers')
       .update({
-        name,
-        phone,
-        address,
+        name: name.trim(),
+        phone: phone.trim() || null,
+        address: address.trim() || null,
         starting_empties_owed: Number(startingEmpties || 0),
         starting_empties_product_id: startingEmptiesProductId,
       })
       .eq('id', customerId)
+      .select()
+      .single()
     setSaving(false)
     if (error) {
       setActionError(error.message)
       return
     }
+    if (!updated) {
+      setActionError('Update failed — you may not have permission to edit this customer.')
+      return
+    }
     setEditing(false)
-    refreshBalance()
-    refreshProductBalances()
+    await Promise.all([refreshBalance(), refreshProductBalances()])
   }
 
   async function handleDeleteCustomer() {
@@ -189,6 +322,24 @@ export function CustomerDetail() {
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
 
   const historyGroups = buildHistoryGroups(transactions, productNameById)
+
+  function handleDownloadPdf() {
+    if (!balance) return
+    const agency = agencySettings ? { name: agencySettings.business_name, phone: agencySettings.business_phone, address: agencySettings.business_address } : null
+    const html = generatePdfHtml(balance.name, balance.phone, balance.address, balance.amount_due, historyGroups, agency)
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, '_blank')
+    if (win) setTimeout(() => { win.print(); URL.revokeObjectURL(url) }, 600)
+    else URL.revokeObjectURL(url)
+  }
+
+  function handleShareWhatsApp() {
+    if (!balance) return
+    const agency = agencySettings ? { name: agencySettings.business_name, phone: agencySettings.business_phone, address: agencySettings.business_address } : null
+    const text = formatHistoryText(balance.name, balance.phone, balance.amount_due, productBalances, historyGroups, agency)
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank')
+  }
 
   return (
     <div className="p-5 pb-10 pt-2">
@@ -328,6 +479,23 @@ export function CustomerDetail() {
       <div className="mt-3 flex items-center justify-between rounded-[18px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
         <span className="text-[13px] font-semibold text-[#C9BBA8]">Amount due</span>
         <span className="font-display text-[22px] font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          className="flex flex-1 items-center justify-center gap-[7px] rounded-[14px] bg-surface py-[12px] text-[13px] font-bold text-ink shadow-card transition active:scale-[0.98]"
+        >
+          <DownloadIcon size={16} /> Download PDF
+        </button>
+        <button
+          type="button"
+          onClick={handleShareWhatsApp}
+          className="flex flex-1 items-center justify-center gap-[7px] rounded-[14px] bg-[#25D366] py-[12px] text-[13px] font-bold text-white shadow-card transition active:scale-[0.98]"
+        >
+          <ShareIcon size={16} color="#fff" /> WhatsApp
+        </button>
       </div>
 
       <div className="my-[18px] grid grid-cols-3 gap-3">
