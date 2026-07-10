@@ -18,6 +18,7 @@ import { ExportLedger } from './pages/ExportLedger'
 import { Purchases } from './pages/Purchases'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { Godown } from './pages/Godown'
+import { SetCurrentStock } from './pages/SetCurrentStock'
 import { Reports } from './pages/Reports'
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/purchases/new" element={<RecordPurchase />} />
           <Route path="/purchases/:txId/edit" element={<RecordPurchase />} />
           <Route path="/godown" element={<Godown />} />
+          <Route path="/godown/set-stock" element={<SetCurrentStock />} />
         </Route>
       </Routes>
       {!hideNav && <BottomNav />}

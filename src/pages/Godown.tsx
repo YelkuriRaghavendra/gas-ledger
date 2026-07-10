@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 import { useGodownStock } from '../hooks/useGodownStock'
 import { useEmptiesNetRate } from '../hooks/useEmptiesNetRate'
+import { usePurchases } from '../hooks/usePurchases'
 import { predictDaysUntilFull } from '../utils/godownPrediction'
 import { ChevronLeftIcon } from '../components/icons'
 
 export function Godown() {
   const { data: stock, loading } = useGodownStock()
   const { data: rates } = useEmptiesNetRate()
+  const { data: purchases } = usePurchases()
+  const hasAdjustment = purchases.some((p) => p.note === 'Opening stock adjustment')
 
   if (loading) return <p className="p-4 text-muted">Loading…</p>
 
@@ -16,6 +19,15 @@ export function Godown() {
         <ChevronLeftIcon size={18} /> Back
       </Link>
       <h1 className="mb-[22px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Godown inventory</h1>
+
+      {!hasAdjustment && (
+        <Link
+          to="/godown/set-stock"
+          className="mb-4 flex h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-accent bg-[#FBEDE4] text-[14px] font-bold text-accent"
+        >
+          Set current stock
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 gap-3">
         {stock.map((s) => {

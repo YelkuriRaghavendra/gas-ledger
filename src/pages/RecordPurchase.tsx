@@ -17,6 +17,8 @@ export function RecordPurchase() {
 
   // A single bill can buy any number of sizes: qty received + price each per product.
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
+  const [emptiesByProduct, setEmptiesByProduct] = useState<Record<number, number>>({})
+  const [matchEmptiesByProduct, setMatchEmptiesByProduct] = useState<Record<number, boolean>>({})
   const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({})
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
@@ -49,6 +51,8 @@ export function RecordPurchase() {
     if (!purchase) return
     setEditProductId(purchase.product_id)
     setQtyByProduct({ [purchase.product_id]: purchase.qty })
+    setEmptiesByProduct({ [purchase.product_id]: purchase.empties_given })
+    setMatchEmptiesByProduct({ [purchase.product_id]: purchase.empties_given === purchase.qty })
     setPriceByProduct({ [purchase.product_id]: purchase.qty > 0 ? String(purchase.amount / purchase.qty) : String(purchase.amount) })
     setDate(dateInputValue(purchase.created_at))
     setLoadedEdit(true)
@@ -56,7 +60,17 @@ export function RecordPurchase() {
 
   const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
 
-  const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
+  const isMatched = (pid: number) => matchEmptiesByProduct[pid] ?? true
+  const setQty = (pid: number, v: number) => {
+    setQtyByProduct((s) => ({ ...s, [pid]: v }))
+    if (isMatched(pid)) setEmptiesByProduct((s) => ({ ...s, [pid]: v }))
+  }
+  const setEmpties = (pid: number, v: number) => setEmptiesByProduct((s) => ({ ...s, [pid]: v }))
+  const toggleMatch = (pid: number) => {
+    const next = !isMatched(pid)
+    setMatchEmptiesByProduct((s) => ({ ...s, [pid]: next }))
+    if (next) setEmptiesByProduct((s) => ({ ...s, [pid]: qtyByProduct[pid] ?? 0 }))
+  }
   const setPrice = (pid: number, v: string) => setPriceByProduct((s) => ({ ...s, [pid]: v }))
 
   const purchaseTotal = shownProducts.reduce(
@@ -71,6 +85,7 @@ export function RecordPurchase() {
         productId: p.id,
         name: p.name,
         qty: qtyByProduct[p.id] ?? 0,
+        empties: emptiesByProduct[p.id] ?? 0,
         price: Number(priceByProduct[p.id] || 0),
       }))
       .filter((l) => l.qty > 0)
@@ -94,7 +109,7 @@ export function RecordPurchase() {
       const l = lines[0]
       const { error } = await supabase
         .from('purchases')
-        .update({ qty: l.qty, empties_given: l.qty, amount: l.qty * l.price, created_at: timestamp })
+        .update({ qty: l.qty, empties_given: l.empties, amount: l.qty * l.price, created_at: timestamp })
         .eq('id', Number(txId))
       setSaving(false)
       if (error) {
@@ -105,11 +120,10 @@ export function RecordPurchase() {
       return
     }
 
-    // empties_given auto-matches the full cylinders bought (one empty per full).
     const rows = lines.map((l) => ({
       product_id: l.productId,
       qty: l.qty,
-      empties_given: l.qty,
+      empties_given: l.empties,
       amount: l.qty * l.price,
       paid: false,
       method: null,
@@ -173,17 +187,30 @@ export function RecordPurchase() {
                       <p className={fieldLabel}>Received</p>
                       <Stepper value={qty} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} tone="surface" size="sm" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={fieldLabel}>Price each (₹)</p>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={priceByProduct[p.id] ?? ''}
-                        onChange={(e) => setPrice(p.id, e.target.value)}
-                        className={`${fieldInput} !bg-surface`}
-                      />
+                    <div className={`min-w-0 flex-1 ${isMatched(p.id) ? 'opacity-50' : ''}`}>
+                      <p className={fieldLabel}>Empties given</p>
+                      <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" tone="surface" size="sm" />
                     </div>
+                  </div>
+                  <label className="mt-2 flex cursor-pointer items-center gap-[8px] text-[12px] font-semibold text-muted">
+                    <input
+                      type="checkbox"
+                      checked={isMatched(p.id)}
+                      onChange={() => toggleMatch(p.id)}
+                      className="h-[16px] w-[16px] accent-[#2E8B57]"
+                    />
+                    Match empties to received
+                  </label>
+                  <div className="mt-3">
+                    <p className={fieldLabel}>Price each (₹)</p>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={priceByProduct[p.id] ?? ''}
+                      onChange={(e) => setPrice(p.id, e.target.value)}
+                      className={`${fieldInput} !bg-surface`}
+                    />
                   </div>
                 </div>
               )
