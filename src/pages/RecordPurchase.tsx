@@ -125,8 +125,7 @@ export function RecordPurchase() {
       qty: l.qty,
       empties_given: l.empties,
       amount: l.qty * l.price,
-      paid: false,
-      method: null,
+      paid: true,
       created_by: session?.user.id,
       created_at: timestamp,
     }))
