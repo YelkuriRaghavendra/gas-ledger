@@ -187,12 +187,13 @@ select * from (values
 ) as v(name, price, segment, kind, unit, sort_order)
 where not exists (select 1 from public.products where segment = 'domestic');
 
--- Combos: each New Connection includes one 14.2 kg cylinder.
+-- Combos: each New Connection includes a cylinder + regulator + lighter.
+-- Adjust anytime from Domestic → Stock → Combos.
 insert into public.bundle_components (bundle_product_id, component_product_id, qty)
-select nc.id, cyl.id, 1
+select nc.id, comp.id, 1
 from public.products nc
-join public.products cyl
-  on cyl.segment = 'domestic' and cyl.name = '14.2 kg'
+join public.products comp
+  on comp.segment = 'domestic' and comp.name in ('14.2 kg', 'Regulator', 'Lighter')
 where nc.segment = 'domestic'
   and nc.name like 'New Connection%'
   and not exists (

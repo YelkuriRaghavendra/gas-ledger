@@ -14,12 +14,17 @@ export function DomesticStock() {
     <div className="p-5 pb-[110px] pt-3">
       <div className="mb-[22px] flex items-center justify-between">
         <h1 className="font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Stock</h1>
-        <Link
-          to="/domestic/purchases/new"
-          className="flex items-center gap-2 rounded-[13px] bg-[#2E8B57] px-[14px] py-[9px] text-[13px] font-bold text-white shadow-[0_8px_18px_-8px_rgba(46,139,87,0.7)]"
-        >
-          <TruckIcon size={16} color="#fff" strokeWidth={2.2} /> Stock in
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/domestic/combos" className="text-[13px] font-bold text-[#2E8B57]">
+            Combos ›
+          </Link>
+          <Link
+            to="/domestic/purchases/new"
+            className="flex items-center gap-2 rounded-[13px] bg-[#2E8B57] px-[14px] py-[9px] text-[13px] font-bold text-white shadow-[0_8px_18px_-8px_rgba(46,139,87,0.7)]"
+          >
+            <TruckIcon size={16} color="#fff" strokeWidth={2.2} /> Stock in
+          </Link>
+        </div>
       </div>
 
       {error && <p className="mb-4 text-red-600">{error}</p>}
