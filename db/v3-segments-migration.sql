@@ -53,10 +53,16 @@ create index if not exists idx_transactions_bill on public.transactions (bill_id
 create index if not exists idx_purchases_bill on public.purchases (bill_id);
 
 -- ── 4. Views become segment-aware ────────────────────────────
+-- CREATE OR REPLACE can't add columns mid-view, so drop and
+-- recreate (monthly first — it depends on daily).
+drop view if exists public.monthly_product_summary;
+drop view if exists public.daily_product_summary;
+drop view if exists public.daily_purchase_summary;
+drop view if exists public.godown_stock;
 
 -- Live godown stock, now exposing segment/kind/unit so each mode
 -- reads only its own rows.
-create or replace view public.godown_stock as
+create view public.godown_stock as
 select
   p.id as product_id,
   p.name as product_name,
@@ -77,7 +83,7 @@ where p.active
 group by p.id, p.name, p.segment, p.kind, p.unit, p.godown_capacity;
 
 -- Daily sales rollup per product, segment exposed.
-create or replace view public.daily_product_summary as
+create view public.daily_product_summary as
 select
   date_trunc('day', t.created_at) as day,
   t.product_id,
@@ -93,7 +99,7 @@ join products p on p.id = t.product_id
 where t.type in ('sale', 'return')
 group by 1, 2, 3, 4;
 
-create or replace view public.monthly_product_summary as
+create view public.monthly_product_summary as
 select
   date_trunc('month', day) as month,
   product_id,
@@ -107,7 +113,7 @@ from daily_product_summary
 group by 1, 2, 3, 4;
 
 -- Purchases rollup per product, segment exposed.
-create or replace view public.daily_purchase_summary as
+create view public.daily_purchase_summary as
 select
   date_trunc('day', pu.created_at) as day,
   pu.product_id,
