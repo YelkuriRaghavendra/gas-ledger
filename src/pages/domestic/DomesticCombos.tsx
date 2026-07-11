@@ -1,23 +1,27 @@
-import { useState } from 'react'
+import { FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
 import { useBundleComponents } from '../../hooks/useBundleComponents'
 import { BottomSheet } from '../../components/BottomSheet'
 import { Stepper } from '../../components/Stepper'
-import { ChevronLeftIcon } from '../../components/icons'
+import { ChevronLeftIcon, PlusIcon } from '../../components/icons'
 import type { Product } from '../../types/db'
 
 // Combo editor: a combo (bundle) is a product — usually a service like
 // "New Connection" — that consumes other items' stock when billed.
 export function DomesticCombos() {
-  const { data: products } = useProducts('domestic')
+  const { data: products, refresh: refreshProducts } = useProducts('domestic')
   const { data: bundles, refresh } = useBundleComponents()
 
   const [editing, setEditing] = useState<Product | null>(null)
   const [qtyByComponent, setQtyByComponent] = useState<Record<number, number>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newPrice, setNewPrice] = useState('')
 
   const productNameById = new Map(products.map((p) => [p.id, p.name]))
   // A combo can be built from anything that holds stock.
@@ -34,6 +38,38 @@ export function DomesticCombos() {
     setQtyByComponent(current)
     setError(null)
     setEditing(p)
+  }
+
+  async function handleCreate(e: FormEvent) {
+    e.preventDefault()
+    const name = newName.trim()
+    if (!name) return
+    setSaving(true)
+    setError(null)
+    const maxSort = products.reduce((m, p) => Math.max(m, p.sort_order), 0)
+    const { data: created, error: insError } = await supabase
+      .from('products')
+      .insert({
+        name,
+        price: Number(newPrice || 0),
+        segment: 'domestic',
+        kind: 'service',
+        unit: 'pc',
+        sort_order: maxSort + 1,
+      })
+      .select()
+      .single()
+    setSaving(false)
+    if (insError) {
+      setError(insError.message)
+      return
+    }
+    setCreating(false)
+    setNewName('')
+    setNewPrice('')
+    await refreshProducts()
+    // Jump straight into picking what the new combo includes.
+    openEditor(created as Product)
   }
 
   async function handleSave() {
@@ -65,12 +101,27 @@ export function DomesticCombos() {
     refresh()
   }
 
+  const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
+  const fieldInput = 'h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink'
+
   return (
     <div className="p-5 pb-[110px] pt-3">
       <Link to="/domestic/stock" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Stock
       </Link>
-      <h1 className="mb-1 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Combos</h1>
+      <div className="mb-1 flex items-center justify-between">
+        <h1 className="font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Combos</h1>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null)
+            setCreating(true)
+          }}
+          className="flex items-center gap-[6px] rounded-[13px] bg-[#2E8B57] px-[14px] py-[9px] text-[13px] font-bold text-white shadow-[0_8px_18px_-8px_rgba(46,139,87,0.7)]"
+        >
+          <PlusIcon size={16} strokeWidth={2.4} /> New combo
+        </button>
+      </div>
       <p className="mb-5 text-[13px] font-medium leading-[1.5] text-subtle">
         A combo bundles items into one billed product — selling it takes each included item out of stock.
       </p>
@@ -102,11 +153,50 @@ export function DomesticCombos() {
         })}
         {bundleCandidates.length === 0 && (
           <li className="rounded-[18px] bg-surface px-4 py-8 text-center text-sm font-medium text-subtle shadow-card">
-            No service products to build combos from
+            No combos yet — tap "New combo" to create one
           </li>
         )}
       </ul>
 
+      {/* Create a new combo product */}
+      <BottomSheet open={creating} onClose={() => setCreating(false)} slideUp>
+        <form onSubmit={handleCreate}>
+          <h2 className="mb-4 font-display text-[19px] font-bold text-ink">New combo</h2>
+          <div className="mb-3">
+            <p className={fieldLabel}>Name</p>
+            <input
+              required
+              autoFocus
+              placeholder="e.g. New Connection (Special)"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className={fieldInput}
+            />
+          </div>
+          <div className="mb-1">
+            <p className={fieldLabel}>Price (₹)</p>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+              className={fieldInput}
+            />
+          </div>
+          {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
+          <button
+            type="submit"
+            disabled={saving}
+            className="mt-4 h-[50px] w-full rounded-[14px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
+          >
+            {saving ? 'Creating…' : 'Create & choose items'}
+          </button>
+        </form>
+      </BottomSheet>
+
+      {/* Edit what a combo includes */}
       <BottomSheet open={editing !== null} onClose={() => setEditing(null)} slideUp>
         {editing && (
           <div>
