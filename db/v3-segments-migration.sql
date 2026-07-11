@@ -182,18 +182,24 @@ select * from (values
   ('Lighter',                  80::numeric, 'domestic', 'accessory', 'pc', 7),
   ('New Connection (Regular)', 1200::numeric, 'domestic', 'service', 'pc', 8),
   ('New Connection (Deepam)',    0::numeric, 'domestic', 'service', 'pc', 9),
-  ('RC (Refill)',             925::numeric, 'domestic', 'service',  'pc', 10),
-  ('Pass Book',                 0::numeric, 'domestic', 'service',  'pc', 11)
+  ('RC (Refill)',             925::numeric, 'domestic', 'accessory', 'pc', 10),
+  ('Pass Book',                 0::numeric, 'domestic', 'accessory', 'pc', 11)
 ) as v(name, price, segment, kind, unit, sort_order)
 where not exists (select 1 from public.products where segment = 'domestic');
 
--- Combos: each New Connection includes a cylinder + regulator + lighter.
--- Adjust anytime from Domestic → Stock → Combos.
+-- Fix kinds if an earlier run seeded these as services: RC and Pass
+-- Book are ordinary stocked items, not combos.
+update public.products
+set kind = 'accessory'
+where segment = 'domestic' and name in ('RC (Refill)', 'Pass Book') and kind = 'service';
+
+-- Combos: each New Connection includes a cylinder + regulator +
+-- lighter + pass book. Adjust anytime from Domestic → Stock → Combos.
 insert into public.bundle_components (bundle_product_id, component_product_id, qty)
 select nc.id, comp.id, 1
 from public.products nc
 join public.products comp
-  on comp.segment = 'domestic' and comp.name in ('14.2 kg', 'Regulator', 'Lighter')
+  on comp.segment = 'domestic' and comp.name in ('14.2 kg', 'Regulator', 'Lighter', 'Pass Book')
 where nc.segment = 'domestic'
   and nc.name like 'New Connection%'
   and not exists (
