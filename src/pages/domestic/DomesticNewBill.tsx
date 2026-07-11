@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
+import { useBundleComponents } from '../../hooks/useBundleComponents'
 import { Stepper } from '../../components/Stepper'
 import { combineDateWithNow, formatCurrency, todayInputValue } from '../../utils/format'
 import { ChevronLeftIcon } from '../../components/icons'
@@ -20,6 +21,15 @@ export function DomesticNewBill() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: products } = useProducts('domestic')
+  const { data: bundles } = useBundleComponents()
+
+  const productNameById = new Map(products.map((p) => [p.id, p.name]))
+  function comboHint(productId: number) {
+    const parts = bundles
+      .filter((b) => b.bundle_product_id === productId)
+      .map((b) => `${b.qty} × ${productNameById.get(b.component_product_id) ?? 'item'}`)
+    return parts.length > 0 ? `includes ${parts.join(', ')}` : null
+  }
 
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
   const [emptiesByProduct, setEmptiesByProduct] = useState<Record<number, number>>({})
@@ -165,6 +175,7 @@ export function DomesticNewBill() {
                     const isOpen = expanded.has(p.id)
                     const qty = qtyByProduct[p.id] ?? 0
                     const lineTotal = qty * Number(priceByProduct[p.id] || 0)
+                    const hint = comboHint(p.id)
                     if (!isOpen) {
                       return (
                         <button
@@ -173,21 +184,27 @@ export function DomesticNewBill() {
                           onClick={() => expand(p.id)}
                           className="flex w-full items-center justify-between rounded-[14px] bg-cream px-4 py-[12px]"
                         >
-                          <span className="text-[13.5px] font-bold text-ink">{p.name}</span>
-                          <span className="text-[13px] font-bold text-[#2E8B57]">+ Add</span>
+                          <span className="min-w-0 text-left">
+                            <span className="block text-[13.5px] font-bold text-ink">{p.name}</span>
+                            {hint && <span className="block text-[11px] font-semibold text-subtle">{hint}</span>}
+                          </span>
+                          <span className="shrink-0 text-[13px] font-bold text-[#2E8B57]">+ Add</span>
                         </button>
                       )
                     }
                     return (
                       <div key={p.id} className="rounded-[16px] bg-cream p-4">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[14px] font-bold text-ink">{p.name}</span>
-                            {qty > 0 && (
-                              <span className="text-[11px] font-bold text-muted">
-                                ×{qty} · {formatCurrency(lineTotal)}
-                              </span>
-                            )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[14px] font-bold text-ink">{p.name}</span>
+                              {qty > 0 && (
+                                <span className="text-[11px] font-bold text-muted">
+                                  ×{qty} · {formatCurrency(lineTotal)}
+                                </span>
+                              )}
+                            </div>
+                            {hint && <p className="text-[11px] font-semibold text-subtle">{hint}</p>}
                           </div>
                           <button
                             type="button"

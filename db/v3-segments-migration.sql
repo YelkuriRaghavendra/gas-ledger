@@ -52,6 +52,25 @@ alter table public.purchases
 create index if not exists idx_transactions_bill on public.transactions (bill_id);
 create index if not exists idx_purchases_bill on public.purchases (bill_id);
 
+-- ── 3b. Combos (bundle items) ────────────────────────────────
+-- A bundle (e.g. "New Connection") has no stock of its own; selling
+-- it consumes its components' stock (e.g. 1 × 14.2 kg cylinder).
+create table if not exists public.bundle_components (
+  id                    bigserial primary key,
+  bundle_product_id     bigint not null references public.products(id) on delete cascade,
+  component_product_id  bigint not null references public.products(id) on delete restrict,
+  qty                   numeric not null default 1 check (qty > 0),
+  unique (bundle_product_id, component_product_id)
+);
+
+alter table public.bundle_components enable row level security;
+drop policy if exists "bundle_components_read" on public.bundle_components;
+create policy "bundle_components_read" on public.bundle_components
+  for select to authenticated using (true);
+drop policy if exists "bundle_components_write" on public.bundle_components;
+create policy "bundle_components_write" on public.bundle_components
+  for all to authenticated using (true) with check (true);
+
 -- ── 4. Views become segment-aware ────────────────────────────
 -- CREATE OR REPLACE can't add columns mid-view, so drop and
 -- recreate (monthly first — it depends on daily).
@@ -72,6 +91,11 @@ select
   p.godown_capacity,
   coalesce(sum(pu.qty), 0)
     - coalesce((select sum(t.qty) from transactions t where t.product_id = p.id and t.type = 'sale'), 0)
+    -- combos: selling a bundle consumes its components' stock
+    - coalesce((select sum(t.qty * bc.qty)
+                from transactions t
+                join bundle_components bc on bc.bundle_product_id = t.product_id
+                where bc.component_product_id = p.id and t.type = 'sale'), 0)
     as full_cylinders,
   (coalesce((select sum(t.empties) from transactions t where t.product_id = p.id and t.type = 'sale'), 0)
     + coalesce((select sum(t.qty) from transactions t where t.product_id = p.id and t.type = 'return'), 0))
@@ -162,6 +186,18 @@ select * from (values
   ('Pass Book',                 0::numeric, 'domestic', 'service',  'pc', 11)
 ) as v(name, price, segment, kind, unit, sort_order)
 where not exists (select 1 from public.products where segment = 'domestic');
+
+-- Combos: each New Connection includes one 14.2 kg cylinder.
+insert into public.bundle_components (bundle_product_id, component_product_id, qty)
+select nc.id, cyl.id, 1
+from public.products nc
+join public.products cyl
+  on cyl.segment = 'domestic' and cyl.name = '14.2 kg'
+where nc.segment = 'domestic'
+  and nc.name like 'New Connection%'
+  and not exists (
+    select 1 from public.bundle_components b where b.bundle_product_id = nc.id
+  );
 
 -- Existing commercial rows: mark cylinders explicitly (they already
 -- default to kind='cylinder', segment='commercial' — nothing to do).
