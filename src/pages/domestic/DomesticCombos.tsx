@@ -72,6 +72,28 @@ export function DomesticCombos() {
     openEditor(created as Product)
   }
 
+  async function handleDelete() {
+    if (!editing) return
+    if (!confirm(`Delete "${editing.name}"? It will disappear from billing.`)) return
+    setSaving(true)
+    setError(null)
+    // Try a real delete first; if old bills reference it, deactivate
+    // instead so history keeps the name.
+    const { error: delError } = await supabase.from('products').delete().eq('id', editing.id)
+    if (delError) {
+      const { error: updError } = await supabase.from('products').update({ active: false }).eq('id', editing.id)
+      if (updError) {
+        setError(updError.message)
+        setSaving(false)
+        return
+      }
+    }
+    setSaving(false)
+    setEditing(null)
+    await refreshProducts()
+    refresh()
+  }
+
   async function handleSave() {
     if (!editing) return
     setSaving(true)
@@ -220,14 +242,24 @@ export function DomesticCombos() {
               ))}
             </div>
             {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="mt-4 h-[50px] w-full rounded-[14px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save combo'}
-            </button>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving}
+                className="h-[50px] w-[110px] shrink-0 rounded-[14px] border-[1.5px] border-borderMuted bg-surface font-bold text-red-600 transition active:scale-[0.99] disabled:opacity-50"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="h-[50px] flex-1 rounded-[14px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save combo'}
+              </button>
+            </div>
           </div>
         )}
       </BottomSheet>
