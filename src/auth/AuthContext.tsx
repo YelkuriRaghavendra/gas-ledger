@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { clearMode } from '../mode/mode'
 import type { Profile } from '../types/db'
 
 interface AuthState {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     supabase
       .from('profiles')
-      .select('id, name, role')
+      .select('id, name, role, segment_access')
       .eq('id', session.user.id)
       .single()
       .then(({ data, error }) => {
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    clearMode()
     await supabase.auth.signOut()
   }
 

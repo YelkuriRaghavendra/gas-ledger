@@ -61,6 +61,15 @@ export function Account() {
         </Link>
       </div>
 
+      {profile?.segment_access === 'both' && (
+        <Link
+          to="/choose"
+          className="mb-[22px] flex items-center justify-between rounded-[20px] border border-[#D9EDE1] bg-[#EAF4EE] px-[18px] py-4 text-sm font-bold text-[#2E8B57]"
+        >
+          Switch to Domestic <span style={{ color: '#7FB99A' }}>›</span>
+        </Link>
+      )}
+
       <button
         onClick={signOut}
         className="h-[52px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-white text-[15px] font-bold"

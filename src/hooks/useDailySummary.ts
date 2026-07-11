@@ -28,7 +28,7 @@ export function useDailySummary() {
     const day = todayStart()
 
     const [productsRes, moneyRes] = await Promise.all([
-      supabase.from('daily_product_summary').select('*').eq('day', day),
+      supabase.from('daily_product_summary').select('*').eq('day', day).eq('segment', 'commercial'),
       supabase.from('daily_money_summary').select('*').eq('day', day).maybeSingle(),
     ])
 
@@ -42,7 +42,11 @@ export function useDailySummary() {
     // table. If it doesn't exist yet, swallow the error and leave purchases
     // empty so the screen degrades gracefully instead of erroring out.
     try {
-      const purchasesRes = await supabase.from('daily_purchase_summary').select('*').eq('day', day)
+      const purchasesRes = await supabase
+        .from('daily_purchase_summary')
+        .select('*')
+        .eq('day', day)
+        .eq('segment', 'commercial')
       if (!purchasesRes.error) setPurchases(purchasesRes.data as DailyPurchaseSummary[])
       else setPurchases([])
     } catch {

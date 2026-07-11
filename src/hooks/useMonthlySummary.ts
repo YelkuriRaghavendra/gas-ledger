@@ -36,8 +36,8 @@ export function useMonthlySummary() {
     const lastMonth = monthStart(-1)
 
     const [productsRes, prevProductsRes, moneyRes, prevMoneyRes] = await Promise.all([
-      supabase.from('monthly_product_summary').select('*').eq('month', thisMonth),
-      supabase.from('monthly_product_summary').select('*').eq('month', lastMonth),
+      supabase.from('monthly_product_summary').select('*').eq('month', thisMonth).eq('segment', 'commercial'),
+      supabase.from('monthly_product_summary').select('*').eq('month', lastMonth).eq('segment', 'commercial'),
       supabase.from('monthly_money_summary').select('*').eq('month', thisMonth).maybeSingle(),
       supabase.from('monthly_money_summary').select('*').eq('month', lastMonth).maybeSingle(),
     ])
@@ -59,6 +59,7 @@ export function useMonthlySummary() {
         .from('daily_purchase_summary')
         .select('*')
         .gte('day', thisMonth)
+        .eq('segment', 'commercial')
       if (!purchasesRes.error) setPurchases(purchasesRes.data as DailyPurchaseSummary[])
       else setPurchases([])
     } catch {

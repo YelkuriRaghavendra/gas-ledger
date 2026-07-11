@@ -32,6 +32,7 @@ export function useRevenueTrend(days: 7 | 30) {
       .from('daily_product_summary')
       .select('*')
       .gte('day', start)
+      .eq('segment', 'commercial')
       .order('day', { ascending: true })
 
     if (error) {

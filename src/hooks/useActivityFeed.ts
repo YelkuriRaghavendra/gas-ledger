@@ -7,11 +7,13 @@ export function useActivityFeed(limit = 50) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Domestic sales carry no customer — keep them out of the commercial feed.
   const refresh = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('activity_feed')
       .select('*')
+      .not('customer_id', 'is', null)
       .order('created_at', { ascending: false })
       .limit(limit)
     if (error) setError(error.message)
@@ -20,23 +22,8 @@ export function useActivityFeed(limit = 50) {
   }, [limit])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    supabase
-      .from('activity_feed')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit)
-      .then(({ data, error }) => {
-        if (cancelled) return
-        if (error) setError(error.message)
-        else setData(data as ActivityEntry[])
-        setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [limit])
+    refresh()
+  }, [refresh])
 
   return { data, loading, error, refresh }
 }
