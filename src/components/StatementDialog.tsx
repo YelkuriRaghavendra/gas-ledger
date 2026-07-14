@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { BottomSheet } from './BottomSheet'
 import { DownloadIcon, ShareIcon, ChevronLeftIcon } from './icons'
 import { formatCurrency } from '../utils/format'
@@ -43,6 +43,16 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
   const [from, setFrom] = useState(toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
   const [to, setTo] = useState(toDateInputValue(now))
 
+  // Refresh the custom-range defaults each time the dialog opens so they don't
+  // go stale if the component stays mounted across a month boundary.
+  useEffect(() => {
+    if (open) {
+      const today = new Date()
+      setFrom(toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)))
+      setTo(toDateInputValue(today))
+    }
+  }, [open])
+
   function buildPdfHtml() {
     const filtered = filterGroupsByPeriod(groups, period, from, to)
     return generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency)
@@ -76,14 +86,18 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
   }
 
   async function handleShareOther() {
-    if (navigator.share) {
+    const html = buildPdfHtml()
+    const file = new File([html], `${customerName}-statement.html`, { type: 'text/html' })
+    const business = agency?.name || 'Statement'
+    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ title: `${customerName} — Statement`, text: summaryText() })
+        await navigator.share({ files: [file], title: `${business} statement`, text: summaryText() })
       } catch {
-        // user cancelled the share sheet — nothing to do
+        // user cancelled the share sheet (AbortError) — nothing to do
       }
     } else {
-      handleDownloadPdf()
+      // No file-share support — fall back to the Download PDF behavior.
+      openPrintWindow()
     }
   }
 
