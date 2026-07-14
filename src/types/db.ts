@@ -50,6 +50,8 @@ export interface Transaction {
   bill_id: string | null
   created_by: string | null
   created_at: string
+  updated_at: string
+  updated_by: string | null
 }
 
 export interface CustomerBalance {
@@ -82,6 +84,8 @@ export interface Purchase {
   bill_id: string | null
   created_by: string | null
   created_at: string
+  updated_at: string
+  updated_by: string | null
 }
 
 export interface GodownStock {
