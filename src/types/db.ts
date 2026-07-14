@@ -101,9 +101,9 @@ export interface GodownStock {
 
 export interface ActivityEntry {
   id: number
-  customer_id: number
+  customer_id: number | null
   customer_name: string
-  type: TransactionType
+  type: 'sale' | 'return' | 'payment' | 'purchase'
   product_id: number | null
   product_name: string | null
   qty: number
@@ -112,6 +112,8 @@ export interface ActivityEntry {
   note: string | null
   created_by: string | null
   created_at: string
+  updated_at: string
+  segment: Segment
 }
 
 export interface AgencySettings {
