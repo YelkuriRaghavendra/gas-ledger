@@ -115,6 +115,11 @@ export interface AgencySettings {
   business_name: string
   business_phone: string | null
   business_address: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  pincode: string | null
+  gst_number: string | null
   price_per_cylinder: number
   updated_at: string
 }
