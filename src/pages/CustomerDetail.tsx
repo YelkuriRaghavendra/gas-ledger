@@ -11,24 +11,11 @@ import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
-import { BottomSheet } from '../components/BottomSheet'
-import { ChevronLeftIcon, PhoneIcon, MapPinIcon, PlusIcon, ReturnIcon, CreditCardIcon, DownloadIcon } from '../components/icons'
+import { StatementDialog } from '../components/StatementDialog'
+import { DetailModal } from '../components/DetailModal'
+import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon } from '../components/icons'
 import type { Transaction } from '../types/db'
-import { HistoryEntry, HistoryGroup, historyTitle, generatePdfHtml } from '../utils/statement'
-
-function historySubtitle(t: Transaction) {
-  const date = formatRelativeDate(t.created_at)
-  if (t.type === 'sale') {
-    const empties = t.empties ? ` · ${t.empties} empties collected` : ''
-    const paid = t.paid ? ` · Paid${t.method ? ` (${t.method === 'upi' ? 'UPI' : 'Cash'})` : ''}` : ''
-    return `${date} · ${formatCurrency(t.amount)}${empties}${paid}`
-  }
-  if (t.type === 'payment') {
-    const method = t.method ? ` · ${t.method === 'upi' ? 'UPI' : 'Cash'}` : ''
-    return `${date} · ${formatCurrency(t.amount)}${method}`
-  }
-  return date
-}
+import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
 
 function historyAmount(t: Transaction) {
   if (t.type === 'sale') return `+${t.qty}`
@@ -81,7 +68,22 @@ function digestLine(group: HistoryGroup) {
   return parts.join(' · ')
 }
 
-
+function detailRows(t: HistoryEntry): { k: string; v: string }[] {
+  const rows: { k: string; v: string }[] = []
+  if (t.productName) rows.push({ k: 'Product', v: t.productName })
+  if (t.type === 'sale') {
+    rows.push({ k: 'Quantity sold', v: String(t.qty) })
+    rows.push({ k: 'Empties collected', v: String(t.empties) })
+    rows.push({ k: 'Payment', v: t.paid ? `Paid${t.method ? ` · ${t.method === 'upi' ? 'UPI' : 'Cash'}` : ''}` : 'On credit' })
+  } else if (t.type === 'return') {
+    rows.push({ k: 'Quantity', v: String(t.qty) })
+  } else if (t.type === 'payment' && t.method) {
+    rows.push({ k: 'Method', v: t.method === 'upi' ? 'UPI' : 'Cash' })
+  }
+  if (t.note) rows.push({ k: 'Note', v: t.note })
+  rows.push({ k: 'Balance after', v: formatCurrency(t.balanceAfter) })
+  return rows
+}
 
 export function CustomerDetail() {
   const { id } = useParams()
@@ -95,6 +97,8 @@ export function CustomerDetail() {
   const { data: transactions, refresh: refreshTx } = useTransactions(customerId)
   const { data: agencySettings } = useAgencySettings()
   const [editing, setEditing] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [statementOpen, setStatementOpen] = useState(false)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
@@ -182,25 +186,61 @@ export function CustomerDetail() {
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
 
   const historyGroups = buildHistoryGroups(transactions, productNameById)
-
-  function handleDownloadPdf() {
-    if (!balance) return
-    const agency = agencySettings ? { name: agencySettings.business_name, phone: agencySettings.business_phone, address: agencySettings.business_address } : null
-    const html = generatePdfHtml(balance.name, balance.phone, balance.address, balance.amount_due, historyGroups, agency)
-    const blob = new Blob([html], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const win = window.open(url, '_blank')
-    if (win) setTimeout(() => { win.print(); URL.revokeObjectURL(url) }, 600)
-    else URL.revokeObjectURL(url)
-  }
-
-
+  const totalEmptiesOut = productBalances.reduce((sum, pb) => sum + pb.empties_outstanding, 0)
+  const agencyAddress = agencySettings
+    ? [agencySettings.address_line1, agencySettings.address_line2, agencySettings.city, agencySettings.pincode].filter(Boolean).join(', ') ||
+      agencySettings.business_address
+    : null
+  const agency = agencySettings
+    ? { name: agencySettings.business_name, phone: agencySettings.business_phone, address: agencyAddress }
+    : null
 
   return (
-    <div className="p-5 pb-10 pt-2">
-      <Link to="/customers" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
-        <ChevronLeftIcon size={18} /> Customers
-      </Link>
+    <div className="p-5 pb-24 pt-2">
+      <div className="mb-3 flex items-center justify-between">
+        <Link to="/customers" className="inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+          <ChevronLeftIcon size={18} /> Customers
+        </Link>
+        {isOwner && !editing && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="More options"
+              className="flex h-[34px] w-[34px] items-center justify-center rounded-[11px] bg-surface text-base font-bold leading-none text-ink shadow-card"
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-[42px] z-20 w-36 rounded-[14px] bg-surface p-1.5 shadow-float">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      startEdit()
+                    }}
+                    className="block w-full rounded-[10px] px-3 py-[9px] text-left text-sm font-bold text-ink"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      handleDeleteCustomer()
+                    }}
+                    className="block w-full rounded-[10px] px-3 py-[9px] text-left text-sm font-bold text-red-600"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {actionError && <p className="mb-4 text-sm text-red-600">{actionError}</p>}
 
@@ -270,33 +310,23 @@ export function CustomerDetail() {
           <Avatar id={balance.id} name={balance.name} size={58} />
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl font-bold leading-[1.1] tracking-[-0.3px] text-ink">{balance.name}</h1>
-            <p className="mt-[3px] text-[13px] font-semibold text-muted">{balance.phone}</p>
-          </div>
-          <div className="flex shrink-0 gap-3 text-xs font-bold">
-            <button onClick={handleDownloadPdf} className="text-ink">
-              <DownloadIcon size={16} />
-            </button>
-            {isOwner && (
-              <>
-                <button onClick={startEdit} className="text-accent">
-                  Edit
-                </button>
-                <button onClick={handleDeleteCustomer} className="text-red-600">
-                  Delete
-                </button>
-              </>
+            {(balance.address || balance.phone) && (
+              <p className="mt-[3px] flex items-center gap-[4px] text-[12px] font-semibold text-muted">
+                <MapPinIcon size={13} />
+                <span className="truncate">{[balance.address, balance.phone].filter(Boolean).join(' · ')}</span>
+              </p>
             )}
           </div>
         </div>
       )}
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex gap-[9px]">
         {balance.phone && (
           <a
             href={`tel:${balance.phone}`}
-            className="flex flex-1 items-center justify-center gap-[7px] rounded-[14px] bg-surface py-[12px] text-[13.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
+            className="flex flex-1 items-center justify-center gap-[6px] rounded-[14px] bg-surface py-[13px] text-[12.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
           >
-            <PhoneIcon size={16} /> Call
+            <PhoneIcon size={15} /> Call
           </a>
         )}
         {balance.address && (
@@ -304,70 +334,55 @@ export function CustomerDetail() {
             href={`https://maps.google.com/?q=${encodeURIComponent(balance.address)}`}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-[7px] overflow-hidden rounded-[14px] bg-surface py-[12px] text-[12.5px] font-semibold text-muted shadow-card transition active:scale-[0.98]"
+            className="flex flex-1 items-center justify-center gap-[6px] rounded-[14px] bg-surface py-[13px] text-[12.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
           >
-            <MapPinIcon size={16} />
-            <span className="truncate">{balance.address}</span>
+            <MapPinIcon size={15} /> Directions
           </a>
         )}
+        <button
+          type="button"
+          onClick={() => setStatementOpen(true)}
+          className="flex flex-1 items-center justify-center gap-[6px] rounded-[14px] bg-surface py-[13px] text-[12.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
+        >
+          <ShareIcon size={15} /> Statement
+        </button>
       </div>
 
+      <div className="mb-[18px] flex items-center justify-between rounded-[20px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#C9BBA8]">Amount due</p>
+          <p className="mt-[3px] font-display text-[25px] font-bold leading-none text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-[#A99B87]">Empties out</p>
+          <p className="mt-[2px] font-display text-[19px] font-bold text-[#5FCF97]">{totalEmptiesOut}</p>
+        </div>
+      </div>
+
+      <h2 className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.6px] text-subtle">By product</h2>
       <div className="grid grid-cols-2 gap-3">
         {productBalances.map((pb) => (
-          <div key={pb.product_id} className="rounded-[18px] bg-surface p-4 shadow-card">
-            <span className="inline-block rounded-lg bg-ink px-[9px] py-[3px] font-display text-[12px] font-bold text-white">
+          <div key={pb.product_id} className="rounded-[18px] bg-surface p-[14px] shadow-card">
+            <span className="inline-block rounded-[10px] bg-ink px-[10px] py-[4px] text-[11.5px] font-bold text-white">
               {pb.product_name}
             </span>
-            <p className="mt-[14px] font-display text-[30px] font-bold leading-none text-[#F26B2C]">
-              {pb.empties_outstanding}
-            </p>
-            <p className="mt-[4px] text-[11px] font-semibold text-subtle">empties owed</p>
-            <div className="mt-[14px] flex gap-2 border-t border-borderMuted pt-[12px]">
-              <div className="flex-1">
-                <p className="font-display text-[17px] font-bold text-ink">{pb.sold}</p>
-                <p className="text-[10.5px] font-semibold text-subtle">sold</p>
+            <p className="mt-3 font-display text-[28px] font-bold leading-none text-[#F26B2C]">{pb.empties_outstanding}</p>
+            <p className="mt-1 text-[10.5px] font-semibold text-subtle">empties owed</p>
+            <div className="mt-[11px] flex gap-4 border-t border-borderMuted pt-[11px]">
+              <div>
+                <p className="font-display text-[16px] font-bold text-ink">{pb.sold}</p>
+                <p className="mt-[2px] text-[10px] font-semibold text-subtle">sold</p>
               </div>
-              <div className="flex-1">
-                <p className="font-display text-[17px] font-bold text-[#2E8B57]">{pb.returned}</p>
-                <p className="text-[10.5px] font-semibold text-subtle">returned</p>
+              <div>
+                <p className="font-display text-[16px] font-bold text-[#2E8B57]">{pb.returned}</p>
+                <p className="mt-[2px] text-[10px] font-semibold text-subtle">returned</p>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-between rounded-[18px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
-        <span className="text-[13px] font-semibold text-[#C9BBA8]">Amount due</span>
-        <span className="font-display text-[22px] font-bold text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</span>
-      </div>
-
-
-
-      <div className="my-[18px] grid grid-cols-3 gap-3">
-        <Link
-          to={`/customers/${customerId}/sale`}
-          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-gradient-to-br from-accentSoft to-accent py-[14px] text-[13px] font-bold text-white shadow-glow transition active:scale-[0.97]"
-        >
-          <PlusIcon size={20} strokeWidth={2.3} />
-          Sale
-        </Link>
-        <Link
-          to={`/customers/${customerId}/return`}
-          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-surface py-[14px] text-[13px] font-bold text-ink shadow-card transition active:scale-[0.97]"
-        >
-          <ReturnIcon size={20} color="#2E8B57" strokeWidth={2.2} />
-          Return
-        </Link>
-        <Link
-          to={`/customers/${customerId}/payment`}
-          className="flex flex-col items-center gap-[6px] rounded-[16px] bg-surface py-[14px] text-[13px] font-bold text-ink shadow-card transition active:scale-[0.97]"
-        >
-          <CreditCardIcon size={20} color="#3B6EA5" strokeWidth={2.2} />
-          Payment
-        </Link>
-      </div>
-
-      <h2 className="mb-3 font-display text-[18px] font-bold tracking-[-0.3px] text-ink">History</h2>
+      <h2 className="mb-3 mt-6 font-display text-[18px] font-bold tracking-[-0.3px] text-ink">History</h2>
       {historyGroups.map((group) => (
         <div key={group.key} className="mb-5">
           <div className="mb-2 flex items-baseline justify-between gap-2 px-1">
@@ -391,17 +406,14 @@ export function CustomerDetail() {
                       {getActivityIcon(t.type)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
-                        <p className="shrink-0 font-display text-sm font-bold" style={{ color: tint.color }}>
-                          {historyAmount(t)}
-                        </p>
-                      </div>
-                      <div className="mt-[2px] flex items-baseline justify-between gap-2">
-                        <p className="truncate text-xs font-semibold text-[#9A8F80]">{historySubtitle(t)}</p>
-                        <p className="shrink-0 text-xs font-semibold text-muted">Bal {formatCurrency(t.balanceAfter)}</p>
-                      </div>
-                      {t.note && <p className="mt-[1px] truncate text-xs italic text-muted">{t.note}</p>}
+                      <p className="truncate text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
+                      <p className="mt-[2px] truncate text-xs font-semibold text-[#9A8F80]">{formatRelativeDate(t.created_at)}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-display text-sm font-bold" style={{ color: tint.color }}>
+                        {historyAmount(t)}
+                      </p>
+                      <p className="mt-[1px] text-xs font-semibold text-muted">Bal {formatCurrency(t.balanceAfter)}</p>
                     </div>
                     <span className="shrink-0 rotate-180">
                       <ChevronLeftIcon size={16} color="#B7AC9B" />
@@ -415,60 +427,34 @@ export function CustomerDetail() {
       ))}
       {transactions.length === 0 && <p className="text-muted">No transactions yet.</p>}
 
-      <BottomSheet open={viewingTx !== null} onClose={() => setViewingTx(null)}>
-        {viewingTx && (
-          <div>
-            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">{historyTitle(viewingTx, viewingTx.productName)}</h2>
-            <dl className="flex flex-col gap-3">
-              <div className="flex justify-between border-b border-borderMuted pb-3">
-                <dt className="text-[13px] font-semibold text-muted">Date &amp; time</dt>
-                <dd className="text-[13px] font-bold text-ink">{formatDate(viewingTx.created_at)}</dd>
-              </div>
-              {viewingTx.type !== 'payment' && (
-                <div className="flex justify-between border-b border-borderMuted pb-3">
-                  <dt className="text-[13px] font-semibold text-muted">Cylinders</dt>
-                  <dd className="text-[13px] font-bold text-ink">{viewingTx.qty}</dd>
-                </div>
-              )}
-              {viewingTx.type === 'sale' && (
-                <div className="flex justify-between border-b border-borderMuted pb-3">
-                  <dt className="text-[13px] font-semibold text-muted">Empties collected</dt>
-                  <dd className="text-[13px] font-bold text-ink">{viewingTx.empties}</dd>
-                </div>
-              )}
-              {viewingTx.type !== 'return' && (
-                <div className="flex justify-between border-b border-borderMuted pb-3">
-                  <dt className="text-[13px] font-semibold text-muted">Amount</dt>
-                  <dd className="text-[13px] font-bold text-ink">{formatCurrency(viewingTx.amount)}</dd>
-                </div>
-              )}
-              {(viewingTx.type === 'payment' || viewingTx.paid) && (
-                <div className="flex justify-between border-b border-borderMuted pb-3">
-                  <dt className="text-[13px] font-semibold text-muted">Payment method</dt>
-                  <dd className="text-[13px] font-bold text-ink">{viewingTx.method === 'upi' ? 'UPI' : 'Cash'}</dd>
-                </div>
-              )}
-              {viewingTx.type === 'sale' && (
-                <div className="flex justify-between border-b border-borderMuted pb-3">
-                  <dt className="text-[13px] font-semibold text-muted">Payment status</dt>
-                  <dd className="text-[13px] font-bold text-ink">{viewingTx.paid ? 'Paid' : 'On credit'}</dd>
-                </div>
-              )}
-              {viewingTx.note && (
-                <div className="flex justify-between border-b border-borderMuted pb-3">
-                  <dt className="text-[13px] font-semibold text-muted">Note</dt>
-                  <dd className="text-right text-[13px] font-bold text-ink">{viewingTx.note}</dd>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <dt className="text-[13px] font-semibold text-muted">Balance after</dt>
-                <dd className="text-[13px] font-bold text-ink">{formatCurrency(viewingTx.balanceAfter)}</dd>
-              </div>
-            </dl>
-            {isOwner && (
-              <div className="mt-5 flex gap-2">
+      <StatementDialog
+        open={statementOpen}
+        onClose={() => setStatementOpen(false)}
+        customerName={balance.name}
+        amountDue={balance.amount_due}
+        groups={historyGroups}
+        customer={{ phone: balance.phone, address: balance.address }}
+        agency={agency}
+      />
+
+      {viewingTx && (
+        <DetailModal
+          open={viewingTx !== null}
+          onClose={() => setViewingTx(null)}
+          icon={getActivityIcon(viewingTx.type)}
+          iconBg={getActivityTint(viewingTx.type).bg}
+          iconColor={getActivityTint(viewingTx.type).color}
+          title={historyTitle(viewingTx, viewingTx.productName)}
+          amount={historyAmount(viewingTx)}
+          rows={detailRows(viewingTx)}
+          created={formatDate(viewingTx.created_at)}
+          updated={formatDate(viewingTx.updated_at)}
+          actions={
+            isOwner ? (
+              <>
                 <Link
                   to={transactionEditPath(viewingTx)}
+                  onClick={() => setViewingTx(null)}
                   className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
                 >
                   Edit
@@ -476,19 +462,19 @@ export function CustomerDetail() {
                 <button
                   type="button"
                   onClick={() => {
-                    const id = viewingTx.id
+                    const txId = viewingTx.id
                     setViewingTx(null)
-                    handleDeleteTransaction(id)
+                    handleDeleteTransaction(txId)
                   }}
-                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] border-[1.5px] border-borderMuted bg-surface font-bold text-red-600 transition active:scale-[0.99]"
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
                 >
                   Delete
                 </button>
-              </div>
-            )}
-          </div>
-        )}
-      </BottomSheet>
+              </>
+            ) : undefined
+          }
+        />
+      )}
     </div>
   )
 }
