@@ -14,7 +14,6 @@ import { NewSale } from './pages/NewSale'
 import { LogReturn } from './pages/LogReturn'
 import { RecordPayment } from './pages/RecordPayment'
 import { ActivityFeed } from './pages/ActivityFeed'
-import { Account } from './pages/Account'
 import { BusinessDetails } from './pages/BusinessDetails'
 import { CylinderPricing } from './pages/CylinderPricing'
 import { ExportLedger } from './pages/ExportLedger'
@@ -59,7 +58,6 @@ export default function App() {
             <Route path="/customers/:id/payment" element={<RecordPayment />} />
             <Route path="/customers/:id/payment/:txId/edit" element={<RecordPayment />} />
             <Route path="/activity" element={<ActivityFeed />} />
-            <Route path="/account" element={<Account />} />
             <Route path="/account/business" element={<BusinessDetails />} />
             <Route path="/account/pricing" element={<CylinderPricing />} />
             <Route path="/account/export" element={<ExportLedger />} />

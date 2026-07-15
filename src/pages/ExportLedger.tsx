@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { ChevronLeftIcon } from '../components/icons'
 
 function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return ''
@@ -40,6 +42,9 @@ export function ExportLedger() {
 
   return (
     <div className="p-5 pb-10 pt-3">
+      <Link to="/" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+        <ChevronLeftIcon size={18} /> Back
+      </Link>
       <h1 className="mb-2 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Export ledger</h1>
       <p className="mb-5 text-[13px] font-medium leading-[1.5] text-subtle">
         Download every sale, return, and payment as a CSV file.

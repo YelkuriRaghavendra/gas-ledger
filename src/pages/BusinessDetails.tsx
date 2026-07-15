@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
+import { ChevronLeftIcon } from '../components/icons'
 
 export function BusinessDetails() {
   const { data, loading, refresh } = useAgencySettings()
@@ -59,7 +60,7 @@ export function BusinessDetails() {
       return
     }
     refresh()
-    navigate('/account')
+    navigate('/')
   }
 
   const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
@@ -69,6 +70,9 @@ export function BusinessDetails() {
 
   return (
     <div className="p-4">
+      <Link to="/" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+        <ChevronLeftIcon size={18} /> Back
+      </Link>
       <h1 className="mb-4 text-xl font-bold text-ink">Business details</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

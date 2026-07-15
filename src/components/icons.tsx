@@ -30,15 +30,6 @@ export function ActivityIcon({ size = 24, color = 'currentColor', strokeWidth = 
   )
 }
 
-export function AccountIcon({ size = 24, color = 'currentColor', strokeWidth = 2 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
-    </svg>
-  )
-}
-
 export function PlusIcon({ size = 24, color = '#fff', strokeWidth = 2 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round">
