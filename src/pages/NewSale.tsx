@@ -42,6 +42,7 @@ export function NewSale() {
   // Each size starts as a slim row; tapping "+ Add to sale" expands it into a
   // full entry line. In edit mode the single line is always expanded.
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [seededExpand, setSeededExpand] = useState(false)
   const expand = (pid: number) => setExpanded((s) => new Set(s).add(pid))
   const collapse = (pid: number) => {
     setExpanded((s) => {
@@ -79,6 +80,14 @@ export function NewSale() {
       return next
     })
   }, [products, editing])
+
+  // Open the primary cylinder (19 kg — first by sort order) by default, since
+  // it's the most common sale. Seed once so a manual collapse still sticks.
+  useEffect(() => {
+    if (editing || seededExpand || products.length === 0) return
+    setExpanded(new Set([products[0].id]))
+    setSeededExpand(true)
+  }, [products, editing, seededExpand])
 
   useEffect(() => {
     if (!editing || loadedEdit) return
