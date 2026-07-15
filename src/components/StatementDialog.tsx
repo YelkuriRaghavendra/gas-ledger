@@ -1,8 +1,8 @@
 import { ReactNode, useEffect, useState } from 'react'
 import { BottomSheet } from './BottomSheet'
-import { DownloadIcon, ShareIcon, ChevronLeftIcon } from './icons'
+import { DownloadIcon, ChevronLeftIcon } from './icons'
 import { formatCurrency } from '../utils/format'
-import { generatePdfHtml, filterGroupsByPeriod } from '../utils/statement'
+import { generatePdfHtml, generatePdfBlob, statementFilename, filterGroupsByPeriod } from '../utils/statement'
 import type { HistoryGroup, StatementPeriod } from '../utils/statement'
 
 interface StatementDialogProps {
@@ -53,13 +53,14 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
     }
   }, [open])
 
-  function buildPdfHtml() {
+  function buildPdf() {
     const filtered = filterGroupsByPeriod(groups, period, from, to)
-    return generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency)
+    return generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency)
   }
 
   function openPrintWindow() {
-    const html = buildPdfHtml()
+    const filtered = filterGroupsByPeriod(groups, period, from, to)
+    const html = generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency)
     const blob = new Blob([html], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
     const win = window.open(url, '_blank')
@@ -73,21 +74,20 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
   }
 
   function handleDownloadPdf() {
-    openPrintWindow()
+    const blob = buildPdf()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = statementFilename(customerName)
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
-  function handleWhatsApp() {
-    const text = `${summaryText()}. Download the attached PDF for the full statement.`
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
-  }
-
-  function handlePrint() {
-    openPrintWindow()
-  }
-
-  async function handleShareOther() {
-    const html = buildPdfHtml()
-    const file = new File([html], `${customerName}-statement.html`, { type: 'text/html' })
+  async function handleWhatsApp() {
+    const blob = buildPdf()
+    const file = new File([blob], statementFilename(customerName), { type: 'application/pdf' })
     const business = agency?.name || 'Statement'
     if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
@@ -96,9 +96,13 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
         // user cancelled the share sheet (AbortError) — nothing to do
       }
     } else {
-      // No file-share support — fall back to the Download PDF behavior.
-      openPrintWindow()
+      // No file-share support (desktop) — fall back to a text-only WhatsApp message.
+      window.open(`https://wa.me/?text=${encodeURIComponent(summaryText())}`, '_blank')
     }
+  }
+
+  function handlePrint() {
+    openPrintWindow()
   }
 
   return (
@@ -149,14 +153,14 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
           tint="#FDECE3"
           icon={<DownloadIcon size={17} color="#E4571B" />}
           title="Download PDF"
-          subtitle="Open & print the statement"
+          subtitle="Save the statement as a PDF"
           onClick={handleDownloadPdf}
         />
         <OptionRow
           tint="#E4F5EA"
           icon={<WhatsAppGlyph />}
           title="Share on WhatsApp"
-          subtitle="Send PDF to the customer"
+          subtitle="Attach the PDF (on phone)"
           onClick={handleWhatsApp}
         />
         <OptionRow
@@ -165,13 +169,6 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
           title="Print"
           subtitle="To a connected printer"
           onClick={handlePrint}
-        />
-        <OptionRow
-          tint="#F1EDF9"
-          icon={<ShareIcon size={17} color="#7A5AF8" />}
-          title="Share to other apps"
-          subtitle="Email, Drive, etc."
-          onClick={handleShareOther}
         />
       </div>
     </BottomSheet>
