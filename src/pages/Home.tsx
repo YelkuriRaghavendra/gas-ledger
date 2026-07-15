@@ -109,7 +109,7 @@ export function Home() {
                 const tint = getActivityTint(entry.type)
                 return (
                   <li
-                    key={entry.id}
+                    key={`${entry.type}-${entry.id}`}
                     className="flex items-center gap-[13px] rounded-[18px] bg-surface px-[15px] py-[14px] shadow-card"
                   >
                     <div

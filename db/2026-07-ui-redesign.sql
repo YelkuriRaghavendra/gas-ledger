@@ -37,7 +37,7 @@ create view public.activity_feed as
 select
   t.id, t.customer_id, c.name as customer_name, t.type, t.qty, t.empties,
   t.amount, t.note, t.created_by, t.created_at, t.updated_at,
-  t.product_id, p.name as product_name, p.segment
+  t.product_id, p.name as product_name, 'commercial' as segment
 from transactions t
 join customers c on c.id = t.customer_id
 left join products p on p.id = t.product_id
