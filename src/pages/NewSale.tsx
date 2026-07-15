@@ -154,6 +154,7 @@ export function NewSale() {
           method: received ? method : null,
           note: note.trim() || null,
           created_at: timestamp,
+          updated_by: session?.user.id,
         })
         .eq('id', Number(txId))
       setSaving(false)

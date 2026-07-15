@@ -109,7 +109,7 @@ export function RecordPurchase() {
       const l = lines[0]
       const { error } = await supabase
         .from('purchases')
-        .update({ qty: l.qty, empties_given: l.empties, amount: l.qty * l.price, created_at: timestamp })
+        .update({ qty: l.qty, empties_given: l.empties, amount: l.qty * l.price, created_at: timestamp, updated_by: session?.user.id })
         .eq('id', Number(txId))
       setSaving(false)
       if (error) {

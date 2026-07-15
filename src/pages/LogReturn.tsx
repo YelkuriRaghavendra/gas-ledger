@@ -87,7 +87,7 @@ export function LogReturn() {
     if (editing && editProductId !== null) {
       const { error } = await supabase
         .from('transactions')
-        .update({ qty: lines[0].qty, created_at: timestamp })
+        .update({ qty: lines[0].qty, created_at: timestamp, updated_by: session?.user.id })
         .eq('id', Number(txId))
       setSaving(false)
       if (error) {
