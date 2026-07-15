@@ -18,7 +18,6 @@ import type { Transaction } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
 
 function historyAmount(t: Transaction) {
-  if (t.type === 'sale') return `+${t.qty}`
   if (t.type === 'return') return `−${t.qty}`
   return formatCurrency(t.amount)
 }
