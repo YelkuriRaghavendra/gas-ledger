@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -5,6 +6,8 @@ import { useProducts } from '../../hooks/useProducts'
 import { usePurchases } from '../../hooks/usePurchases'
 import { formatCurrency, formatRelativeDate } from '../../utils/format'
 import { PlusIcon } from '../../components/icons'
+import { AppHeader } from '../../components/AppHeader'
+import { AccountMenu } from '../../components/AccountMenu'
 import type { Purchase } from '../../types/db'
 
 interface PurchaseBill {
@@ -31,6 +34,7 @@ function groupIntoBills(rows: Purchase[]): PurchaseBill[] {
 }
 
 export function DomesticPurchases() {
+  const [accountOpen, setAccountOpen] = useState(false)
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
   const { data: products } = useProducts('domestic')
@@ -46,7 +50,11 @@ export function DomesticPurchases() {
   }
 
   return (
-    <div className="p-5 pb-[110px] pt-3">
+    <div className="pb-[110px]">
+      <AppHeader segment="domestic" onOpenAccount={() => setAccountOpen(true)} />
+      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+
+      <div className="p-5 pt-1">
       <div className="mb-[22px] flex items-center justify-between">
         <h1 className="font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Purchases</h1>
         <Link
@@ -91,6 +99,7 @@ export function DomesticPurchases() {
         ))}
       </ul>
       {bills.length === 0 && <p className="text-muted">No stock received yet.</p>}
+      </div>
     </div>
   )
 }
