@@ -39,12 +39,6 @@ export function Account() {
           Products <span style={{ color: '#C0B4A2' }}>›</span>
         </Link>
         <Link
-          to="/account/reports"
-          className="flex items-center justify-between border-b border-[#F1E9DB] px-[18px] py-4 text-sm font-semibold text-ink"
-        >
-          Reports <span style={{ color: '#C0B4A2' }}>›</span>
-        </Link>
-        <Link
           to="/purchases"
           className="flex items-center justify-between border-b border-[#F1E9DB] px-[18px] py-4 text-sm font-semibold text-ink"
         >

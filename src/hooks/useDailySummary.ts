@@ -13,8 +13,8 @@ function todayStart() {
  * daily_purchase_summary if that view exists. Phase 2 (which owns the
  * `purchases` table and its summary view) may not be deployed yet, so the
  * purchases fetch is best-effort: a missing view/table yields an empty
- * `purchases` array rather than surfacing an error, letting the Reports
- * screen omit the purchases sub-section instead of crashing.
+ * `purchases` array rather than surfacing an error, letting consumers
+ * omit the purchases figures instead of crashing.
  */
 export function useDailySummary() {
   const [products, setProducts] = useState<DailyProductSummary[]>([])

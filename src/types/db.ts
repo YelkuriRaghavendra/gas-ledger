@@ -135,7 +135,7 @@ export interface AgencySettings {
 // reads Phase 2's `purchases` table. Defined locally (not imported from a
 // Phase 2 types module) since this worktree doesn't carry Phase 2's
 // TypeScript types — only the SQL view may or may not exist at runtime. See
-// useDailySummary/useMonthlySummary for how a missing view degrades gracefully.
+// useDailySummary for how a missing view degrades gracefully.
 export interface DailyProductSummary {
   day: string
   product_id: number
@@ -158,20 +158,4 @@ export interface DailyPurchaseSummary {
   cylinders_purchased: number
   empties_given_to_supplier: number
   purchase_amount: number
-}
-
-export interface MonthlyProductSummary {
-  month: string
-  product_id: number
-  product_name: string
-  segment: Segment
-  cylinders_sold: number
-  revenue: number
-  collected_at_sale: number
-  empties_collected: number
-}
-
-export interface MonthlyMoneySummary {
-  month: string
-  payments_collected: number
 }
