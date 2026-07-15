@@ -49,3 +49,29 @@ select
 from purchases pu
 join products pr on pr.id = pu.product_id
 order by created_at desc;
+
+-- 4. Outright cylinder sales: customer buys/owns the cylinder (not part of empties-owed)
+alter table public.transactions add column if not exists outright boolean not null default false;
+
+-- customer_product_balances: outright sales/returns don't move the empties-owed
+-- needle. godown_stock is unaffected by this change (kept as-is): a full
+-- cylinder still leaves the godown on an outright sale, and an outright
+-- return's qty still adds an empty back to the godown.
+create or replace view public.customer_product_balances as
+select
+  c.id as customer_id,
+  p.id as product_id,
+  p.name as product_name,
+  coalesce(sum(t.qty) filter (where t.type = 'sale' and not t.outright), 0)
+    + case when c.starting_empties_product_id = p.id then c.starting_empties_owed else 0 end as sold,
+  coalesce(sum(t.empties) filter (where t.type = 'sale' and not t.outright), 0)
+    + coalesce(sum(t.qty) filter (where t.type = 'return' and not t.outright), 0) as returned,
+  coalesce(sum(t.qty) filter (where t.type = 'sale' and not t.outright), 0)
+    + case when c.starting_empties_product_id = p.id then c.starting_empties_owed else 0 end
+    - (coalesce(sum(t.empties) filter (where t.type = 'sale' and not t.outright), 0)
+       + coalesce(sum(t.qty) filter (where t.type = 'return' and not t.outright), 0)) as empties_outstanding
+from customers c
+cross join products p
+left join transactions t on t.customer_id = c.id and t.product_id = p.id
+where p.segment = 'commercial' and p.active
+group by c.id, p.id, p.name, c.starting_empties_product_id, c.starting_empties_owed;

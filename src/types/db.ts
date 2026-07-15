@@ -52,6 +52,7 @@ export interface Transaction {
   created_at: string
   updated_at: string
   updated_by: string | null
+  outright: boolean
 }
 
 export interface CustomerBalance {

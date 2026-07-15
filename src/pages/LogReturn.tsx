@@ -22,6 +22,7 @@ export function LogReturn() {
 
   // A return can cover any number of sizes at once: qty of empties returned per product.
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
+  const [outrightByProduct, setOutrightByProduct] = useState<Record<number, boolean>>({})
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -41,6 +42,7 @@ export function LogReturn() {
     if (!tx || tx.product_id === null) return
     setEditProductId(tx.product_id)
     setQtyByProduct({ [tx.product_id]: tx.qty })
+    setOutrightByProduct({ [tx.product_id]: tx.outright })
     setOriginalQty(tx.qty)
     setDate(dateInputValue(tx.created_at))
     setLoadedEdit(true)
@@ -49,6 +51,7 @@ export function LogReturn() {
   const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
 
   const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
+  const setOutright = (pid: number, v: boolean) => setOutrightByProduct((s) => ({ ...s, [pid]: v }))
 
   function ownedFor(pid: number) {
     const bal = productBalances.find((b) => b.product_id === pid)?.empties_outstanding ?? 0
@@ -66,7 +69,12 @@ export function LogReturn() {
       return
     }
     const lines = shownProducts
-      .map((p) => ({ productId: p.id, name: p.name, qty: qtyByProduct[p.id] ?? 0 }))
+      .map((p) => ({
+        productId: p.id,
+        name: p.name,
+        qty: qtyByProduct[p.id] ?? 0,
+        outright: outrightByProduct[p.id] ?? false,
+      }))
       .filter((l) => l.qty > 0)
 
     if (lines.length === 0) {
@@ -74,6 +82,7 @@ export function LogReturn() {
       return
     }
     for (const l of lines) {
+      if (l.outright) continue
       if (l.qty > ownedFor(l.productId)) {
         setError(`Can't return more than the ${ownedFor(l.productId)} ${l.name} empties outstanding.`)
         return
@@ -87,7 +96,12 @@ export function LogReturn() {
     if (editing && editProductId !== null) {
       const { error } = await supabase
         .from('transactions')
-        .update({ qty: lines[0].qty, created_at: timestamp, updated_by: session?.user.id })
+        .update({
+          qty: lines[0].qty,
+          created_at: timestamp,
+          updated_by: session?.user.id,
+          outright: lines[0].outright,
+        })
         .eq('id', Number(txId))
       setSaving(false)
       if (error) {
@@ -107,6 +121,7 @@ export function LogReturn() {
       amount: 0,
       created_by: session?.user.id,
       created_at: timestamp,
+      outright: l.outright,
     }))
     const { error } = await supabase.from('transactions').insert(rows)
     setSaving(false)
@@ -161,21 +176,39 @@ export function LogReturn() {
           )}
 
           <div className="flex gap-3">
-            {shownProducts.map((p) => (
-              <div key={p.id} className="min-w-0 flex-1">
-                <p className={fieldLabel}>{p.name}</p>
-                <Stepper
-                  value={qtyByProduct[p.id] ?? 0}
-                  onChange={(v) => setQty(p.id, v)}
-                  min={editing ? 1 : 0}
-                  variant="secondary"
-                  size="sm"
-                />
-                <p className="mt-2 text-[11px] font-semibold text-muted">
-                  Owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span>
-                </p>
-              </div>
-            ))}
+            {shownProducts.map((p) => {
+              const outright = outrightByProduct[p.id] ?? false
+              return (
+                <div key={p.id} className="min-w-0 flex-1">
+                  <p className={fieldLabel}>{p.name}</p>
+                  <Stepper
+                    value={qtyByProduct[p.id] ?? 0}
+                    onChange={(v) => setQty(p.id, v)}
+                    min={editing ? 1 : 0}
+                    variant="secondary"
+                    size="sm"
+                  />
+                  {p.kind === 'cylinder' && (
+                    <label className="mt-2 flex cursor-pointer items-center gap-[6px] text-[11px] font-semibold text-muted">
+                      <input
+                        type="checkbox"
+                        checked={outright}
+                        onChange={(e) => setOutright(p.id, e.target.checked)}
+                        className="h-[14px] w-[14px] accent-[#E4571B]"
+                      />
+                      Owned cylinder (bought outright)
+                    </label>
+                  )}
+                  {outright ? (
+                    <p className="mt-2 text-[11px] font-semibold text-muted">Not counted against empties owed.</p>
+                  ) : (
+                    <p className="mt-2 text-[11px] font-semibold text-muted">
+                      Owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span>
+                    </p>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
 
