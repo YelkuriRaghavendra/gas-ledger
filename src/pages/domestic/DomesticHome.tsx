@@ -30,7 +30,6 @@ export function DomesticHome() {
   )
 
   const cylinders = stock.filter((s) => s.kind === 'cylinder')
-  const accessories = stock.filter((s) => s.kind === 'accessory')
 
   const cylinderItems: CardItem[] = cylinders.map((s) => ({
     name: s.product_name,
@@ -71,16 +70,6 @@ export function DomesticHome() {
             </div>
 
             <CylindersCard accent="green" linkLabel="All stock" linkTo="/domestic/stock" items={cylinderItems} />
-
-            {accessories.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {accessories.map((s) => (
-                  <span key={s.product_id} className="rounded-full bg-surface px-[13px] py-[7px] text-xs font-bold text-ink shadow-card">
-                    {s.product_name} · <span className={s.full_cylinders < 0 ? 'text-red-600' : 'text-[#2E8B57]'}>{s.full_cylinders}</span>
-                  </span>
-                ))}
-              </div>
-            )}
 
             <div className="mb-3 mt-[18px] flex items-baseline justify-between">
               <h2 className="font-display text-[18px] font-bold tracking-[-0.3px] text-ink">Today's bills</h2>
