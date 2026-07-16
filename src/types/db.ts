@@ -1,19 +1,28 @@
 export type Role = 'owner' | 'staff'
+export type Segment = 'commercial' | 'domestic'
+export type SegmentAccess = Segment | 'both'
 
 export interface Profile {
   id: string
   name: string
   role: Role
+  segment_access: SegmentAccess
 }
 
 export type TransactionType = 'sale' | 'return' | 'payment'
 export type PaymentMethod = 'cash' | 'upi'
+export type ProductKind = 'cylinder' | 'accessory' | 'service'
 
 export interface Product {
   id: number
   name: string
   price: number
   godown_capacity: number | null
+  segment: Segment
+  kind: ProductKind
+  unit: string
+  active: boolean
+  sort_order: number
   created_at: string
 }
 
@@ -29,7 +38,7 @@ export interface Customer {
 
 export interface Transaction {
   id: number
-  customer_id: number
+  customer_id: number | null
   type: TransactionType
   product_id: number | null
   qty: number
@@ -38,6 +47,7 @@ export interface Transaction {
   paid: boolean
   method: PaymentMethod | null
   note: string | null
+  bill_id: string | null
   created_by: string | null
   created_at: string
 }
@@ -69,6 +79,7 @@ export interface Purchase {
   paid: boolean
   method: PaymentMethod | null
   note: string | null
+  bill_id: string | null
   created_by: string | null
   created_at: string
 }
@@ -76,6 +87,9 @@ export interface Purchase {
 export interface GodownStock {
   product_id: number
   product_name: string
+  segment: Segment
+  kind: ProductKind
+  unit: string
   godown_capacity: number | null
   full_cylinders: number
   empty_cylinders: number
@@ -115,6 +129,7 @@ export interface DailyProductSummary {
   day: string
   product_id: number
   product_name: string
+  segment: Segment
   cylinders_sold: number
   revenue: number
   collected_at_sale: number
@@ -138,6 +153,7 @@ export interface MonthlyProductSummary {
   month: string
   product_id: number
   product_name: string
+  segment: Segment
   cylinders_sold: number
   revenue: number
   collected_at_sale: number
