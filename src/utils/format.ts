@@ -15,6 +15,19 @@ export function formatDate(iso: string) {
   })
 }
 
+// Returns a formatted "last updated" time only when the record was genuinely
+// edited after creation. Null/invalid timestamps (never edited, or predating
+// the updated_at column) and updates within ~1s of creation return undefined,
+// so callers can hide the row instead of showing "Invalid Date".
+export function formatUpdated(updatedIso: string | null | undefined, createdIso: string): string | undefined {
+  if (!updatedIso) return undefined
+  const u = new Date(updatedIso).getTime()
+  if (Number.isNaN(u)) return undefined
+  const c = new Date(createdIso).getTime()
+  if (!Number.isNaN(c) && Math.abs(u - c) < 1000) return undefined
+  return formatDate(updatedIso)
+}
+
 export function formatRelativeDate(iso: string) {
   const date = new Date(iso)
   const now = new Date()

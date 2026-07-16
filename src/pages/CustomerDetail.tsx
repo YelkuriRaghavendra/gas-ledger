@@ -7,7 +7,8 @@ import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useProducts } from '../hooks/useProducts'
 import { useTransactions } from '../hooks/useTransactions'
 import { useAgencySettings } from '../hooks/useAgencySettings'
-import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
+import { useProfiles } from '../hooks/useProfiles'
+import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
@@ -106,6 +107,7 @@ export function CustomerDetail() {
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
+  const profileNames = useProfiles()
 
   const productNameById = new Map(products.map((p) => [p.id, p.name]))
 
@@ -347,14 +349,14 @@ export function CustomerDetail() {
         </button>
       </div>
 
-      <div className="mb-[18px] flex items-center justify-between rounded-[20px] bg-gradient-to-br from-inkSoft to-ink px-[18px] py-4 text-white shadow-float">
+      <div className="mb-[18px] flex items-center justify-between rounded-[20px] bg-surface px-[18px] py-4 shadow-card">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#C9BBA8]">Amount due</p>
-          <p className="mt-[3px] font-display text-[25px] font-bold leading-none text-[#FF8A4C]">{formatCurrency(balance.amount_due)}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-subtle">Amount due</p>
+          <p className="mt-[3px] font-display text-[25px] font-bold leading-none text-accent">{formatCurrency(balance.amount_due)}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-[#A99B87]">Empties out</p>
-          <p className="mt-[2px] font-display text-[19px] font-bold text-[#5FCF97]">{totalEmptiesOut}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-subtle">Empties out</p>
+          <p className="mt-[2px] font-display text-[19px] font-bold text-[#2E8B57]">{totalEmptiesOut}</p>
         </div>
       </div>
 
@@ -447,7 +449,9 @@ export function CustomerDetail() {
           amount={historyAmount(viewingTx)}
           rows={detailRows(viewingTx)}
           created={formatDate(viewingTx.created_at)}
-          updated={formatDate(viewingTx.updated_at)}
+          createdBy={viewingTx.created_by ? profileNames.get(viewingTx.created_by) : undefined}
+          updated={formatUpdated(viewingTx.updated_at, viewingTx.created_at)}
+          updatedBy={viewingTx.updated_by ? profileNames.get(viewingTx.updated_by) : undefined}
           actions={
             isOwner ? (
               <>

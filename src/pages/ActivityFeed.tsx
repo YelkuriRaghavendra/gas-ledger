@@ -6,7 +6,8 @@ import { AppHeader } from '../components/AppHeader'
 import { AccountMenu } from '../components/AccountMenu'
 import { DetailModal } from '../components/DetailModal'
 import { useActivityFeed, type FeedItem } from '../hooks/useActivityFeed'
-import { formatCurrency, formatDate, formatRelativeDate } from '../utils/format'
+import { useProfiles } from '../hooks/useProfiles'
+import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 
 const TYPE_LABEL: Record<FeedItem['type'], string> = {
@@ -62,6 +63,7 @@ export function ActivityFeed() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<FeedItem | null>(null)
   const isOwner = profile?.role === 'owner'
+  const profileNames = useProfiles()
 
   async function handleDelete(entry: FeedItem) {
     if (!confirm('Delete this entry?')) return
@@ -135,7 +137,9 @@ export function ActivityFeed() {
           amount={formatCurrency(selected.amount)}
           rows={detailRows(selected)}
           created={formatDate(selected.created_at)}
-          updated={formatDate(selected.updated_at)}
+          createdBy={selected.created_by ? profileNames.get(selected.created_by) : undefined}
+          updated={formatUpdated(selected.updated_at, selected.created_at)}
+          updatedBy={selected.updated_by ? profileNames.get(selected.updated_by) : undefined}
           actions={
             isOwner ? (
               <>

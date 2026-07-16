@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
+import { useProfiles } from '../../hooks/useProfiles'
 import { useDomesticSales, type DomesticBill } from '../../hooks/useDomesticSales'
-import { formatCurrency, formatDate, formatRelativeDate } from '../../utils/format'
+import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../../utils/format'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
@@ -59,12 +60,17 @@ function billUpdatedAt(bill: DomesticBill) {
   return bill.lines.reduce((max, l) => (l.updated_at > max ? l.updated_at : max), bill.lines[0].updated_at)
 }
 
+function billUpdatedBy(bill: DomesticBill) {
+  return bill.lines.reduce((latest, l) => (l.updated_at > latest.updated_at ? l : latest), bill.lines[0]).updated_by
+}
+
 export function DomesticHistory() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<DomesticBill | null>(null)
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
   const { data: products } = useProducts('domestic')
+  const profileNames = useProfiles()
   const since = useMemo(() => daysAgoStartIso(30), [])
   const { bills, loading, error, refresh } = useDomesticSales(since)
 
@@ -150,7 +156,9 @@ export function DomesticHistory() {
           amount={formatCurrency(selected.total)}
           rows={billRows(selected, productNameById)}
           created={formatDate(billCreatedAt(selected))}
-          updated={formatDate(billUpdatedAt(selected))}
+          createdBy={selected.lines[0].created_by ? profileNames.get(selected.lines[0].created_by) : undefined}
+          updated={formatUpdated(billUpdatedAt(selected), billCreatedAt(selected))}
+          updatedBy={billUpdatedBy(selected) ? profileNames.get(billUpdatedBy(selected)!) : undefined}
           actions={
             isOwner ? (
               <button
