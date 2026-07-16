@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { DailyMoneySummary, DailyProductSummary, DailyPurchaseSummary } from '../types/db'
 
-function todayStart() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
+// Today's business date in IST (Asia/Kolkata) as 'YYYY-MM-DD', matching the
+// daily_* views' day bucket (which truncate created_at in Asia/Kolkata).
+// en-CA formats as YYYY-MM-DD; the timeZone makes it correct regardless of
+// the device's own timezone.
+function todayInIST() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
 }
 
 /**
@@ -25,7 +27,7 @@ export function useDailySummary() {
 
   const refresh = useCallback(async () => {
     setLoading(true)
-    const day = todayStart()
+    const day = todayInIST()
 
     const [productsRes, moneyRes] = await Promise.all([
       supabase.from('daily_product_summary').select('*').eq('day', day).eq('segment', 'commercial'),

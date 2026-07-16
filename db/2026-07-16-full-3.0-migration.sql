@@ -177,6 +177,7 @@ drop view if exists public.monthly_money_summary;    -- dead
 drop view if exists public.monthly_product_summary;   -- dead
 drop view if exists public.daily_product_summary;
 drop view if exists public.daily_purchase_summary;
+drop view if exists public.daily_money_summary;       -- recreated below (IST day bucket)
 drop view if exists public.customer_product_balances;
 drop view if exists public.activity_feed;
 drop view if exists public.godown_stock;
@@ -202,9 +203,12 @@ where p.active
 group by p.id, p.name, p.segment, p.kind, p.unit, p.godown_capacity;
 
 -- Daily sales rollup per product (segment exposed).
+-- Day is bucketed in IST (Asia/Kolkata) so "today" matches the local
+-- business day, not UTC — otherwise IST-morning sales fall in the wrong
+-- bucket and "Sold today" reads 0.
 create view public.daily_product_summary as
 select
-  date_trunc('day', t.created_at) as day, t.product_id, p.name as product_name, p.segment,
+  (t.created_at at time zone 'Asia/Kolkata')::date as day, t.product_id, p.name as product_name, p.segment,
   coalesce(sum(t.qty)    filter (where t.type = 'sale'), 0) as cylinders_sold,
   coalesce(sum(t.amount) filter (where t.type = 'sale'), 0) as revenue,
   coalesce(sum(t.amount) filter (where t.type = 'sale' and t.paid), 0) as collected_at_sale,
@@ -215,16 +219,25 @@ join products p on p.id = t.product_id
 where t.type in ('sale', 'return')
 group by 1, 2, 3, 4;
 
--- Daily purchases rollup per product (segment exposed).
+-- Daily purchases rollup per product (segment exposed). Day in IST.
 create view public.daily_purchase_summary as
 select
-  date_trunc('day', pu.created_at) as day, pu.product_id, p.segment,
+  (pu.created_at at time zone 'Asia/Kolkata')::date as day, pu.product_id, p.segment,
   coalesce(sum(pu.qty), 0) as cylinders_purchased,
   coalesce(sum(pu.empties_given), 0) as empties_given_to_supplier,
   coalesce(sum(pu.amount), 0) as purchase_amount
 from purchases pu
 join products p on p.id = pu.product_id
 group by 1, 2, 3;
+
+-- Daily payments collected. Day in IST so "collected today" matches the
+-- local business day (base version bucketed by UTC).
+create view public.daily_money_summary as
+select
+  (created_at at time zone 'Asia/Kolkata')::date as day,
+  coalesce(sum(amount) filter (where type = 'payment'), 0) as payments_collected
+from transactions
+group by 1;
 
 -- Per-customer empties owed (outright sales/returns excluded; commercial only).
 create view public.customer_product_balances as

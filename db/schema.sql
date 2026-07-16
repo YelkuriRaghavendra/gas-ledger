@@ -282,7 +282,7 @@ order by created_at desc;
 -- Daily sales rollup per product.
 create view public.daily_product_summary as
 select
-  date_trunc('day', t.created_at) as day, t.product_id, p.name as product_name, p.segment,
+  (t.created_at at time zone 'Asia/Kolkata')::date as day, t.product_id, p.name as product_name, p.segment,
   coalesce(sum(t.qty)    filter (where t.type = 'sale'), 0) as cylinders_sold,
   coalesce(sum(t.amount) filter (where t.type = 'sale'), 0) as revenue,
   coalesce(sum(t.amount) filter (where t.type = 'sale' and t.paid), 0) as collected_at_sale,
@@ -296,7 +296,7 @@ group by 1, 2, 3, 4;
 -- Daily purchases rollup per product.
 create view public.daily_purchase_summary as
 select
-  date_trunc('day', pu.created_at) as day, pu.product_id, p.segment,
+  (pu.created_at at time zone 'Asia/Kolkata')::date as day, pu.product_id, p.segment,
   coalesce(sum(pu.qty), 0) as cylinders_purchased,
   coalesce(sum(pu.empties_given), 0) as empties_given_to_supplier,
   coalesce(sum(pu.amount), 0) as purchase_amount
@@ -307,7 +307,7 @@ group by 1, 2, 3;
 -- «VERIFY» Daily money collected (separate payment events only).
 create view public.daily_money_summary as
 select
-  date_trunc('day', created_at) as day,
+  (created_at at time zone 'Asia/Kolkata')::date as day,
   coalesce(sum(amount) filter (where type = 'payment'), 0) as payments_collected
 from transactions
 group by 1;
