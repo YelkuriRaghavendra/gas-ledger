@@ -42,6 +42,12 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
   const [period, setPeriod] = useState<StatementPeriod>('this-month')
   const [from, setFrom] = useState(toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
   const [to, setTo] = useState(toDateInputValue(now))
+  // The PDF is rasterised from HTML (async), so build it ahead of time and
+  // keep it ready. This also lets the WhatsApp share fire synchronously inside
+  // the user's tap — navigator.share needs an active user gesture, which an
+  // await would consume.
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+  const [building, setBuilding] = useState(false)
 
   // Refresh the custom-range defaults each time the dialog opens so they don't
   // go stale if the component stays mounted across a month boundary.
@@ -53,10 +59,31 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
     }
   }, [open])
 
-  function buildPdf() {
+  // Pre-build the PDF whenever the dialog opens or the period changes.
+  useEffect(() => {
+    if (!open) {
+      setPdfBlob(null)
+      return
+    }
+    let cancelled = false
+    setBuilding(true)
+    setPdfBlob(null)
     const filtered = filterGroupsByPeriod(groups, period, from, to)
-    return generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency)
-  }
+    generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency)
+      .then((blob) => {
+        if (!cancelled) setPdfBlob(blob)
+      })
+      .catch(() => {
+        if (!cancelled) setPdfBlob(null)
+      })
+      .finally(() => {
+        if (!cancelled) setBuilding(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, period, from, to, amountDue, customerName])
 
   function openPrintWindow() {
     const filtered = filterGroupsByPeriod(groups, period, from, to)
@@ -74,8 +101,8 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
   }
 
   function handleDownloadPdf() {
-    const blob = buildPdf()
-    const url = URL.createObjectURL(blob)
+    if (!pdfBlob) return
+    const url = URL.createObjectURL(pdfBlob)
     const a = document.createElement('a')
     a.href = url
     a.download = statementFilename(customerName)
@@ -86,8 +113,8 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
   }
 
   async function handleWhatsApp() {
-    const blob = buildPdf()
-    const file = new File([blob], statementFilename(customerName), { type: 'application/pdf' })
+    if (!pdfBlob) return
+    const file = new File([pdfBlob], statementFilename(customerName), { type: 'application/pdf' })
     const business = agency?.name || 'Statement'
     if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
@@ -153,15 +180,17 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
           tint="#FDECE3"
           icon={<DownloadIcon size={17} color="#E4571B" />}
           title="Download PDF"
-          subtitle="Save the statement as a PDF"
+          subtitle={building ? 'Preparing PDF…' : 'Save the statement as a PDF'}
           onClick={handleDownloadPdf}
+          disabled={!pdfBlob}
         />
         <OptionRow
           tint="#E4F5EA"
           icon={<WhatsAppGlyph />}
           title="Share on WhatsApp"
-          subtitle="Attach the PDF (on phone)"
+          subtitle={building ? 'Preparing PDF…' : 'Attach the PDF (on phone)'}
           onClick={handleWhatsApp}
+          disabled={!pdfBlob}
         />
         <OptionRow
           tint="#EAF0F7"
@@ -181,18 +210,21 @@ function OptionRow({
   title,
   subtitle,
   onClick,
+  disabled = false,
 }: {
   icon: ReactNode
   tint: string
   title: string
   subtitle: string
   onClick: () => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 border-t border-[#F1E9DB] py-[13px] text-left first:border-t-0"
+      disabled={disabled}
+      className="flex w-full items-center gap-3 border-t border-[#F1E9DB] py-[13px] text-left transition first:border-t-0 disabled:opacity-50"
     >
       <div
         className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[12px]"

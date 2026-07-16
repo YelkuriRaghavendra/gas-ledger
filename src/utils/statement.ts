@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import html2canvas from 'html2canvas'
 import { formatCurrency, formatDate } from './format'
 import type { Transaction } from '../types/db'
 
@@ -100,113 +100,70 @@ export function generatePdfHtml(
 </body></html>`
 }
 
-export function generatePdfBlob(
+// Build the PDF from the SAME HTML used for Print, so Download and Share
+// are visually identical to the printed statement. The HTML is laid out
+// off-screen at 640px (its max-width), rasterised with html2canvas, then
+// paged onto A4. Async because rasterising waits for layout.
+export async function generatePdfBlob(
   customerName: string,
   phone: string | null,
   address: string | null,
   amountDue: number,
   groups: HistoryGroup[],
   agency: { name: string; phone: string | null; address: string | null } | null,
-): Blob {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const marginX = 40
-  let y = 50
+): Promise<Blob> {
+  const html = generatePdfHtml(customerName, phone, address, amountDue, groups, agency)
 
-  // Header block: agency name, phone, address, divider.
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.setTextColor(31, 24, 19) // #1F1813
-  doc.text(agency?.name || 'Cylinder Tracker', marginX, y)
-  y += 18
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.left = '-10000px'
+  iframe.style.top = '0'
+  iframe.style.width = '640px'
+  iframe.style.border = '0'
+  document.body.appendChild(iframe)
 
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(107, 94, 80) // #6B5E50
-  if (agency?.phone) {
-    doc.text(agency.phone, marginX, y)
-    y += 14
+  try {
+    const idoc = iframe.contentDocument
+    if (!idoc) throw new Error('Could not create statement frame')
+    idoc.open()
+    idoc.write(html)
+    idoc.close()
+
+    // Let layout settle before rasterising.
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    const body = idoc.body
+    const canvas = await html2canvas(body, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      windowWidth: 640,
+      width: 640,
+      height: body.scrollHeight,
+    })
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageW = doc.internal.pageSize.getWidth()
+    const pageH = doc.internal.pageSize.getHeight()
+    const imgW = pageW
+    const imgH = (canvas.height / canvas.width) * imgW
+    const imgData = canvas.toDataURL('image/jpeg', 0.95)
+
+    // Slice the tall image across A4 pages.
+    let heightLeft = imgH
+    let position = 0
+    doc.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
+    heightLeft -= pageH
+    while (heightLeft > 0) {
+      position -= pageH
+      doc.addPage()
+      doc.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
+      heightLeft -= pageH
+    }
+
+    return doc.output('blob')
+  } finally {
+    document.body.removeChild(iframe)
   }
-  if (agency?.address) {
-    doc.text(agency.address, marginX, y)
-    y += 14
-  }
-
-  y += 6
-  doc.setDrawColor(31, 24, 19)
-  doc.setLineWidth(1)
-  doc.line(marginX, y, pageWidth - marginX, y)
-  y += 22
-
-  // Customer block (left) + amount due (right).
-  const customerTop = y
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
-  doc.setTextColor(31, 24, 19)
-  doc.text(customerName, marginX, y)
-  y += 16
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(107, 94, 80)
-  if (phone) {
-    doc.text(phone, marginX, y)
-    y += 14
-  }
-  if (address) {
-    doc.text(address, marginX, y)
-    y += 14
-  }
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(139, 126, 110) // #8B7E6E
-  doc.text('AMOUNT DUE', pageWidth - marginX, customerTop, { align: 'right' })
-  doc.setFontSize(20)
-  doc.setTextColor(228, 87, 27) // #E4571B
-  doc.text(formatCurrency(amountDue), pageWidth - marginX, customerTop + 20, { align: 'right' })
-
-  y = Math.max(y, customerTop + 20) + 20
-
-  // Transaction table.
-  const rows = groups.flatMap((g) =>
-    g.entries.map((t) => {
-      const typeLabel = t.type === 'sale' ? 'Sale' : t.type === 'return' ? 'Return' : 'Payment'
-      return [
-        formatDate(t.created_at),
-        typeLabel,
-        historyTitle(t, t.productName),
-        t.type !== 'return' ? formatCurrency(t.amount) : '—',
-        formatCurrency(t.balanceAfter),
-      ]
-    }),
-  )
-
-  autoTable(doc, {
-    startY: y,
-    head: [['Date', 'Type', 'Description', 'Amount', 'Balance']],
-    body: rows,
-    theme: 'striped',
-    margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, textColor: [31, 24, 19], cellPadding: 6 },
-    headStyles: { fillColor: [31, 24, 19], textColor: [255, 255, 255], fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [250, 250, 247] },
-    columnStyles: {
-      3: { halign: 'right' },
-      4: { halign: 'right' },
-    },
-  })
-
-  // Footer: generated date.
-  const now = new Date()
-  const dateStr = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
-  const pageHeight = doc.internal.pageSize.getHeight()
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(176, 168, 152) // #B0A898
-  doc.text(dateStr, pageWidth / 2, pageHeight - 30, { align: 'center' })
-
-  return doc.output('blob')
 }
 
 export function statementFilename(customerName: string): string {
