@@ -41,13 +41,13 @@ export function generatePdfHtml(
           const typeBg = t.type === 'sale' ? '#FFF3ED' : t.type === 'return' ? '#EDF7F1' : '#EDF2F7'
           const typeColor = t.type === 'sale' ? '#C24B1A' : t.type === 'return' ? '#1D7A4A' : '#3B6EA5'
           return `<tr style="background:${bg}">
-            <td style="padding:10px 12px;font-size:12px;color:#6B5E50">${esc(formatDate(t.created_at))}</td>
-            <td style="padding:10px 12px;text-align:center">
-              <span style="display:inline-block;background:${typeBg};color:${typeColor};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.3px">${typeLabel}</span>
+            <td style="padding:10px 12px;vertical-align:middle;font-size:12px;color:#6B5E50">${esc(formatDate(t.created_at))}</td>
+            <td style="padding:10px 12px;vertical-align:middle;text-align:center">
+              <span style="display:inline-block;background:${typeBg};color:${typeColor};font-size:10px;font-weight:700;line-height:18px;height:18px;padding:0 8px;border-radius:4px;letter-spacing:0.3px;vertical-align:middle">${typeLabel}</span>
             </td>
-            <td style="padding:10px 12px;font-size:13px;font-weight:600;color:#1F1813">${esc(historyTitle(t, t.productName))}</td>
-            <td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:600;color:#1F1813">${t.type !== 'return' ? formatCurrency(t.amount) : '—'}</td>
-            <td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:600;color:#6B5E50">${formatCurrency(t.balanceAfter)}</td>
+            <td style="padding:10px 12px;vertical-align:middle;font-size:13px;font-weight:600;color:#1F1813">${esc(historyTitle(t, t.productName))}</td>
+            <td style="padding:10px 12px;vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#1F1813">${t.type !== 'return' ? formatCurrency(t.amount) : '—'}</td>
+            <td style="padding:10px 12px;vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#6B5E50">${formatCurrency(t.balanceAfter)}</td>
           </tr>`
         },
       ),
