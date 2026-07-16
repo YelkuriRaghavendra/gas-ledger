@@ -65,7 +65,7 @@ export function RecordPayment() {
     if (editing) {
       const { error } = await supabase
         .from('transactions')
-        .update({ amount: amountNum, created_at: timestamp, method, note: note.trim() || null })
+        .update({ amount: amountNum, created_at: timestamp, method, note: note.trim() || null, updated_by: session?.user.id })
         .eq('id', Number(txId))
       setSaving(false)
       if (error) {

@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { ChevronLeftIcon } from '../components/icons'
 
 function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return ''
@@ -39,17 +41,24 @@ export function ExportLedger() {
   }
 
   return (
-    <div className="p-4">
-      <h1 className="mb-4 text-xl font-bold text-ink">Export ledger</h1>
-      <p className="mb-4 text-sm text-muted">Download every sale, return, and payment as a CSV file.</p>
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-      <button
-        onClick={handleExport}
-        disabled={exporting}
-        className="w-full rounded-lg bg-accent py-3 font-semibold text-white disabled:opacity-50"
-      >
-        {exporting ? 'Preparing…' : 'Export CSV'}
-      </button>
+    <div className="p-5 pb-10 pt-3">
+      <Link to="/" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+        <ChevronLeftIcon size={18} /> Back
+      </Link>
+      <h1 className="mb-2 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Export ledger</h1>
+      <p className="mb-5 text-[13px] font-medium leading-[1.5] text-subtle">
+        Download every sale, return, and payment as a CSV file.
+      </p>
+      <div className="rounded-[20px] bg-surface p-5 shadow-card">
+        {error && <p className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="h-[56px] w-full rounded-[16px] bg-gradient-to-br from-accentSoft to-accent text-[15px] font-bold text-white shadow-glow transition active:scale-[0.99] disabled:opacity-50"
+        >
+          {exporting ? 'Preparing…' : 'Export CSV'}
+        </button>
+      </div>
     </div>
   )
 }

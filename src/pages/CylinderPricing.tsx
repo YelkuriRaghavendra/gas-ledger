@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProducts } from '../hooks/useProducts'
+import { ChevronLeftIcon } from '../components/icons'
 
 export function CylinderPricing() {
   const { data: products, loading, refresh } = useProducts()
@@ -60,13 +61,16 @@ export function CylinderPricing() {
     }
     setSaving(false)
     refresh()
-    navigate('/account')
+    navigate('/')
   }
 
   if (loading) return <p className="p-4 text-muted">Loading…</p>
 
   return (
     <div className="p-5 pb-10 pt-3">
+      <Link to="/" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+        <ChevronLeftIcon size={18} /> Back
+      </Link>
       <h1 className="mb-2 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Products</h1>
       <p className="mb-5 text-sm font-medium text-muted">
         These prices prefill the "Price each" field on New Sale for each cylinder size, and can still be overridden per

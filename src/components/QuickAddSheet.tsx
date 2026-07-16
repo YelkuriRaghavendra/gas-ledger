@@ -5,52 +5,58 @@ interface QuickAddSheetProps {
   open: boolean
   onClose: () => void
   onNavigate: (path: string) => void
+  /** When set (e.g. viewing a specific customer), Sale/Return/Payment links target that customer directly. */
+  customerId?: number
 }
 
-const items = [
-  {
-    path: '/sale',
-    label: 'New sale',
-    description: 'Record cylinders sold',
-    iconBg: '#FBEDE4',
-    Icon: PlusIcon,
-    iconColor: '#E4571B',
-  },
-  {
-    path: '/return',
-    label: 'Log return',
-    description: 'Empty cylinders back',
-    iconBg: '#EAF4EE',
-    Icon: ReturnIcon,
-    iconColor: '#2E8B57',
-  },
-  {
-    path: '/payment',
-    label: 'Record payment',
-    description: 'Collect dues from customer',
-    iconBg: '#E8EEF6',
-    Icon: CreditCardIcon,
-    iconColor: '#3B6EA5',
-  },
-  {
-    path: '/customers/new',
-    label: 'Add customer',
-    description: 'New account',
-    iconBg: '#EDE7DA',
-    Icon: UserPlusIcon,
-    iconColor: '#211913',
-  },
-  {
-    path: '/purchases/new',
-    label: 'Record purchase',
-    description: 'Cylinders in from supplier',
-    iconBg: '#FBEDE4',
-    Icon: TruckIcon,
-    iconColor: '#E4571B',
-  },
-]
+function buildItems(customerId?: number) {
+  const base = customerId != null ? `/customers/${customerId}` : ''
+  return [
+    {
+      path: `${base}/sale`,
+      label: 'New sale',
+      description: 'Record cylinders sold',
+      iconBg: '#FBEDE4',
+      Icon: PlusIcon,
+      iconColor: '#E4571B',
+    },
+    {
+      path: `${base}/return`,
+      label: 'Log return',
+      description: 'Empty cylinders back',
+      iconBg: '#EAF4EE',
+      Icon: ReturnIcon,
+      iconColor: '#2E8B57',
+    },
+    {
+      path: `${base}/payment`,
+      label: 'Record payment',
+      description: 'Collect dues from customer',
+      iconBg: '#E8EEF6',
+      Icon: CreditCardIcon,
+      iconColor: '#3B6EA5',
+    },
+    {
+      path: '/customers/new',
+      label: 'Add customer',
+      description: 'New account',
+      iconBg: '#EDE7DA',
+      Icon: UserPlusIcon,
+      iconColor: '#211913',
+    },
+    {
+      path: '/purchases/new',
+      label: 'Record purchase',
+      description: 'Cylinders in from supplier',
+      iconBg: '#FBEDE4',
+      Icon: TruckIcon,
+      iconColor: '#E4571B',
+    },
+  ]
+}
 
-export function QuickAddSheet({ open, onClose, onNavigate }: QuickAddSheetProps) {
+export function QuickAddSheet({ open, onClose, onNavigate, customerId }: QuickAddSheetProps) {
+  const items = buildItems(customerId)
   return (
     <BottomSheet open={open} onClose={onClose} slideUp>
       <h2 className="mb-4 font-display text-[19px] font-bold text-ink">Quick add</h2>

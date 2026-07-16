@@ -50,6 +50,9 @@ export interface Transaction {
   bill_id: string | null
   created_by: string | null
   created_at: string
+  updated_at: string
+  updated_by: string | null
+  outright: boolean
 }
 
 export interface CustomerBalance {
@@ -82,6 +85,8 @@ export interface Purchase {
   bill_id: string | null
   created_by: string | null
   created_at: string
+  updated_at: string
+  updated_by: string | null
 }
 
 export interface GodownStock {
@@ -97,9 +102,9 @@ export interface GodownStock {
 
 export interface ActivityEntry {
   id: number
-  customer_id: number
+  customer_id: number | null
   customer_name: string
-  type: TransactionType
+  type: 'sale' | 'return' | 'payment' | 'purchase'
   product_id: number | null
   product_name: string | null
   qty: number
@@ -108,6 +113,9 @@ export interface ActivityEntry {
   note: string | null
   created_by: string | null
   created_at: string
+  updated_at: string
+  updated_by: string | null
+  segment: Segment
 }
 
 export interface AgencySettings {
@@ -115,6 +123,11 @@ export interface AgencySettings {
   business_name: string
   business_phone: string | null
   business_address: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  pincode: string | null
+  gst_number: string | null
   price_per_cylinder: number
   updated_at: string
 }
@@ -124,7 +137,7 @@ export interface AgencySettings {
 // reads Phase 2's `purchases` table. Defined locally (not imported from a
 // Phase 2 types module) since this worktree doesn't carry Phase 2's
 // TypeScript types — only the SQL view may or may not exist at runtime. See
-// useDailySummary/useMonthlySummary for how a missing view degrades gracefully.
+// useDailySummary for how a missing view degrades gracefully.
 export interface DailyProductSummary {
   day: string
   product_id: number
@@ -147,20 +160,4 @@ export interface DailyPurchaseSummary {
   cylinders_purchased: number
   empties_given_to_supplier: number
   purchase_amount: number
-}
-
-export interface MonthlyProductSummary {
-  month: string
-  product_id: number
-  product_name: string
-  segment: Segment
-  cylinders_sold: number
-  revenue: number
-  collected_at_sale: number
-  empties_collected: number
-}
-
-export interface MonthlyMoneySummary {
-  month: string
-  payments_collected: number
 }

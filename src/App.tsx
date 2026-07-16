@@ -14,7 +14,6 @@ import { NewSale } from './pages/NewSale'
 import { LogReturn } from './pages/LogReturn'
 import { RecordPayment } from './pages/RecordPayment'
 import { ActivityFeed } from './pages/ActivityFeed'
-import { Account } from './pages/Account'
 import { BusinessDetails } from './pages/BusinessDetails'
 import { CylinderPricing } from './pages/CylinderPricing'
 import { ExportLedger } from './pages/ExportLedger'
@@ -22,7 +21,6 @@ import { Purchases } from './pages/Purchases'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { Godown } from './pages/Godown'
 import { SetCurrentStock } from './pages/SetCurrentStock'
-import { Reports } from './pages/Reports'
 import { DomesticHome } from './pages/domestic/DomesticHome'
 import { DomesticNewBill } from './pages/domestic/DomesticNewBill'
 import { DomesticStock } from './pages/domestic/DomesticStock'
@@ -60,10 +58,8 @@ export default function App() {
             <Route path="/customers/:id/payment" element={<RecordPayment />} />
             <Route path="/customers/:id/payment/:txId/edit" element={<RecordPayment />} />
             <Route path="/activity" element={<ActivityFeed />} />
-            <Route path="/account" element={<Account />} />
             <Route path="/account/business" element={<BusinessDetails />} />
             <Route path="/account/pricing" element={<CylinderPricing />} />
-            <Route path="/account/reports" element={<Reports />} />
             <Route path="/account/export" element={<ExportLedger />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/purchases/new" element={<RecordPurchase />} />

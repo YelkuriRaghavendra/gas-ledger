@@ -1,17 +1,23 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useGodownStock } from '../../hooks/useGodownStock'
 import { TruckIcon } from '../../components/icons'
+import { AppHeader } from '../../components/AppHeader'
+import { AccountMenu } from '../../components/AccountMenu'
 
 export function DomesticStock() {
+  const [accountOpen, setAccountOpen] = useState(false)
   const { data: stock, loading, error } = useGodownStock('domestic')
 
   const cylinders = stock.filter((s) => s.kind === 'cylinder')
   const accessories = stock.filter((s) => s.kind === 'accessory')
 
-  if (loading) return <p className="p-4 text-muted">Loading…</p>
-
   return (
-    <div className="p-5 pb-[110px] pt-3">
+    <div className="pb-[110px]">
+      <AppHeader segment="domestic" onOpenAccount={() => setAccountOpen(true)} />
+      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+
+      <div className="p-5 pt-1">
       <div className="mb-[22px] flex items-center justify-between">
         <h1 className="font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Stock</h1>
         <div className="flex items-center gap-3">
@@ -27,8 +33,11 @@ export function DomesticStock() {
         </div>
       </div>
 
+      {loading && <p className="mb-4 text-muted">Loading…</p>}
       {error && <p className="mb-4 text-red-600">{error}</p>}
 
+      {!loading && (
+        <>
       <h2 className="mb-3 font-display text-[16px] font-bold tracking-[-0.3px] text-ink">Cylinders</h2>
       <div className="grid grid-cols-1 gap-3">
         {cylinders.map((s) => (
@@ -78,6 +87,9 @@ export function DomesticStock() {
         {accessories.length === 0 && (
           <p className="px-4 py-8 text-center text-sm font-medium text-subtle">No accessory products yet</p>
         )}
+      </div>
+        </>
+      )}
       </div>
     </div>
   )

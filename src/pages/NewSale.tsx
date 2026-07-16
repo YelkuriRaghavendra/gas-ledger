@@ -25,6 +25,7 @@ export function NewSale() {
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
   const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({})
   const [emptiesByProduct, setEmptiesByProduct] = useState<Record<number, number>>({})
+  const [outrightByProduct, setOutrightByProduct] = useState<Record<number, boolean>>({})
 
   const [received, setReceived] = useState(false)
   const [method, setMethod] = useState<PaymentMethod>('cash')
@@ -41,6 +42,7 @@ export function NewSale() {
   // Each size starts as a slim row; tapping "+ Add to sale" expands it into a
   // full entry line. In edit mode the single line is always expanded.
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [seededExpand, setSeededExpand] = useState(false)
   const expand = (pid: number) => setExpanded((s) => new Set(s).add(pid))
   const collapse = (pid: number) => {
     setExpanded((s) => {
@@ -54,6 +56,11 @@ export function NewSale() {
       return n
     })
     setEmptiesByProduct((s) => {
+      const n = { ...s }
+      delete n[pid]
+      return n
+    })
+    setOutrightByProduct((s) => {
       const n = { ...s }
       delete n[pid]
       return n
@@ -74,6 +81,14 @@ export function NewSale() {
     })
   }, [products, editing])
 
+  // Open the primary cylinder (19 kg — first by sort order) by default, since
+  // it's the most common sale. Seed once so a manual collapse still sticks.
+  useEffect(() => {
+    if (editing || seededExpand || products.length === 0) return
+    setExpanded(new Set([products[0].id]))
+    setSeededExpand(true)
+  }, [products, editing, seededExpand])
+
   useEffect(() => {
     if (!editing || loadedEdit) return
     const tx = transactions.find((t) => t.id === Number(txId))
@@ -81,6 +96,7 @@ export function NewSale() {
     setEditProductId(tx.product_id)
     setQtyByProduct({ [tx.product_id]: tx.qty })
     setEmptiesByProduct({ [tx.product_id]: tx.empties })
+    setOutrightByProduct({ [tx.product_id]: tx.outright })
     setPriceByProduct({ [tx.product_id]: tx.qty > 0 ? String(tx.amount / tx.qty) : String(tx.amount) })
     setOriginalEmpties(tx.empties)
     setDate(dateInputValue(tx.created_at))
@@ -95,6 +111,7 @@ export function NewSale() {
   const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
   const setEmpties = (pid: number, v: number) => setEmptiesByProduct((s) => ({ ...s, [pid]: v }))
   const setPrice = (pid: number, v: string) => setPriceByProduct((s) => ({ ...s, [pid]: v }))
+  const setOutright = (pid: number, v: boolean) => setOutrightByProduct((s) => ({ ...s, [pid]: v }))
 
   function ownedFor(pid: number) {
     const bal = productBalances.find((b) => b.product_id === pid)?.empties_outstanding ?? 0
@@ -113,13 +130,17 @@ export function NewSale() {
       return
     }
     const lines = shownProducts
-      .map((p) => ({
-        productId: p.id,
-        name: p.name,
-        qty: qtyByProduct[p.id] ?? 0,
-        price: Number(priceByProduct[p.id] || 0),
-        empties: emptiesByProduct[p.id] ?? 0,
-      }))
+      .map((p) => {
+        const outright = outrightByProduct[p.id] ?? false
+        return {
+          productId: p.id,
+          name: p.name,
+          qty: qtyByProduct[p.id] ?? 0,
+          price: Number(priceByProduct[p.id] || 0),
+          empties: outright ? 0 : emptiesByProduct[p.id] ?? 0,
+          outright,
+        }
+      })
       .filter((l) => l.qty > 0)
 
     if (lines.length === 0) {
@@ -131,6 +152,7 @@ export function NewSale() {
         setError(`Enter a price for ${l.name}`)
         return
       }
+      if (l.outright) continue
       const cap = ownedFor(l.productId) + l.qty
       if (l.empties > cap) {
         setError(`Empties taken for ${l.name} can't exceed ${cap} (${ownedFor(l.productId)} owed + ${l.qty} this sale).`)
@@ -154,6 +176,8 @@ export function NewSale() {
           method: received ? method : null,
           note: note.trim() || null,
           created_at: timestamp,
+          updated_by: session?.user.id,
+          outright: l.outright,
         })
         .eq('id', Number(txId))
       setSaving(false)
@@ -177,6 +201,7 @@ export function NewSale() {
       note: note.trim() || null,
       created_by: session?.user.id,
       created_at: timestamp,
+      outright: l.outright,
     }))
     const { error } = await supabase.from('transactions').insert(rows)
     setSaving(false)
@@ -239,6 +264,7 @@ export function NewSale() {
             const isOpen = editing || expanded.has(p.id)
             const qty = qtyByProduct[p.id] ?? 0
             const lineTotal = qty * Number(priceByProduct[p.id] || 0)
+            const outright = outrightByProduct[p.id] ?? false
             return (
               <div key={p.id} className={i > 0 ? 'mt-[10px]' : ''}>
                 {!isOpen ? (
@@ -281,10 +307,12 @@ export function NewSale() {
                         <p className={fieldLabel}>Sold</p>
                         <Stepper value={qtyByProduct[p.id] ?? 0} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} tone="surface" size="sm" />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={fieldLabel}>Empties taken</p>
-                        <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" tone="surface" size="sm" />
-                      </div>
+                      {!outright && (
+                        <div className="min-w-0 flex-1">
+                          <p className={fieldLabel}>Empties taken</p>
+                          <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" tone="surface" size="sm" />
+                        </div>
+                      )}
                     </div>
                     <div className="mt-3">
                       <p className={fieldLabel}>Price each (₹)</p>
@@ -297,9 +325,26 @@ export function NewSale() {
                         className={`${fieldInput} !bg-surface`}
                       />
                     </div>
-                    <p className="mt-2 text-[12px] font-semibold text-muted">
-                      Customer owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span> {p.name} empties
-                    </p>
+                    {p.kind === 'cylinder' && (
+                      <label className="mt-3 flex cursor-pointer items-center gap-[8px] text-[12px] font-semibold text-muted">
+                        <input
+                          type="checkbox"
+                          checked={outright}
+                          onChange={(e) => setOutright(p.id, e.target.checked)}
+                          className="h-[16px] w-[16px] accent-[#E4571B]"
+                        />
+                        Customer keeps cylinder (outright sale)
+                      </label>
+                    )}
+                    {outright ? (
+                      <p className="mt-2 text-[12px] font-semibold text-muted">
+                        Customer owns this cylinder — not counted as empties owed.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-[12px] font-semibold text-muted">
+                        Customer owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span> {p.name} empties
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

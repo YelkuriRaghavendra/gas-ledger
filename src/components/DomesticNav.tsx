@@ -18,8 +18,8 @@ export function DomesticNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 flex items-center justify-around border-t border-[#EBE1D1] bg-cream/[.92] px-2 pb-[14px] backdrop-blur-md"
-      style={{ height: 80 }}
+      className="fixed bottom-0 left-0 right-0 flex items-center justify-around border-t border-[#EBE1D1] bg-cream/[.92] px-1 pb-[10px] backdrop-blur-md"
+      style={{ height: 72 }}
     >
       {leftTabs.map(({ to, label, Icon, end }) => (
         <NavLink key={to} to={to} end={end} className="flex flex-1 flex-col items-center gap-[3px]">
@@ -37,7 +37,7 @@ export function DomesticNav() {
         <button
           onClick={() => navigate('/domestic/bill')}
           aria-label="New bill"
-          className="-mt-6 flex h-14 w-14 items-center justify-center rounded-[20px] bg-[#2E8B57] shadow-[0_12px_24px_-8px_rgba(46,139,87,0.7)]"
+          className="-mt-6 flex h-[54px] w-[54px] items-center justify-center rounded-[18px] bg-[#2E8B57] shadow-[0_12px_24px_-8px_rgba(46,139,87,0.7)]"
         >
           <PlusIcon size={28} color="#fff" strokeWidth={2.4} />
         </button>
