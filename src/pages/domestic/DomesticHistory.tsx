@@ -8,6 +8,7 @@ import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '.
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
+import { countNewConnections } from '../../utils/newConnection'
 
 interface DayGroup {
   day: string
@@ -76,6 +77,7 @@ export function DomesticHistory() {
 
   const productNameById = new Map(products.map((p) => [p.id, p.name]))
   const groups = groupByDay(bills)
+  const ncProductIds = new Set(products.filter((p) => p.is_new_connection).map((p) => p.id))
 
   async function handleDelete(bill: DomesticBill) {
     if (!confirm('Delete this bill?')) return
@@ -107,6 +109,10 @@ export function DomesticHistory() {
                   <p className="text-[11.5px] font-bold uppercase tracking-[0.4px] text-subtle">{formatRelativeDate(g.day)}</p>
                   <p className="font-display text-[13px] font-bold text-[#2E8B57]">
                     {formatCurrency(g.revenue)} · {g.bills.length} bill{g.bills.length === 1 ? '' : 's'}
+                    {(() => {
+                      const nc = countNewConnections(g.bills, ncProductIds)
+                      return nc > 0 ? ` · ${nc} NC` : null
+                    })()}
                   </p>
                 </div>
                 <ul className="flex flex-col gap-[9px]">
