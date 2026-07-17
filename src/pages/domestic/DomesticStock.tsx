@@ -89,7 +89,7 @@ export function DomesticStock() {
             }}
             className="flex items-center gap-1 rounded-[13px] border-[1.5px] border-[#2E8B57] px-[12px] py-[8px] text-[13px] font-bold text-[#2E8B57]"
           >
-            <PlusIcon size={15} strokeWidth={2.4} /> Add item
+            <PlusIcon size={15} strokeWidth={2.4} color="#2E8B57" /> Add item
           </button>
           <Link
             to="/domestic/purchases/new"
