@@ -22,6 +22,7 @@ export interface Product {
   kind: ProductKind
   unit: string
   active: boolean
+  is_new_connection: boolean
   sort_order: number
   created_at: string
 }
