@@ -102,7 +102,7 @@ export function NewBillTable({
                     )}
 
                     {p.price_options && p.price_options.length > 0 && !isEditingPrice && (
-                      <div className="mt-[5px] flex flex-wrap gap-[5px]">
+                      <div className="mt-[5px] flex flex-col items-start gap-[5px]">
                         {[{ label: 'Default', amount: p.price }, ...p.price_options].map((opt, idx) => {
                           const active = Number(priceByProduct[p.id] || 0) === opt.amount
                           return (
