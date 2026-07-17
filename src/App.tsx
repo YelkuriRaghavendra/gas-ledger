@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ModeGate } from './mode/ModeGate'
 import { BottomNav } from './components/BottomNav'
@@ -42,28 +42,29 @@ export default function App() {
           <Route element={<ModeGate />}>
             <Route path="/choose" element={<ModeSelect />} />
 
-            {/* Commercial */}
-            <Route path="/" element={<Home />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/customers/new" element={<AddCustomer />} />
-            <Route path="/customers/:id" element={<CustomerDetail />} />
-            <Route path="/sale" element={<NewSale />} />
-            <Route path="/customers/:id/sale" element={<NewSale />} />
-            <Route path="/customers/:id/sale/:txId/edit" element={<NewSale />} />
-            <Route path="/return" element={<LogReturn />} />
-            <Route path="/customers/:id/return" element={<LogReturn />} />
-            <Route path="/customers/:id/return/:txId/edit" element={<LogReturn />} />
-            <Route path="/payment" element={<RecordPayment />} />
-            <Route path="/customers/:id/payment" element={<RecordPayment />} />
-            <Route path="/customers/:id/payment/:txId/edit" element={<RecordPayment />} />
-            <Route path="/activity" element={<ActivityFeed />} />
+            {/* Commercial (all under /commercial, mirroring /domestic) */}
+            <Route path="/" element={<Navigate to="/commercial" replace />} />
+            <Route path="/commercial" element={<Home />} />
+            <Route path="/commercial/customers" element={<Customers />} />
+            <Route path="/commercial/customers/new" element={<AddCustomer />} />
+            <Route path="/commercial/customers/:id" element={<CustomerDetail />} />
+            <Route path="/commercial/sale" element={<NewSale />} />
+            <Route path="/commercial/customers/:id/sale" element={<NewSale />} />
+            <Route path="/commercial/customers/:id/sale/:txId/edit" element={<NewSale />} />
+            <Route path="/commercial/return" element={<LogReturn />} />
+            <Route path="/commercial/customers/:id/return" element={<LogReturn />} />
+            <Route path="/commercial/customers/:id/return/:txId/edit" element={<LogReturn />} />
+            <Route path="/commercial/payment" element={<RecordPayment />} />
+            <Route path="/commercial/customers/:id/payment" element={<RecordPayment />} />
+            <Route path="/commercial/customers/:id/payment/:txId/edit" element={<RecordPayment />} />
+            <Route path="/commercial/activity" element={<ActivityFeed />} />
             <Route path="/account/business" element={<BusinessDetails />} />
             <Route path="/account/pricing" element={<CylinderPricing />} />
-            <Route path="/purchases" element={<Purchases />} />
-            <Route path="/purchases/new" element={<RecordPurchase />} />
-            <Route path="/purchases/:txId/edit" element={<RecordPurchase />} />
-            <Route path="/godown" element={<Godown />} />
-            <Route path="/godown/set-stock" element={<SetCurrentStock />} />
+            <Route path="/commercial/purchases" element={<Purchases />} />
+            <Route path="/commercial/purchases/new" element={<RecordPurchase />} />
+            <Route path="/commercial/purchases/:txId/edit" element={<RecordPurchase />} />
+            <Route path="/commercial/godown" element={<Godown />} />
+            <Route path="/commercial/godown/set-stock" element={<SetCurrentStock />} />
 
             {/* Domestic */}
             <Route path="/domestic" element={<DomesticHome />} />

@@ -10,7 +10,7 @@ interface QuickAddSheetProps {
 }
 
 function buildItems(customerId?: number) {
-  const base = customerId != null ? `/customers/${customerId}` : ''
+  const base = customerId != null ? `/commercial/customers/${customerId}` : '/commercial'
   return [
     {
       path: `${base}/sale`,
@@ -37,7 +37,7 @@ function buildItems(customerId?: number) {
       iconColor: '#3B6EA5',
     },
     {
-      path: '/customers/new',
+      path: '/commercial/customers/new',
       label: 'Add customer',
       description: 'New account',
       iconBg: '#EDE7DA',
@@ -45,7 +45,7 @@ function buildItems(customerId?: number) {
       iconColor: '#211913',
     },
     {
-      path: '/purchases/new',
+      path: '/commercial/purchases/new',
       label: 'Record purchase',
       description: 'Cylinders in from supplier',
       iconBg: '#FBEDE4',

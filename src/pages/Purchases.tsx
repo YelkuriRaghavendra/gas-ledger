@@ -63,7 +63,7 @@ export function Purchases() {
         <div className="mb-[22px] flex items-center justify-between">
           <h1 className="font-display text-2xl font-bold tracking-[-0.4px] text-ink">Purchases</h1>
           <Link
-            to="/purchases/new"
+            to="/commercial/purchases/new"
             className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-gradient-to-br from-accentSoft to-accent shadow-glow"
           >
             <PlusIcon size={20} strokeWidth={2.4} color="#fff" />
@@ -124,7 +124,7 @@ export function Purchases() {
             isOwner ? (
               <>
                 <Link
-                  to={`/purchases/${selected.id}/edit`}
+                  to={`/commercial/purchases/${selected.id}/edit`}
                   onClick={() => setSelected(null)}
                   className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
                 >

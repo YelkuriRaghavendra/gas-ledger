@@ -121,7 +121,7 @@ export function SetCurrentStock() {
         return
       }
 
-      navigate('/godown')
+      navigate('/commercial/godown')
     } catch (err: any) {
       setError(err.message ?? 'Something went wrong')
       setSaving(false)
@@ -132,7 +132,7 @@ export function SetCurrentStock() {
 
   return (
     <div className="p-5 pb-[110px] pt-3">
-      <Link to="/godown" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+      <Link to="/commercial/godown" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
       <h1 className="mb-2 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Set current stock</h1>

@@ -11,12 +11,12 @@ export function ModeSelect() {
   const { profile } = useAuth()
 
   if (profile && profile.segment_access !== 'both') {
-    return <Navigate to={profile.segment_access === 'domestic' ? '/domestic' : '/'} replace />
+    return <Navigate to={profile.segment_access === 'domestic' ? '/domestic' : '/commercial'} replace />
   }
 
   function choose(mode: 'commercial' | 'domestic') {
     setMode(mode)
-    navigate(mode === 'domestic' ? '/domestic' : '/', { replace: true })
+    navigate(mode === 'domestic' ? '/domestic' : '/commercial', { replace: true })
   }
 
   return (

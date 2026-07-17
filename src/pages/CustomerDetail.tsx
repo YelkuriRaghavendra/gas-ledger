@@ -26,7 +26,7 @@ function historyAmount(t: Transaction) {
 }
 
 function transactionEditPath(t: Transaction) {
-  return `/customers/${t.customer_id}/${t.type}/${t.id}/edit`
+  return `/commercial/customers/${t.customer_id}/${t.type}/${t.id}/edit`
 }
 
 function dayKey(iso: string) {
@@ -173,7 +173,7 @@ export function CustomerDetail() {
       setActionError(error.message)
       return
     }
-    navigate('/customers')
+    navigate('/commercial/customers')
   }
 
   async function handleDeleteTransaction(txId: number) {
@@ -217,7 +217,7 @@ export function CustomerDetail() {
   return (
     <div className="p-5 pb-24 pt-2">
       <div className="mb-3 flex items-center justify-between">
-        <Link to="/customers" className="inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+        <Link to="/commercial/customers" className="inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
           <ChevronLeftIcon size={18} /> Customers
         </Link>
         {isOwner && !editing && (
