@@ -16,6 +16,7 @@ export function DomesticCombos() {
 
   const [editing, setEditing] = useState<Product | null>(null)
   const [qtyByComponent, setQtyByComponent] = useState<Record<number, number>>({})
+  const [ncFlag, setNcFlag] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,6 +37,7 @@ export function DomesticCombos() {
     const current: Record<number, number> = {}
     for (const c of componentsOf(p.id)) current[c.component_product_id] = c.qty
     setQtyByComponent(current)
+    setNcFlag(p.is_new_connection)
     setError(null)
     setEditing(p)
   }
@@ -118,8 +120,18 @@ export function DomesticCombos() {
         return
       }
     }
+    const { error: prodError } = await supabase
+      .from('products')
+      .update({ is_new_connection: ncFlag })
+      .eq('id', editing.id)
+    if (prodError) {
+      setError(prodError.message)
+      setSaving(false)
+      return
+    }
     setSaving(false)
     setEditing(null)
+    await refreshProducts()
     refresh()
   }
 
@@ -241,6 +253,15 @@ export function DomesticCombos() {
                 </div>
               ))}
             </div>
+            <label className="mt-4 flex cursor-pointer items-center gap-[8px] text-[12px] font-semibold text-muted">
+              <input
+                type="checkbox"
+                checked={ncFlag}
+                onChange={(e) => setNcFlag(e.target.checked)}
+                className="h-[16px] w-[16px] accent-[#2E8B57]"
+              />
+              Count as New Connection
+            </label>
             {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
             <div className="mt-4 flex gap-2">
               <button
