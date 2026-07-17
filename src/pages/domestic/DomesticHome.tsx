@@ -7,6 +7,7 @@ import { formatCurrency } from '../../utils/format'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { CylindersCard, type CardItem } from '../../components/CylindersCard'
+import { countNewConnections } from '../../utils/newConnection'
 
 function todayStartIso() {
   const d = new Date()
@@ -28,6 +29,9 @@ export function DomesticHome() {
     (sum, b) => sum + b.lines.reduce((s, l) => s + (l.product_id !== null && cylinderIds.has(l.product_id) ? l.qty : 0), 0),
     0,
   )
+
+  const ncProductIds = new Set(products.filter((p) => p.is_new_connection).map((p) => p.id))
+  const newConnectionsSold = countNewConnections(bills, ncProductIds)
 
   const cylinders = stock.filter((s) => s.kind === 'cylinder')
 
@@ -66,6 +70,12 @@ export function DomesticHome() {
               <p className="relative mt-[9px] text-[12.5px] font-semibold text-[#9DC7AF]">
                 {bills.length} bill{bills.length === 1 ? '' : 's'} · {cylindersSoldToday} cylinder
                 {cylindersSoldToday === 1 ? '' : 's'} sold
+                {newConnectionsSold > 0 && (
+                  <>
+                    {' · '}
+                    {newConnectionsSold} New Connection{newConnectionsSold === 1 ? '' : 's'}
+                  </>
+                )}
               </p>
             </div>
 
