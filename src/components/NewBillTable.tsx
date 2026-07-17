@@ -80,7 +80,7 @@ export function NewBillTable({
 
               return (
                 <div
-                  key={r.key}
+                  key={p.id}
                   className={`grid grid-cols-[1fr_124px_64px] items-center gap-2 border-t border-borderMuted px-4 py-[11px] ${
                     qty > 0 ? 'bg-[#F3FAF5]' : ''
                   }`}
