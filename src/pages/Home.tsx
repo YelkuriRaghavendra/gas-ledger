@@ -1,26 +1,46 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
+import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { useAllCustomerProductBalances } from '../hooks/useAllCustomerProductBalances'
 import { useGodownStock } from '../hooks/useGodownStock'
 import { useProducts } from '../hooks/useProducts'
-import { useActivityFeed } from '../hooks/useActivityFeed'
+import { useActivityFeed, type FeedItem } from '../hooks/useActivityFeed'
+import { useProfiles } from '../hooks/useProfiles'
 import { useDailySummary } from '../hooks/useDailySummary'
-import { formatCurrency, formatRelativeDate } from '../utils/format'
+import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
+import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
 import { HeroCard } from '../components/HeroCard'
 import { AppHeader } from '../components/AppHeader'
 import { AccountMenu } from '../components/AccountMenu'
 import { CylindersCard, type CardItem } from '../components/CylindersCard'
+import { DetailModal } from '../components/DetailModal'
 
 export function Home() {
   const [accountOpen, setAccountOpen] = useState(false)
+  const [selected, setSelected] = useState<FeedItem | null>(null)
+  const { profile } = useAuth()
+  const isOwner = profile?.role === 'owner'
+  const profileNames = useProfiles()
   const { data, loading, error } = useCustomerBalances()
   const { data: productBalances } = useAllCustomerProductBalances()
   const { data: godown } = useGodownStock()
   const { data: products } = useProducts()
-  const { data: activity } = useActivityFeed(3)
+  const { data: activity, refresh: refreshActivity } = useActivityFeed(3)
   const { products: dailyProducts } = useDailySummary()
+
+  async function handleDelete(entry: FeedItem) {
+    if (!confirm('Delete this entry?')) return
+    setSelected(null)
+    if (entry.type === 'purchase') {
+      await supabase.from('purchases').delete().eq('id', entry.id)
+    } else {
+      await supabase.from('transactions').delete().eq('id', entry.id)
+    }
+    refreshActivity()
+  }
 
   const totalDue = data.reduce((sum, c) => sum + c.amount_due, 0)
   const customersWithDue = data.filter((c) => c.amount_due > 0).length
@@ -110,33 +130,33 @@ export function Home() {
                 return (
                   <li
                     key={`${entry.type}-${entry.id}`}
-                    className="flex items-center gap-[13px] rounded-[18px] bg-surface px-[15px] py-[14px] shadow-card"
+                    className="rounded-[18px] bg-surface px-[15px] py-[14px] shadow-card"
                   >
-                    <div
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-lg"
-                      style={{ backgroundColor: tint.bg, color: tint.color }}
+                    <button
+                      type="button"
+                      onClick={() => setSelected(entry)}
+                      className="flex w-full items-center gap-[13px] text-left"
                     >
-                      {getActivityIcon(entry.type)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14.5px] font-bold text-ink">{entry.title}</p>
-                      <p className="mt-[2px] text-xs font-medium text-subtle">
-                        {entry.type === 'sale' &&
-                          `${entry.qty}${entry.product_name ? ` ${entry.product_name}` : ''} sold · ${entry.empties} empties in`}
-                        {entry.type === 'return' && `${entry.product_name ? `${entry.product_name} ` : ''}empties returned`}
-                        {entry.type === 'payment' && 'Payment received'}
-                        {entry.type === 'purchase' && `${entry.qty} in`}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="font-display text-[15px] font-bold" style={{ color: tint.color }}>
-                        {entry.type === 'sale' && `+${entry.qty}`}
-                        {entry.type === 'return' && `−${entry.qty}`}
-                        {entry.type === 'payment' && formatCurrency(entry.amount)}
-                        {entry.type === 'purchase' && `+${entry.qty}`}
-                      </p>
-                      <p className="mt-px text-[11px] font-semibold text-subtle">{formatRelativeDate(entry.created_at)}</p>
-                    </div>
+                      <div
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-lg"
+                        style={{ backgroundColor: tint.bg, color: tint.color }}
+                      >
+                        {getActivityIcon(entry.type)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[14.5px] font-bold text-ink">{entry.title}</p>
+                        <p className="mt-[2px] text-xs font-medium text-subtle">{subtitleFor(entry)}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="font-display text-[15px] font-bold" style={{ color: tint.color }}>
+                          {entry.type === 'sale' && `+${entry.qty}`}
+                          {entry.type === 'return' && (entry.outright ? `${entry.qty}` : `−${entry.qty}`)}
+                          {entry.type === 'payment' && formatCurrency(entry.amount)}
+                          {entry.type === 'purchase' && `+${entry.qty}`}
+                        </p>
+                        <p className="mt-px text-[11px] font-semibold text-subtle">{formatRelativeDate(entry.created_at)}</p>
+                      </div>
+                    </button>
                   </li>
                 )
               })}
@@ -149,6 +169,43 @@ export function Home() {
           </>
         )}
       </div>
+
+      {selected && (
+        <DetailModal
+          open={selected !== null}
+          onClose={() => setSelected(null)}
+          icon={getActivityIcon(selected.type)}
+          iconBg={getActivityTint(selected.type).bg}
+          iconColor={getActivityTint(selected.type).color}
+          title={detailTitle(selected)}
+          amount={formatCurrency(selected.amount)}
+          rows={detailRows(selected)}
+          created={formatDate(selected.created_at)}
+          createdBy={selected.created_by ? profileNames.get(selected.created_by) : undefined}
+          updated={formatUpdated(selected.updated_at, selected.created_at)}
+          updatedBy={selected.updated_by ? profileNames.get(selected.updated_by) : undefined}
+          actions={
+            isOwner ? (
+              <>
+                <Link
+                  to={editPath(selected)}
+                  onClick={() => setSelected(null)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(selected)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
+                >
+                  Delete
+                </button>
+              </>
+            ) : undefined
+          }
+        />
+      )}
     </div>
   )
 }
