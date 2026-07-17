@@ -7,7 +7,8 @@ import { PlusIcon } from '../../components/icons'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { BottomSheet } from '../../components/BottomSheet'
-import type { Product, ProductKind } from '../../types/db'
+import { PriceOptionsEditor } from '../../components/PriceOptionsEditor'
+import type { Product, ProductKind, PriceOption } from '../../types/db'
 
 export function DomesticStock() {
   const navigate = useNavigate()
@@ -21,8 +22,12 @@ export function DomesticStock() {
   const [price, setPrice] = useState('')
   const [capacity, setCapacity] = useState('')
   const [unit, setUnit] = useState('pc')
+  const [priceOptions, setPriceOptions] = useState<PriceOption[]>([])
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Keep only fully-filled alternate-price rows.
+  const cleanOptions = (opts: PriceOption[]) => opts.filter((o) => o.label.trim() && o.amount > 0)
 
   function resetForm() {
     setName('')
@@ -30,6 +35,7 @@ export function DomesticStock() {
     setPrice('')
     setCapacity('')
     setUnit('pc')
+    setPriceOptions([])
     setFormError(null)
   }
 
@@ -47,6 +53,7 @@ export function DomesticStock() {
       kind,
       unit: unit.trim() || 'pc',
       sort_order: maxSort + 1,
+      price_options: kind === 'service' ? [] : cleanOptions(priceOptions),
     }
     if (kind === 'cylinder' && capacity.trim()) payload.godown_capacity = Number(capacity)
     const { data: created, error: insError } = await supabase.from('products').insert(payload).select().single()
@@ -69,6 +76,7 @@ export function DomesticStock() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [editName, setEditName] = useState('')
   const [editPrice, setEditPrice] = useState('')
+  const [editPriceOptions, setEditPriceOptions] = useState<PriceOption[]>([])
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -79,6 +87,7 @@ export function DomesticStock() {
     if (!p) return
     setEditName(p.name)
     setEditPrice(String(p.price))
+    setEditPriceOptions(p.price_options ?? [])
     setEditError(null)
     setEditingProduct(p)
   }
@@ -92,7 +101,11 @@ export function DomesticStock() {
     setEditError(null)
     const { error: updError } = await supabase
       .from('products')
-      .update({ name: trimmed, price: Number(editPrice || 0) })
+      .update({
+        name: trimmed,
+        price: Number(editPrice || 0),
+        price_options: editingProduct.kind === 'service' ? [] : cleanOptions(editPriceOptions),
+      })
       .eq('id', editingProduct.id)
     setEditSaving(false)
     if (updError) {
@@ -301,6 +314,8 @@ export function DomesticStock() {
             </div>
           )}
 
+          {kind !== 'service' && <PriceOptionsEditor value={priceOptions} onChange={setPriceOptions} />}
+
           {kind === 'service' && (
             <p className="mb-1 text-[12px] font-semibold text-subtle">
               You'll pick which items this combo includes on the next screen.
@@ -334,7 +349,7 @@ export function DomesticStock() {
               />
             </div>
 
-            <div className="mb-1">
+            <div className="mb-3">
               <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Price (₹)</p>
               <input
                 type="number"
@@ -345,6 +360,10 @@ export function DomesticStock() {
                 className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
               />
             </div>
+
+            {editingProduct.kind !== 'service' && (
+              <PriceOptionsEditor value={editPriceOptions} onChange={setEditPriceOptions} />
+            )}
 
             {editError && <p className="mt-3 text-sm font-semibold text-red-600">{editError}</p>}
 

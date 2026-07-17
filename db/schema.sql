@@ -48,6 +48,7 @@ create table if not exists public.products (
   unit             text        not null default 'pc',
   active             boolean     not null default true,
   is_new_connection  boolean     not null default false,
+  price_options      jsonb       not null default '[]'::jsonb,
   sort_order         int         not null default 0,
   created_at       timestamptz not null default now(),
   created_by       uuid,

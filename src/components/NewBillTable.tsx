@@ -101,6 +101,26 @@ export function NewBillTable({
                       </button>
                     )}
 
+                    {p.price_options && p.price_options.length > 0 && !isEditingPrice && (
+                      <div className="mt-[5px] flex flex-wrap gap-[5px]">
+                        {[{ label: 'Default', amount: p.price }, ...p.price_options].map((opt, idx) => {
+                          const active = Number(priceByProduct[p.id] || 0) === opt.amount
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => onPrice(p.id, String(opt.amount))}
+                              className={`rounded-[8px] px-[8px] py-[3px] text-[10.5px] font-bold ${
+                                active ? 'bg-[#2E8B57] text-white' : 'border border-[#2E8B57] bg-cream text-[#2E8B57]'
+                              }`}
+                            >
+                              {opt.label} ₹{opt.amount}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
                     {p.kind === 'cylinder' && qty > 0 && (
                       <div className="mt-[3px] flex items-center gap-[6px]">
                         <div className="flex items-center gap-[4px] rounded-[8px] bg-[#E7F5EC] px-[6px] py-[2px]">
