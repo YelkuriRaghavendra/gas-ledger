@@ -86,14 +86,7 @@ export function NewBillTable({
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="flex items-center gap-[6px]">
-                      <p className="truncate text-[14px] font-bold text-ink">{p.name}</p>
-                      {r.label && (
-                        <span className="shrink-0 rounded-[7px] bg-[#E7F5EC] px-[6px] py-[2px] text-[10px] font-bold text-[#2E8B57]">
-                          {r.label}
-                        </span>
-                      )}
-                    </div>
+                    <p className="truncate text-[14px] font-bold text-ink">{p.name}</p>
 
                     {isEditingPrice ? (
                       <input

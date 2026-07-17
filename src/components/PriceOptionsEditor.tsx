@@ -19,19 +19,13 @@ export function PriceOptionsEditor({
         {value.map((o, i) => (
           <div key={i} className="flex gap-2">
             <input
-              placeholder="Label (e.g. Commercial)"
-              value={o.label}
-              onChange={(e) => update(i, { label: e.target.value })}
-              className="h-[46px] min-w-0 flex-1 rounded-[12px] border border-borderMuted bg-cream px-[12px] text-[14px] font-bold text-ink"
-            />
-            <input
               type="number"
               min="0"
               step="0.01"
-              placeholder="₹"
+              placeholder="Price (₹)"
               value={o.amount || ''}
               onChange={(e) => update(i, { amount: Number(e.target.value || 0) })}
-              className="h-[46px] w-[84px] shrink-0 rounded-[12px] border border-borderMuted bg-cream px-[12px] text-[14px] font-bold text-ink"
+              className="h-[46px] min-w-0 flex-1 rounded-[12px] border border-borderMuted bg-cream px-[12px] text-[14px] font-bold text-ink"
             />
             <button
               type="button"

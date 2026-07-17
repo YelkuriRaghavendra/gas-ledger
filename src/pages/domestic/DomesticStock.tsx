@@ -27,7 +27,7 @@ export function DomesticStock() {
   const [formError, setFormError] = useState<string | null>(null)
 
   // Keep only fully-filled alternate-price rows.
-  const cleanOptions = (opts: PriceOption[]) => opts.filter((o) => o.label.trim() && o.amount > 0)
+  const cleanOptions = (opts: PriceOption[]) => opts.filter((o) => o.amount > 0)
 
   function resetForm() {
     setName('')
