@@ -100,7 +100,7 @@ export function Home() {
               <p className="relative mt-1 font-display text-[38px] font-bold leading-none tracking-[-1px] text-white">
                 {formatCurrency(totalDue)}
               </p>
-              <Link to="/customers" className="relative mt-[9px] inline-flex items-center gap-1 text-[12.5px] font-semibold text-mutedOnDark">
+              <Link to="/commercial/customers" className="relative mt-[9px] inline-flex items-center gap-1 text-[12.5px] font-semibold text-mutedOnDark">
                 from {customersWithDue} customer{customersWithDue === 1 ? '' : 's'} ›
               </Link>
               <div className="relative mt-[15px] flex items-center gap-5">
@@ -116,11 +116,11 @@ export function Home() {
               </div>
             </HeroCard>
 
-            <CylindersCard items={cylinderItems} accent="orange" linkLabel="Godown" linkTo="/godown" />
+            <CylindersCard items={cylinderItems} accent="orange" linkLabel="Godown" linkTo="/commercial/godown" />
 
             <div className="mb-3 mt-[18px] flex items-baseline justify-between">
               <h2 className="font-display text-[18px] font-bold tracking-[-0.3px] text-ink">Recent activity</h2>
-              <Link to="/activity" className="text-[13px] font-bold text-accent">
+              <Link to="/commercial/activity" className="text-[13px] font-bold text-accent">
                 See all ›
               </Link>
             </div>

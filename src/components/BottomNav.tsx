@@ -7,12 +7,12 @@ const ACTIVE = '#E4571B'
 const INACTIVE = '#B0A594'
 
 const leftTabs = [
-  { to: '/', label: 'Home', Icon: HomeIcon, end: true },
-  { to: '/customers', label: 'Customers', Icon: UsersIcon, end: false },
+  { to: '/commercial', label: 'Home', Icon: HomeIcon, end: true },
+  { to: '/commercial/customers', label: 'Customers', Icon: UsersIcon, end: false },
 ]
 const rightTabs = [
-  { to: '/purchases', label: 'Purchases', Icon: TruckIcon, end: false },
-  { to: '/activity', label: 'Activity', Icon: ActivityIcon, end: false },
+  { to: '/commercial/purchases', label: 'Purchases', Icon: TruckIcon, end: false },
+  { to: '/commercial/activity', label: 'Activity', Icon: ActivityIcon, end: false },
 ]
 
 export function BottomNav() {
@@ -21,7 +21,7 @@ export function BottomNav() {
   const location = useLocation()
 
   const customerId = useMemo(() => {
-    const match = location.pathname.match(/^\/customers\/(\d+)$/)
+    const match = location.pathname.match(/^\/commercial\/customers\/(\d+)$/)
     return match ? Number(match[1]) : undefined
   }, [location.pathname])
 

@@ -26,7 +26,7 @@ export function Godown() {
 
         {!hasAdjustment && (
           <Link
-            to="/godown/set-stock"
+            to="/commercial/godown/set-stock"
             className="mb-4 flex h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-accent bg-[#FBEDE4] text-[14px] font-bold text-accent"
           >
             Set current stock

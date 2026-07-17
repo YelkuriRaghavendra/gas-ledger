@@ -53,6 +53,6 @@ export function detailRows(entry: FeedItem): { k: string; v: string }[] {
 }
 
 export function editPath(entry: FeedItem) {
-  if (entry.type === 'purchase') return `/purchases/${entry.id}/edit`
-  return `/customers/${entry.customer_id}/${entry.type}/${entry.id}/edit`
+  if (entry.type === 'purchase') return `/commercial/purchases/${entry.id}/edit`
+  return `/commercial/customers/${entry.customer_id}/${entry.type}/${entry.id}/edit`
 }

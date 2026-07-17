@@ -72,7 +72,7 @@ export function Customers() {
           {filtered.map((c) => (
             <li key={c.id}>
               <Link
-                to={`/customers/${c.id}`}
+                to={`/commercial/customers/${c.id}`}
                 className="flex items-center gap-[13px] rounded-[20px] bg-surface p-[15px] shadow-card transition active:scale-[0.99]"
               >
                 <Avatar id={c.id} name={c.name} size={48} />

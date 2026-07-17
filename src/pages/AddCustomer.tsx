@@ -48,7 +48,7 @@ export function AddCustomer() {
       setError(error.message)
       return
     }
-    navigate(`/customers/${data.id}`)
+    navigate(`/commercial/customers/${data.id}`)
   }
 
   const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
@@ -56,7 +56,7 @@ export function AddCustomer() {
 
   return (
     <div className="p-5 pb-10 pt-3">
-      <Link to="/customers" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+      <Link to="/commercial/customers" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
       <h1 className="mb-[18px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Add customer</h1>
