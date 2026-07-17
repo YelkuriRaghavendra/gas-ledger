@@ -9,53 +9,7 @@ import { useActivityFeed, type FeedItem } from '../hooks/useActivityFeed'
 import { useProfiles } from '../hooks/useProfiles'
 import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
-
-const TYPE_LABEL: Record<FeedItem['type'], string> = {
-  sale: 'Sale',
-  return: 'Return',
-  payment: 'Payment',
-  purchase: 'Purchase',
-}
-
-function subtitleFor(entry: FeedItem) {
-  if (entry.type === 'sale') {
-    return `${entry.qty}${entry.product_name ? ` ${entry.product_name}` : ''} sold · ${entry.empties} empties in`
-  }
-  if (entry.type === 'return') return `${entry.product_name ? `${entry.product_name} ` : ''}empties returned`
-  if (entry.type === 'purchase') return `Purchase · ${entry.qty} in`
-  return 'Payment received'
-}
-
-function detailTitle(entry: FeedItem) {
-  const counterparty = entry.type === 'purchase' ? entry.product_name ?? '' : entry.title
-  return `${TYPE_LABEL[entry.type]} · ${counterparty}`
-}
-
-function detailRows(entry: FeedItem): { k: string; v: string }[] {
-  const rows: { k: string; v: string }[] = []
-  if (entry.type === 'sale') {
-    if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })
-    rows.push({ k: 'Quantity sold', v: String(entry.qty) })
-    rows.push({ k: 'Empties collected', v: String(entry.empties) })
-    if (entry.note) rows.push({ k: 'Note', v: entry.note })
-  } else if (entry.type === 'purchase') {
-    if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })
-    rows.push({ k: 'Quantity in', v: String(entry.qty) })
-    rows.push({ k: 'Empties given', v: String(entry.empties) })
-    if (entry.note) rows.push({ k: 'Note', v: entry.note })
-  } else if (entry.type === 'return') {
-    if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })
-    rows.push({ k: 'Quantity', v: String(entry.qty) })
-  } else if (entry.type === 'payment') {
-    rows.push({ k: 'Amount', v: formatCurrency(entry.amount) })
-  }
-  return rows
-}
-
-function editPath(entry: FeedItem) {
-  if (entry.type === 'purchase') return `/purchases/${entry.id}/edit`
-  return `/customers/${entry.customer_id}/${entry.type}/${entry.id}/edit`
-}
+import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
 
 export function ActivityFeed() {
   const { data, loading, error, refresh } = useActivityFeed(50)
@@ -108,7 +62,7 @@ export function ActivityFeed() {
                   <div className="shrink-0 text-right">
                     <p className="font-display text-[15px] font-bold" style={{ color: tint.color }}>
                       {entry.type === 'sale' && `+${entry.qty}`}
-                      {entry.type === 'return' && `−${entry.qty}`}
+                      {entry.type === 'return' && (entry.outright ? `${entry.qty}` : `−${entry.qty}`)}
                       {entry.type === 'purchase' && `+${entry.qty}`}
                       {entry.type === 'payment' && formatCurrency(entry.amount)}
                     </p>
