@@ -19,7 +19,9 @@ import type { Transaction } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
 
 function historyAmount(t: Transaction) {
-  if (t.type === 'return') return `−${t.qty}`
+  // Outright returns are cylinders the customer owns — they don't reduce
+  // empties owed, so no misleading minus sign.
+  if (t.type === 'return') return t.outright ? `${t.qty}` : `−${t.qty}`
   return formatCurrency(t.amount)
 }
 
@@ -73,10 +75,12 @@ function detailRows(t: HistoryEntry): { k: string; v: string }[] {
   if (t.productName) rows.push({ k: 'Product', v: t.productName })
   if (t.type === 'sale') {
     rows.push({ k: 'Quantity sold', v: String(t.qty) })
-    rows.push({ k: 'Empties collected', v: String(t.empties) })
+    if (t.outright) rows.push({ k: 'Outright', v: 'Customer owns cylinder' })
+    else rows.push({ k: 'Empties collected', v: String(t.empties) })
     rows.push({ k: 'Payment', v: t.paid ? `Paid${t.method ? ` · ${t.method === 'upi' ? 'UPI' : 'Cash'}` : ''}` : 'On credit' })
   } else if (t.type === 'return') {
     rows.push({ k: 'Quantity', v: String(t.qty) })
+    if (t.outright) rows.push({ k: 'Outright', v: 'Customer owns cylinder' })
   } else if (t.type === 'payment' && t.method) {
     rows.push({ k: 'Method', v: t.method === 'upi' ? 'UPI' : 'Cash' })
   }
@@ -408,7 +412,10 @@ export function CustomerDetail() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
-                      <p className="mt-[2px] truncate text-xs font-semibold text-[#9A8F80]">{formatRelativeDate(t.created_at)}</p>
+                      <p className="mt-[2px] truncate text-xs font-semibold text-[#9A8F80]">
+                        {formatRelativeDate(t.created_at)}
+                        {t.outright && (t.type === 'sale' || t.type === 'return') ? ' · Outright' : ''}
+                      </p>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-display text-sm font-bold" style={{ color: tint.color }}>
