@@ -44,7 +44,7 @@ export function NewBillTable({
 
   return (
     <div className="overflow-hidden rounded-[20px] bg-surface shadow-card">
-      <div className="grid grid-cols-[1fr_92px_64px] gap-2 bg-cream px-4 py-[10px]">
+      <div className="grid grid-cols-[1fr_124px_64px] gap-2 bg-cream px-4 py-[10px]">
         <div className="text-[9.5px] font-bold uppercase tracking-[0.5px] text-subtle">Item</div>
         <div className="text-center text-[9.5px] font-bold uppercase tracking-[0.5px] text-subtle">Qty</div>
         <div className="text-right text-[9.5px] font-bold uppercase tracking-[0.5px] text-subtle">Amount</div>
@@ -70,7 +70,7 @@ export function NewBillTable({
               return (
                 <div
                   key={p.id}
-                  className={`grid grid-cols-[1fr_92px_64px] items-center gap-2 border-t border-borderMuted px-4 py-[11px] ${
+                  className={`grid grid-cols-[1fr_124px_64px] items-center gap-2 border-t border-borderMuted px-4 py-[11px] ${
                     qty > 0 ? 'bg-[#F3FAF5]' : ''
                   }`}
                 >

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useGodownStock } from '../../hooks/useGodownStock'
 import { useProducts } from '../../hooks/useProducts'
-import { TruckIcon, PlusIcon } from '../../components/icons'
+import { PlusIcon } from '../../components/icons'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { BottomSheet } from '../../components/BottomSheet'
@@ -137,9 +137,12 @@ export function DomesticStock() {
       <div className="p-5 pt-1">
       <div className="mb-[22px] flex items-center justify-between">
         <h1 className="font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Stock</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/domestic/combos" className="text-[13px] font-bold text-[#2E8B57]">
-            Combos ›
+        <div className="flex items-center gap-2">
+          <Link
+            to="/domestic/combos"
+            className="flex items-center rounded-[13px] border-[1.5px] border-[#2E8B57] px-[12px] py-[8px] text-[13px] font-bold text-[#2E8B57]"
+          >
+            Combos
           </Link>
           <button
             type="button"
@@ -151,12 +154,6 @@ export function DomesticStock() {
           >
             <PlusIcon size={15} strokeWidth={2.4} color="#2E8B57" /> Add item
           </button>
-          <Link
-            to="/domestic/purchases/new"
-            className="flex items-center gap-2 rounded-[13px] bg-[#2E8B57] px-[14px] py-[9px] text-[13px] font-bold text-white shadow-[0_8px_18px_-8px_rgba(46,139,87,0.7)]"
-          >
-            <TruckIcon size={16} color="#fff" strokeWidth={2.2} /> Stock in
-          </Link>
         </div>
       </div>
 
