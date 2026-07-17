@@ -66,6 +66,66 @@ export function DomesticStock() {
     refreshStock()
   }
 
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const productById = new Map(products.map((p) => [p.id, p]))
+
+  function openEdit(productId: number) {
+    const p = productById.get(productId)
+    if (!p) return
+    setEditName(p.name)
+    setEditPrice(String(p.price))
+    setEditError(null)
+    setEditingProduct(p)
+  }
+
+  async function handleEditSave(e: FormEvent) {
+    e.preventDefault()
+    if (!editingProduct) return
+    const trimmed = editName.trim()
+    if (!trimmed) return
+    setEditSaving(true)
+    setEditError(null)
+    const { error: updError } = await supabase
+      .from('products')
+      .update({ name: trimmed, price: Number(editPrice || 0) })
+      .eq('id', editingProduct.id)
+    setEditSaving(false)
+    if (updError) {
+      setEditError(updError.message)
+      return
+    }
+    setEditingProduct(null)
+    await refreshProducts()
+    refreshStock()
+  }
+
+  async function handleEditDelete() {
+    if (!editingProduct) return
+    if (!confirm(`Remove "${editingProduct.name}"? It disappears from stock and billing.`)) return
+    setEditSaving(true)
+    setEditError(null)
+    // Try a real delete; if history references it, deactivate so past
+    // records keep the name.
+    const { error: delError } = await supabase.from('products').delete().eq('id', editingProduct.id)
+    if (delError) {
+      const { error: updError } = await supabase.from('products').update({ active: false }).eq('id', editingProduct.id)
+      if (updError) {
+        setEditError(updError.message)
+        setEditSaving(false)
+        return
+      }
+    }
+    setEditSaving(false)
+    setEditingProduct(null)
+    await refreshProducts()
+    refreshStock()
+  }
+
   const cylinders = stock.filter((s) => s.kind === 'cylinder')
   const accessories = stock.filter((s) => s.kind === 'accessory')
 
@@ -109,9 +169,14 @@ export function DomesticStock() {
       <div className="grid grid-cols-1 gap-3">
         {cylinders.map((s) => (
           <div key={s.product_id} className="rounded-[18px] bg-surface p-[18px] shadow-card">
-            <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
-              {s.product_name}
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
+                {s.product_name}
+              </span>
+              <button type="button" onClick={() => openEdit(s.product_id)} className="text-[12px] font-bold text-[#2E8B57]">
+                Edit
+              </button>
+            </div>
             <div className="mt-4 flex items-stretch">
               <div className="flex-1">
                 <p className="text-[11px] font-bold uppercase tracking-[0.4px] text-subtle">Full</p>
@@ -141,15 +206,20 @@ export function DomesticStock() {
       <h2 className="mb-3 mt-6 font-display text-[16px] font-bold tracking-[-0.3px] text-ink">Accessories</h2>
       <div className="overflow-hidden rounded-[18px] bg-surface shadow-card">
         {accessories.map((s, i) => (
-          <div
+          <button
             key={s.product_id}
-            className={`flex items-center justify-between px-[18px] py-[14px] ${i > 0 ? 'border-t border-[#F1E9DB]' : ''}`}
+            type="button"
+            onClick={() => openEdit(s.product_id)}
+            className={`flex w-full items-center justify-between px-[18px] py-[14px] text-left transition active:bg-cream ${i > 0 ? 'border-t border-[#F1E9DB]' : ''}`}
           >
-            <p className="text-sm font-bold text-ink">{s.product_name}</p>
-            <p className={`font-display text-[17px] font-bold ${s.full_cylinders < 0 ? 'text-red-600' : s.full_cylinders === 0 ? 'text-subtle' : 'text-[#2E8B57]'}`}>
-              {s.full_cylinders} <span className="text-[11px] font-semibold text-subtle">{s.unit}</span>
-            </p>
-          </div>
+            <span className="text-sm font-bold text-ink">{s.product_name}</span>
+            <span className="flex items-center gap-3">
+              <span className={`font-display text-[17px] font-bold ${s.full_cylinders < 0 ? 'text-red-600' : s.full_cylinders === 0 ? 'text-subtle' : 'text-[#2E8B57]'}`}>
+                {s.full_cylinders} <span className="text-[11px] font-semibold text-subtle">{s.unit}</span>
+              </span>
+              <span className="text-[12px] font-bold text-[#2E8B57]">Edit</span>
+            </span>
+          </button>
         ))}
         {accessories.length === 0 && (
           <p className="px-4 py-8 text-center text-sm font-medium text-subtle">No accessory products yet</p>
@@ -250,6 +320,56 @@ export function DomesticStock() {
             {saving ? 'Adding…' : kind === 'service' ? 'Create & choose items' : 'Add item'}
           </button>
         </form>
+      </BottomSheet>
+
+      <BottomSheet open={editingProduct !== null} onClose={() => setEditingProduct(null)} slideUp>
+        {editingProduct && (
+          <form onSubmit={handleEditSave}>
+            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">Edit item</h2>
+
+            <div className="mb-3">
+              <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Name</p>
+              <input
+                required
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
+              />
+            </div>
+
+            <div className="mb-1">
+              <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Price (₹)</p>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
+                className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
+              />
+            </div>
+
+            {editError && <p className="mt-3 text-sm font-semibold text-red-600">{editError}</p>}
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={handleEditDelete}
+                disabled={editSaving}
+                className="h-[50px] w-[110px] shrink-0 rounded-[14px] border-[1.5px] border-borderMuted bg-surface font-bold text-red-600 transition active:scale-[0.99] disabled:opacity-50"
+              >
+                Delete
+              </button>
+              <button
+                type="submit"
+                disabled={editSaving}
+                className="h-[50px] flex-1 rounded-[14px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
+              >
+                {editSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        )}
       </BottomSheet>
     </div>
   )
