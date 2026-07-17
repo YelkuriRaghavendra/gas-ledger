@@ -1,13 +1,70 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { FormEvent, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 import { useGodownStock } from '../../hooks/useGodownStock'
-import { TruckIcon } from '../../components/icons'
+import { useProducts } from '../../hooks/useProducts'
+import { TruckIcon, PlusIcon } from '../../components/icons'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
+import { BottomSheet } from '../../components/BottomSheet'
+import type { Product, ProductKind } from '../../types/db'
 
 export function DomesticStock() {
+  const navigate = useNavigate()
   const [accountOpen, setAccountOpen] = useState(false)
-  const { data: stock, loading, error } = useGodownStock('domestic')
+  const { data: stock, loading, error, refresh: refreshStock } = useGodownStock('domestic')
+  const { data: products, refresh: refreshProducts } = useProducts('domestic')
+
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [kind, setKind] = useState<ProductKind>('accessory')
+  const [price, setPrice] = useState('')
+  const [capacity, setCapacity] = useState('')
+  const [unit, setUnit] = useState('pc')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  function resetForm() {
+    setName('')
+    setKind('accessory')
+    setPrice('')
+    setCapacity('')
+    setUnit('pc')
+    setFormError(null)
+  }
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setSaving(true)
+    setFormError(null)
+    const maxSort = products.reduce((m, p) => Math.max(m, p.sort_order), 0)
+    const payload: Record<string, unknown> = {
+      name: trimmed,
+      price: Number(price || 0),
+      segment: 'domestic',
+      kind,
+      unit: unit.trim() || 'pc',
+      sort_order: maxSort + 1,
+    }
+    if (kind === 'cylinder' && capacity.trim()) payload.godown_capacity = Number(capacity)
+    const { data: created, error: insError } = await supabase.from('products').insert(payload).select().single()
+    setSaving(false)
+    if (insError) {
+      setFormError(insError.message)
+      return
+    }
+    setAdding(false)
+    resetForm()
+    if (kind === 'service') {
+      // A combo needs its components chosen — hand off to the Combos editor.
+      navigate('/domestic/combos', { state: { editProductId: (created as Product).id } })
+      return
+    }
+    await refreshProducts()
+    refreshStock()
+  }
 
   const cylinders = stock.filter((s) => s.kind === 'cylinder')
   const accessories = stock.filter((s) => s.kind === 'accessory')
@@ -24,6 +81,16 @@ export function DomesticStock() {
           <Link to="/domestic/combos" className="text-[13px] font-bold text-[#2E8B57]">
             Combos ›
           </Link>
+          <button
+            type="button"
+            onClick={() => {
+              resetForm()
+              setAdding(true)
+            }}
+            className="flex items-center gap-1 rounded-[13px] border-[1.5px] border-[#2E8B57] px-[12px] py-[8px] text-[13px] font-bold text-[#2E8B57]"
+          >
+            <PlusIcon size={15} strokeWidth={2.4} color="#2E8B57" /> Add item
+          </button>
           <Link
             to="/domestic/purchases/new"
             className="flex items-center gap-2 rounded-[13px] bg-[#2E8B57] px-[14px] py-[9px] text-[13px] font-bold text-white shadow-[0_8px_18px_-8px_rgba(46,139,87,0.7)]"
@@ -91,6 +158,99 @@ export function DomesticStock() {
         </>
       )}
       </div>
+
+      <BottomSheet open={adding} onClose={() => setAdding(false)} slideUp>
+        <form onSubmit={handleAdd}>
+          <h2 className="mb-4 font-display text-[19px] font-bold text-ink">Add item</h2>
+
+          <div className="mb-3">
+            <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Name</p>
+            <input
+              required
+              autoFocus
+              placeholder="e.g. Suraksha Gas Pipe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
+            />
+          </div>
+
+          <div className="mb-3">
+            <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Type</p>
+            <div className="flex gap-2">
+              {([
+                { k: 'cylinder' as ProductKind, label: 'Cylinder' },
+                { k: 'accessory' as ProductKind, label: 'Accessory' },
+                { k: 'service' as ProductKind, label: 'Combo' },
+              ]).map(({ k, label }) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKind(k)}
+                  className={`flex-1 rounded-[12px] py-[11px] text-[13.5px] font-bold transition ${
+                    kind === k ? 'bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] text-white shadow-[0_8px_18px_-8px_rgba(46,139,87,0.7)]' : 'bg-cream text-muted'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-3 flex gap-3">
+            <div className="flex-1">
+              <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Price (₹)</p>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
+              />
+            </div>
+            <div className="w-[110px]">
+              <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Unit</p>
+              <input
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
+              />
+            </div>
+          </div>
+
+          {kind === 'cylinder' && (
+            <div className="mb-1">
+              <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Godown capacity (optional)</p>
+              <input
+                type="number"
+                min="0"
+                placeholder="e.g. 300"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
+              />
+            </div>
+          )}
+
+          {kind === 'service' && (
+            <p className="mb-1 text-[12px] font-semibold text-subtle">
+              You'll pick which items this combo includes on the next screen.
+            </p>
+          )}
+
+          {formError && <p className="mt-3 text-sm font-semibold text-red-600">{formError}</p>}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="mt-4 h-[50px] w-full rounded-[14px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
+          >
+            {saving ? 'Adding…' : kind === 'service' ? 'Create & choose items' : 'Add item'}
+          </button>
+        </form>
+      </BottomSheet>
     </div>
   )
 }

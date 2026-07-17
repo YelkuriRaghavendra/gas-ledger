@@ -1,5 +1,5 @@
-import { FormEvent, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
 import { useBundleComponents } from '../../hooks/useBundleComponents'
@@ -41,6 +41,21 @@ export function DomesticCombos() {
     setError(null)
     setEditing(p)
   }
+
+  // When arriving from Stock's "Add item" after creating a combo, open its
+  // component editor straight away (once, after products have loaded).
+  const location = useLocation()
+  const autoOpened = useRef(false)
+  useEffect(() => {
+    if (autoOpened.current) return
+    const pid = (location.state as { editProductId?: number } | null)?.editProductId
+    if (pid == null || products.length === 0) return
+    const p = products.find((x) => x.id === pid)
+    if (p) {
+      autoOpened.current = true
+      openEditor(p)
+    }
+  }, [location.state, products])
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
