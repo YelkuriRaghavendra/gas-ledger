@@ -32,7 +32,7 @@ import { DomesticCombos } from './pages/domestic/DomesticCombos'
 export default function App() {
   const location = useLocation()
   const isDomestic = location.pathname.startsWith('/domestic')
-  const hideNav = location.pathname === '/login' || location.pathname === '/choose'
+  const hideNav = location.pathname === '/login' || location.pathname === '/choose' || location.pathname === '/stock'
 
   return (
     <div className="min-h-screen bg-cream pb-16">

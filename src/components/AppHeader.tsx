@@ -8,7 +8,7 @@ import { setMode } from '../mode/mode'
 export type HeaderView = 'commercial' | 'domestic' | 'stock'
 
 // The switch button cycles through the three views in order.
-const ORDER: HeaderView[] = ['commercial', 'domestic', 'stock']
+const ORDER: HeaderView[] = ['commercial', 'stock', 'domestic']
 
 const initials = (s: string) => s.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
