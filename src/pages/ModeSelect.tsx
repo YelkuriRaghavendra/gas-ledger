@@ -75,7 +75,7 @@ export function ModeSelect() {
             <BoxIcon size={26} color="#fff" strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-display text-[19px] font-bold text-ink">Stock</p>
+            <p className="font-display text-[19px] font-bold text-ink">Godown Inventory</p>
             <p className="mt-[2px] text-[12.5px] font-semibold text-muted">
               Commercial &amp; domestic · full &amp; empty
             </p>

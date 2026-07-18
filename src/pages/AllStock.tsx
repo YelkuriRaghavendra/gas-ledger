@@ -96,8 +96,8 @@ export function AllStock() {
   const bySegment = (segment: Segment) => stock.filter((s) => s.segment === segment)
 
   return (
-    <div className="pb-[110px]">
-      <AppHeader view="stock" title="Stock" onOpenAccount={() => setAccountOpen(true)} />
+    <div className="pb-10">
+      <AppHeader view="stock" title="Godown Inventory" onOpenAccount={() => setAccountOpen(true)} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
 
       <div className="p-5 pt-1">
