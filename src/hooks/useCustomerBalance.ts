@@ -13,7 +13,7 @@ export function useCustomerBalance(id: number) {
       .from('customer_balances')
       .select('*')
       .eq('id', id)
-      .single()
+      .maybeSingle()
     if (error) setError(error.message)
     else setData(data as CustomerBalance)
     setLoading(false)
@@ -26,7 +26,7 @@ export function useCustomerBalance(id: number) {
       .from('customer_balances')
       .select('*')
       .eq('id', id)
-      .single()
+      .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) setError(error.message)

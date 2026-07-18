@@ -7,7 +7,7 @@ import { useProducts } from '../hooks/useProducts'
 import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useTransactions } from '../hooks/useTransactions'
 import { Stepper } from '../components/Stepper'
-import { combineDateWithNow, dateInputValue, formatCurrency, todayInputValue } from '../utils/format'
+import { combineDateWithNow, dateInputValue, emptiesOwed, formatCurrency, todayInputValue } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
 import type { PaymentMethod } from '../types/db'
 
@@ -150,12 +150,6 @@ export function NewSale() {
     for (const l of lines) {
       if (l.price <= 0) {
         setError(`Enter a price for ${l.name}`)
-        return
-      }
-      if (l.outright) continue
-      const cap = ownedFor(l.productId) + l.qty
-      if (l.empties > cap) {
-        setError(`Empties taken for ${l.name} can't exceed ${cap} (${ownedFor(l.productId)} owed + ${l.qty} this sale).`)
         return
       }
     }
@@ -340,11 +334,20 @@ export function NewSale() {
                       <p className="mt-2 text-[12px] font-semibold text-muted">
                         Customer owns this cylinder — not counted as empties owed.
                       </p>
-                    ) : (
-                      <p className="mt-2 text-[12px] font-semibold text-muted">
-                        Customer owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span> {p.name} empties
-                      </p>
-                    )}
+                    ) : (() => {
+                      const e = emptiesOwed(ownedFor(p.id))
+                      if (e.owedBy === 'agency')
+                        return (
+                          <p className="mt-2 text-[12px] font-semibold text-muted">
+                            <span className="font-bold text-[#2E8B57]">{e.count}</span> {p.name} empties in advance
+                          </p>
+                        )
+                      return (
+                        <p className="mt-2 text-[12px] font-semibold text-muted">
+                          <span className="font-bold text-[#C23B22]">{e.count}</span> {p.name} empties pending
+                        </p>
+                      )
+                    })()}
                   </div>
                 )}
               </div>

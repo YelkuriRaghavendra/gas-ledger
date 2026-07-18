@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { useAllCustomerProductBalances } from '../hooks/useAllCustomerProductBalances'
-import { formatCurrency } from '../utils/format'
+import { emptiesOwed, formatCurrency } from '../utils/format'
 import { Avatar } from '../components/Avatar'
 import { StatusPill } from '../components/StatusPill'
 import { SearchIcon, MapPinIcon } from '../components/icons'
@@ -38,7 +38,7 @@ export function Customers() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader segment="commercial" onOpenAccount={() => setAccountOpen(true)} />
+      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
 
       <div className="p-5 pt-1">
@@ -48,7 +48,7 @@ export function Customers() {
             {data.length} account{data.length === 1 ? '' : 's'}
           </span>
           <span className="rounded-full bg-surface px-[13px] py-[6px] text-xs font-bold text-[#C23B22] shadow-card">
-            {totalEmptiesOut} empties out
+            {emptiesOwed(totalEmptiesOut).count} empties {emptiesOwed(totalEmptiesOut).owedBy === 'agency' ? 'advance' : 'pending'}
           </span>
         </div>
 
