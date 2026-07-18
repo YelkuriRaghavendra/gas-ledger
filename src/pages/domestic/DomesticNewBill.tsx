@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
 import { useBundleComponents } from '../../hooks/useBundleComponents'
-import { NewBillTable } from '../../components/NewBillTable'
+import { NewBillTable, type BillRow } from '../../components/NewBillTable'
 import { combineDateWithNow, todayInputValue } from '../../utils/format'
 import { ChevronLeftIcon } from '../../components/icons'
 
@@ -26,53 +26,66 @@ export function DomesticNewBill() {
     return parts.length > 0 ? `includes ${parts.join(', ')}` : null
   }
 
-  const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
-  const [emptiesByProduct, setEmptiesByProduct] = useState<Record<number, number>>({})
-  const [matchByProduct, setMatchByProduct] = useState<Record<number, boolean>>({})
-  const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({})
+  // A product with alternate prices becomes several rows (one per price);
+  // a plain product is a single row. All bill state is keyed by row.key.
+  const rows: BillRow[] = products.flatMap((p): BillRow[] => {
+    const opts = p.price_options ?? []
+    if (opts.length === 0) return [{ key: String(p.id), product: p, label: null, price: p.price }]
+    return [
+      { key: `${p.id}#d`, product: p, label: 'Default', price: p.price },
+      ...opts.map((o, i) => ({ key: `${p.id}#${i}`, product: p, label: o.label, price: o.amount })),
+    ]
+  })
+
+  const [qtyByKey, setQtyByKey] = useState<Record<string, number>>({})
+  const [emptiesByKey, setEmptiesByKey] = useState<Record<string, number>>({})
+  const [matchByKey, setMatchByKey] = useState<Record<string, boolean>>({})
+  const [priceByKey, setPriceByKey] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    setPriceByProduct((prev) => {
+    setPriceByKey((prev) => {
       let changed = false
       const next = { ...prev }
-      for (const p of products) {
-        if (next[p.id] === undefined) {
-          next[p.id] = String(p.price || '')
+      for (const r of rows) {
+        if (next[r.key] === undefined) {
+          next[r.key] = String(r.price || '')
           changed = true
         }
       }
       return changed ? next : prev
     })
+    // rows is derived from products; keying off products is sufficient.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products])
 
-  const isMatched = (pid: number) => matchByProduct[pid] ?? true
-  const setQty = (pid: number, v: number) => {
-    setQtyByProduct((s) => ({ ...s, [pid]: v }))
-    if (isMatched(pid)) setEmptiesByProduct((s) => ({ ...s, [pid]: v }))
+  const isMatched = (key: string) => matchByKey[key] ?? true
+  const setQty = (key: string, v: number) => {
+    setQtyByKey((s) => ({ ...s, [key]: v }))
+    if (isMatched(key)) setEmptiesByKey((s) => ({ ...s, [key]: v }))
   }
-  const toggleMatch = (pid: number) => {
-    const next = !isMatched(pid)
-    setMatchByProduct((s) => ({ ...s, [pid]: next }))
-    if (next) setEmptiesByProduct((s) => ({ ...s, [pid]: qtyByProduct[pid] ?? 0 }))
+  const toggleMatch = (key: string) => {
+    const next = !isMatched(key)
+    setMatchByKey((s) => ({ ...s, [key]: next }))
+    if (next) setEmptiesByKey((s) => ({ ...s, [key]: qtyByKey[key] ?? 0 }))
   }
 
-  const billTotal = products.reduce(
-    (sum, p) => sum + (qtyByProduct[p.id] ?? 0) * Number(priceByProduct[p.id] || 0),
+  const billTotal = rows.reduce(
+    (sum, r) => sum + (qtyByKey[r.key] ?? 0) * Number(priceByKey[r.key] || 0),
     0,
   )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const lines = products
-      .map((p) => ({
-        product: p,
-        qty: qtyByProduct[p.id] ?? 0,
-        price: Number(priceByProduct[p.id] || 0),
-        empties: p.kind === 'cylinder' ? emptiesByProduct[p.id] ?? 0 : 0,
+    const lines = rows
+      .map((r) => ({
+        product: r.product,
+        qty: qtyByKey[r.key] ?? 0,
+        price: Number(priceByKey[r.key] || 0),
+        empties: r.product.kind === 'cylinder' ? emptiesByKey[r.key] ?? 0 : 0,
       }))
       .filter((l) => l.qty > 0)
 
@@ -91,7 +104,7 @@ export function DomesticNewBill() {
     setError(null)
     const billId = crypto.randomUUID()
     const timestamp = combineDateWithNow(date)
-    const rows = lines.map((l) => ({
+    const txRows = lines.map((l) => ({
       customer_id: null,
       type: 'sale' as const,
       product_id: l.product.id,
@@ -105,7 +118,7 @@ export function DomesticNewBill() {
       created_by: session?.user.id,
       created_at: timestamp,
     }))
-    const { error } = await supabase.from('transactions').insert(rows)
+    const { error } = await supabase.from('transactions').insert(txRows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -139,13 +152,13 @@ export function DomesticNewBill() {
 
       <form onSubmit={handleSubmit}>
         <NewBillTable
-          products={products}
-          qtyByProduct={qtyByProduct}
-          priceByProduct={priceByProduct}
-          emptiesByProduct={emptiesByProduct}
+          rows={rows}
+          qtyByKey={qtyByKey}
+          priceByKey={priceByKey}
+          emptiesByKey={emptiesByKey}
           onQty={setQty}
-          onPrice={(pid, v) => setPriceByProduct((s) => ({ ...s, [pid]: v }))}
-          onEmpties={(pid, v) => setEmptiesByProduct((s) => ({ ...s, [pid]: v }))}
+          onPrice={(key, v) => setPriceByKey((s) => ({ ...s, [key]: v }))}
+          onEmpties={(key, v) => setEmptiesByKey((s) => ({ ...s, [key]: v }))}
           onToggleMatch={toggleMatch}
           isMatched={isMatched}
           comboHint={comboHint}

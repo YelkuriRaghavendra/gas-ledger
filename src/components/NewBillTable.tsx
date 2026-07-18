@@ -11,25 +11,35 @@ export const KIND_LABEL: Record<ProductKind, string> = {
 
 const KIND_ORDER: ProductKind[] = ['cylinder', 'accessory', 'service']
 
+// One billable line. A product with alternate prices expands into several
+// rows (one per price); a plain product is a single row. `key` is unique per
+// row; `label` names the price variant (null for a plain single-price item).
+export interface BillRow {
+  key: string
+  product: Product
+  label: string | null
+  price: number
+}
+
 interface NewBillTableProps {
-  products: Product[]
-  qtyByProduct: Record<number, number>
-  priceByProduct: Record<number, string>
-  emptiesByProduct: Record<number, number>
-  onQty: (productId: number, value: number) => void
-  onPrice: (productId: number, value: string) => void
-  onEmpties: (productId: number, value: number) => void
-  onToggleMatch: (productId: number) => void
-  isMatched: (productId: number) => boolean
+  rows: BillRow[]
+  qtyByKey: Record<string, number>
+  priceByKey: Record<string, string>
+  emptiesByKey: Record<string, number>
+  onQty: (key: string, value: number) => void
+  onPrice: (key: string, value: string) => void
+  onEmpties: (key: string, value: number) => void
+  onToggleMatch: (key: string) => void
+  isMatched: (key: string) => boolean
   comboHint: (productId: number) => string | null
   billTotal: number
 }
 
 export function NewBillTable({
-  products,
-  qtyByProduct,
-  priceByProduct,
-  emptiesByProduct,
+  rows,
+  qtyByKey,
+  priceByKey,
+  emptiesByKey,
   onQty,
   onPrice,
   onEmpties,
@@ -38,39 +48,40 @@ export function NewBillTable({
   comboHint,
   billTotal,
 }: NewBillTableProps) {
-  const [editingPriceId, setEditingPriceId] = useState<number | null>(null)
+  const [editingPriceKey, setEditingPriceKey] = useState<string | null>(null)
 
-  const itemCount = products.reduce((n, p) => n + (qtyByProduct[p.id] > 0 ? 1 : 0), 0)
+  const itemCount = rows.reduce((n, r) => n + (qtyByKey[r.key] > 0 ? 1 : 0), 0)
 
   return (
     <div className="overflow-hidden rounded-[20px] bg-surface shadow-card">
-      <div className="grid grid-cols-[1fr_92px_64px] gap-2 bg-cream px-4 py-[10px]">
+      <div className="grid grid-cols-[1fr_124px_64px] gap-2 bg-cream px-4 py-[10px]">
         <div className="text-[9.5px] font-bold uppercase tracking-[0.5px] text-subtle">Item</div>
         <div className="text-center text-[9.5px] font-bold uppercase tracking-[0.5px] text-subtle">Qty</div>
         <div className="text-right text-[9.5px] font-bold uppercase tracking-[0.5px] text-subtle">Amount</div>
       </div>
 
       {KIND_ORDER.map((kind) => {
-        const group = products.filter((p) => p.kind === kind)
+        const group = rows.filter((r) => r.product.kind === kind)
         if (group.length === 0) return null
         return (
           <div key={kind}>
             <div className="bg-cream/60 px-4 pb-1 pt-[9px] text-[9.5px] font-bold uppercase tracking-[0.5px] text-subtle">
               {KIND_LABEL[kind]}
             </div>
-            {group.map((p) => {
-              const qty = qtyByProduct[p.id] ?? 0
-              const price = Number(priceByProduct[p.id] || 0)
-              const empties = emptiesByProduct[p.id] ?? 0
+            {group.map((r) => {
+              const p = r.product
+              const qty = qtyByKey[r.key] ?? 0
+              const price = Number(priceByKey[r.key] || 0)
+              const empties = emptiesByKey[r.key] ?? 0
               const lineTotal = qty * price
               const hint = comboHint(p.id)
-              const matched = isMatched(p.id)
-              const isEditingPrice = editingPriceId === p.id
+              const matched = isMatched(r.key)
+              const isEditingPrice = editingPriceKey === r.key
 
               return (
                 <div
                   key={p.id}
-                  className={`grid grid-cols-[1fr_92px_64px] items-center gap-2 border-t border-borderMuted px-4 py-[11px] ${
+                  className={`grid grid-cols-[1fr_124px_64px] items-center gap-2 border-t border-borderMuted px-4 py-[11px] ${
                     qty > 0 ? 'bg-[#F3FAF5]' : ''
                   }`}
                 >
@@ -83,19 +94,19 @@ export function NewBillTable({
                         type="number"
                         min="0"
                         step="0.01"
-                        value={priceByProduct[p.id] ?? ''}
-                        onChange={(e) => onPrice(p.id, e.target.value)}
-                        onBlur={() => setEditingPriceId(null)}
+                        value={priceByKey[r.key] ?? ''}
+                        onChange={(e) => onPrice(r.key, e.target.value)}
+                        onBlur={() => setEditingPriceKey(null)}
                         className="mt-[3px] h-[26px] w-[84px] rounded-[9px] border-[1.5px] border-[#2E8B57] bg-cream px-[8px] text-[13px] font-bold text-ink focus:outline-none"
                       />
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setEditingPriceId(p.id)}
+                        onClick={() => setEditingPriceKey(r.key)}
                         className="mt-[3px] inline-flex items-center gap-1"
                       >
                         <span className="border-b border-dotted border-[#C4B9A8] text-[11px] font-semibold text-subtle">
-                          ₹{priceByProduct[p.id] || 0} each
+                          ₹{priceByKey[r.key] || 0} each
                         </span>
                         <span className="text-[9.5px] text-[#C4B9A8]">✎</span>
                       </button>
@@ -106,7 +117,7 @@ export function NewBillTable({
                         <div className="flex items-center gap-[4px] rounded-[8px] bg-[#E7F5EC] px-[6px] py-[2px]">
                           <button
                             type="button"
-                            onClick={() => onEmpties(p.id, Math.max(0, empties - 1))}
+                            onClick={() => onEmpties(r.key, Math.max(0, empties - 1))}
                             className="text-[13px] font-bold leading-none text-[#2E8B57]"
                           >
                             −
@@ -114,7 +125,7 @@ export function NewBillTable({
                           <span className="text-[10.5px] font-bold text-[#2E8B57]">{empties} empties in</span>
                           <button
                             type="button"
-                            onClick={() => onEmpties(p.id, empties + 1)}
+                            onClick={() => onEmpties(r.key, empties + 1)}
                             className="text-[13px] font-bold leading-none text-[#2E8B57]"
                           >
                             +
@@ -122,7 +133,7 @@ export function NewBillTable({
                         </div>
                         <button
                           type="button"
-                          onClick={() => onToggleMatch(p.id)}
+                          onClick={() => onToggleMatch(r.key)}
                           className="text-[9.5px] font-semibold text-subtle underline decoration-dotted"
                         >
                           {matched ? 'auto' : 'manual'}
@@ -133,7 +144,7 @@ export function NewBillTable({
                     {hint && <p className="mt-[3px] text-[10.5px] font-semibold text-subtle">{hint}</p>}
                   </div>
 
-                  <Stepper value={qty} onChange={(v) => onQty(p.id, v)} min={0} variant="secondary" tone="cream" size="sm" />
+                  <Stepper value={qty} onChange={(v) => onQty(r.key, v)} min={0} variant="secondary" tone="cream" size="sm" />
 
                   <p className={`text-right font-display text-[15px] font-bold ${qty > 0 ? 'text-ink' : 'text-[#CFC5B5]'}`}>
                     {qty > 0 ? formatCurrency(lineTotal) : '—'}

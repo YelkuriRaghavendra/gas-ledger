@@ -13,10 +13,16 @@ export type TransactionType = 'sale' | 'return' | 'payment'
 export type PaymentMethod = 'cash' | 'upi'
 export type ProductKind = 'cylinder' | 'accessory' | 'service'
 
+export interface PriceOption {
+  label: string
+  amount: number
+}
+
 export interface Product {
   id: number
   name: string
   price: number
+  price_options: PriceOption[]
   godown_capacity: number | null
   segment: Segment
   kind: ProductKind
