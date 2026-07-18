@@ -19,7 +19,7 @@ export function AppHeader({ view, onOpenAccount, title }: { view: HeaderView; on
   const canSwitch = profile?.segment_access === 'both'
   const biz = data?.business_name || 'Cylinder Tracker'
 
-  const label = view === 'commercial' ? 'Commercial' : view === 'domestic' ? 'Domestic' : 'Stock'
+  const label = view === 'commercial' ? 'Commercial' : view === 'domestic' ? 'Domestic' : 'Godown Inventory'
   const badge =
     view === 'commercial'
       ? 'bg-gradient-to-br from-accentSoft to-accent'
