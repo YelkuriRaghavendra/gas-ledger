@@ -8,7 +8,7 @@ import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useTransactions } from '../hooks/useTransactions'
 import { Stepper } from '../components/Stepper'
 import { ChevronLeftIcon } from '../components/icons'
-import { combineDateWithNow, dateInputValue, todayInputValue } from '../utils/format'
+import { combineDateWithNow, dateInputValue, emptiesOwed, todayInputValue } from '../utils/format'
 
 export function LogReturn() {
   const { id, txId } = useParams()
@@ -60,7 +60,7 @@ export function LogReturn() {
 
   const totalOwed = shownProducts.reduce((sum, p) => sum + ownedFor(p.id), 0)
   const totalReturning = shownProducts.reduce((sum, p) => sum + (qtyByProduct[p.id] ?? 0), 0)
-  const remaining = Math.max(0, totalOwed - totalReturning)
+  const remaining = emptiesOwed(totalOwed - totalReturning)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -80,13 +80,6 @@ export function LogReturn() {
     if (lines.length === 0) {
       setError('Enter a quantity for at least one size')
       return
-    }
-    for (const l of lines) {
-      if (l.outright) continue
-      if (l.qty > ownedFor(l.productId)) {
-        setError(`Can't return more than the ${ownedFor(l.productId)} ${l.name} empties outstanding.`)
-        return
-      }
     }
 
     setSaving(true)
@@ -201,11 +194,20 @@ export function LogReturn() {
                   )}
                   {outright ? (
                     <p className="mt-2 text-[11px] font-semibold text-muted">Not counted against empties owed.</p>
-                  ) : (
-                    <p className="mt-2 text-[11px] font-semibold text-muted">
-                      Owes <span className="font-bold text-[#C23B22]">{ownedFor(p.id)}</span>
-                    </p>
-                  )}
+                  ) : (() => {
+                    const e = emptiesOwed(ownedFor(p.id))
+                    if (e.owedBy === 'agency')
+                      return (
+                        <p className="mt-2 text-[11px] font-semibold text-muted">
+                          Advance <span className="font-bold text-[#2E8B57]">{e.count}</span>
+                        </p>
+                      )
+                    return (
+                      <p className="mt-2 text-[11px] font-semibold text-muted">
+                        Pending <span className="font-bold text-[#C23B22]">{e.count}</span>
+                      </p>
+                    )
+                  })()}
                 </div>
               )
             })}
@@ -213,8 +215,10 @@ export function LogReturn() {
         </div>
 
         <div className="mt-4 flex items-end justify-between rounded-[20px] bg-gradient-to-br from-[#EAF4EE] to-[#D9EDE1] p-5">
-          <span className="text-[13px] font-bold uppercase tracking-[0.5px] text-[#3E7A57]">Remaining after return</span>
-          <span className="font-display text-[30px] font-bold leading-none text-[#2E8B57]">{remaining}</span>
+          <span className="text-[13px] font-bold uppercase tracking-[0.5px] text-[#3E7A57]">
+            {remaining.owedBy === 'agency' ? 'Advance after return' : 'Pending after return'}
+          </span>
+          <span className="font-display text-[30px] font-bold leading-none text-[#2E8B57]">{remaining.count}</span>
         </div>
 
         {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}

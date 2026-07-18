@@ -57,3 +57,15 @@ export function combineDateWithNow(dateStr: string) {
   const now = new Date()
   return new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()).toISOString()
 }
+
+// Empties balance sign convention: a positive `empties_outstanding` means the
+// customer owes the agency; negative means the agency owes the customer (they
+// returned more empties than they took — an over-return). Never render a bare
+// minus sign — flip the wording via `owedBy` and show the absolute `count`.
+export type EmptiesOwed = { count: number; owedBy: 'customer' | 'agency' | 'none' }
+
+export function emptiesOwed(n: number): EmptiesOwed {
+  if (n > 0) return { count: n, owedBy: 'customer' }
+  if (n < 0) return { count: -n, owedBy: 'agency' }
+  return { count: 0, owedBy: 'none' }
+}

@@ -12,9 +12,11 @@ export function ModeGate() {
   const inDomestic = location.pathname.startsWith('/domestic')
   const inCommercial = location.pathname.startsWith('/commercial')
   const inChooser = location.pathname === '/choose'
-  // Account pages (business details, pricing) are shared config — reachable
-  // from either mode, so the gate leaves them alone.
+  // Account pages (business details, pricing) and the all-stock screen are
+  // shared / mode-neutral — reachable from either side, so the gate leaves
+  // them alone.
   const inAccount = location.pathname.startsWith('/account')
+  const inStock = location.pathname === '/stock'
 
   if (loading || !profile) {
     return <div className="flex h-screen items-center justify-center text-ink">Loading…</div>
@@ -22,7 +24,7 @@ export function ModeGate() {
 
   const access = profile.segment_access
 
-  if (inAccount) return <Outlet />
+  if (inAccount || inStock) return <Outlet />
 
   if (access === 'commercial' && (inDomestic || inChooser)) return <Navigate to="/commercial" replace />
   if (access === 'domestic' && !inDomestic) return <Navigate to="/domestic" replace />

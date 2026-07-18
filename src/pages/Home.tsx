@@ -9,7 +9,7 @@ import { useProducts } from '../hooks/useProducts'
 import { useActivityFeed, type FeedItem } from '../hooks/useActivityFeed'
 import { useProfiles } from '../hooks/useProfiles'
 import { useDailySummary } from '../hooks/useDailySummary'
-import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
+import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
 import { HeroCard } from '../components/HeroCard'
@@ -74,7 +74,7 @@ export function Home() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader segment="commercial" onOpenAccount={() => setAccountOpen(true)} />
+      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
 
       <div className="px-4">
@@ -105,8 +105,8 @@ export function Home() {
               </Link>
               <div className="relative mt-[15px] flex items-center gap-5">
                 <div>
-                  <p className="text-[10px] font-semibold text-mutedOnDark">Empties out</p>
-                  <p className="mt-[1px] font-display text-[16px] font-semibold text-[#5FCF97]">{emptiesOutTotal}</p>
+                  <p className="text-[10px] font-semibold text-mutedOnDark">{emptiesOwed(emptiesOutTotal).owedBy === 'agency' ? 'Advance' : 'Pending'}</p>
+                  <p className="mt-[1px] font-display text-[16px] font-semibold text-[#5FCF97]">{emptiesOwed(emptiesOutTotal).count}</p>
                 </div>
                 <div className="h-[26px] w-px bg-white/[.14]" />
                 <div>

@@ -20,6 +20,7 @@ import { Purchases } from './pages/Purchases'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { Godown } from './pages/Godown'
 import { SetCurrentStock } from './pages/SetCurrentStock'
+import { AllStock } from './pages/AllStock'
 import { DomesticHome } from './pages/domestic/DomesticHome'
 import { DomesticNewBill } from './pages/domestic/DomesticNewBill'
 import { DomesticStock } from './pages/domestic/DomesticStock'
@@ -41,6 +42,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<ModeGate />}>
             <Route path="/choose" element={<ModeSelect />} />
+            <Route path="/stock" element={<AllStock />} />
 
             {/* Commercial (all under /commercial, mirroring /domestic) */}
             <Route path="/" element={<Navigate to="/commercial" replace />} />

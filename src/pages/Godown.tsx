@@ -18,7 +18,7 @@ export function Godown() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader segment="commercial" onOpenAccount={() => setAccountOpen(true)} />
+      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
 
       <div className="p-5 pt-1">

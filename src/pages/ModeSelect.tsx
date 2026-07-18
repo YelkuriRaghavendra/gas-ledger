@@ -1,8 +1,8 @@
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { setMode } from '../mode/mode'
 import { CylinderIcon } from '../components/CylinderIcon'
-import { HomeIcon, TruckIcon } from '../components/icons'
+import { HomeIcon, TruckIcon, BoxIcon } from '../components/icons'
 
 // Post-login fork for owners (segment_access = 'both'). Single-segment
 // staff never see this screen — ModeGate routes them straight in.
@@ -66,6 +66,22 @@ export function ModeSelect() {
           </div>
           <span className="text-[20px] font-bold text-[#5f8a72]">›</span>
         </button>
+
+        <Link
+          to="/stock"
+          className="mt-4 flex w-full items-center gap-4 rounded-[22px] bg-surface p-5 text-left shadow-card transition active:scale-[0.98]"
+        >
+          <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[16px] bg-ink">
+            <BoxIcon size={26} color="#fff" strokeWidth={2} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-[19px] font-bold text-ink">Stock</p>
+            <p className="mt-[2px] text-[12.5px] font-semibold text-muted">
+              Commercial &amp; domestic · full &amp; empty
+            </p>
+          </div>
+          <span className="text-[20px] font-bold text-subtle">›</span>
+        </Link>
       </div>
     </div>
   )

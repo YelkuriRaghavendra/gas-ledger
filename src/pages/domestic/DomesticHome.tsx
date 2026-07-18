@@ -43,7 +43,7 @@ export function DomesticHome() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader segment="domestic" onOpenAccount={() => setAccountOpen(true)} />
+      <AppHeader view="domestic" onOpenAccount={() => setAccountOpen(true)} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
 
       <div className="px-4">

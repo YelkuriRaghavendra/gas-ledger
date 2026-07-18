@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { emptiesOwed } from '../utils/format'
 
 export interface CardItem { name: string; emptiesWithCustomers?: number; full: number; empty: number }
 
@@ -17,13 +18,16 @@ export function CylindersCard({ items, accent, linkLabel, linkTo }: {
         {items.map((it) => (
           <div key={it.name} className="rounded-[18px] bg-surface p-[14px] shadow-card">
             <span className="inline-block rounded-[10px] bg-ink px-[10px] py-[4px] font-display text-[11.5px] font-bold text-white">{it.name}</span>
-            {it.emptiesWithCustomers !== undefined && (
-              <>
-                <p className="mt-3 font-display text-[28px] font-bold leading-none" style={{ color: bigColor }}>{it.emptiesWithCustomers}</p>
-                <p className="mt-1 text-[10.5px] font-semibold text-subtle">empties with customers</p>
-                <div className="my-[11px] h-px bg-borderMuted" />
-              </>
-            )}
+            {it.emptiesWithCustomers !== undefined && (() => {
+              const e = emptiesOwed(it.emptiesWithCustomers)
+              return (
+                <>
+                  <p className="mt-3 font-display text-[28px] font-bold leading-none" style={{ color: e.owedBy === 'agency' ? '#2E8B57' : bigColor }}>{e.count}</p>
+                  <p className="mt-1 text-[10.5px] font-semibold text-subtle">{e.owedBy === 'agency' ? 'empties in advance' : 'empties pending'}</p>
+                  <div className="my-[11px] h-px bg-borderMuted" />
+                </>
+              )
+            })()}
             <div className={`flex gap-4 ${it.emptiesWithCustomers === undefined ? 'mt-[14px]' : ''}`}>
               <div><p className="font-display text-[21px] font-bold text-ink">{it.full}</p><p className="text-[10px] font-semibold text-subtle">full</p></div>
               <div><p className="font-display text-[21px] font-bold text-[#2E8B57]">{it.empty}</p><p className="text-[10px] font-semibold text-subtle">empty</p></div>

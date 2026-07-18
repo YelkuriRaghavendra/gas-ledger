@@ -8,7 +8,7 @@ import { useProducts } from '../hooks/useProducts'
 import { useTransactions } from '../hooks/useTransactions'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { useProfiles } from '../hooks/useProfiles'
-import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
+import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
@@ -373,8 +373,8 @@ export function CustomerDetail() {
           <p className="mt-[3px] font-display text-[25px] font-bold leading-none text-accent">{formatCurrency(balance.amount_due)}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-subtle">Empties out</p>
-          <p className="mt-[2px] font-display text-[19px] font-bold text-[#2E8B57]">{totalEmptiesOut}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-subtle">{emptiesOwed(totalEmptiesOut).owedBy === 'agency' ? 'Advance' : 'Pending'}</p>
+          <p className="mt-[2px] font-display text-[19px] font-bold text-[#2E8B57]">{emptiesOwed(totalEmptiesOut).count}</p>
         </div>
       </div>
 
@@ -382,13 +382,14 @@ export function CustomerDetail() {
       <div className="grid grid-cols-2 gap-3">
         {productBalances.map((pb) => {
           const nc = ncByProduct.get(pb.product_id)
+          const owed = emptiesOwed(pb.empties_outstanding)
           return (
           <div key={pb.product_id} className="rounded-[18px] bg-surface p-[14px] shadow-card">
             <span className="inline-block rounded-[10px] bg-ink px-[10px] py-[4px] text-[11.5px] font-bold text-white">
               {pb.product_name}
             </span>
-            <p className="mt-3 font-display text-[28px] font-bold leading-none text-[#F26B2C]">{pb.empties_outstanding}</p>
-            <p className="mt-1 text-[10.5px] font-semibold text-subtle">empties owed</p>
+            <p className={`mt-3 font-display text-[28px] font-bold leading-none ${owed.owedBy === 'agency' ? 'text-[#2E8B57]' : 'text-[#F26B2C]'}`}>{owed.count}</p>
+            <p className="mt-1 text-[10.5px] font-semibold text-subtle">{owed.owedBy === 'agency' ? 'empties in advance' : 'empties pending'}</p>
             <div className="mt-[11px] flex gap-4 border-t border-borderMuted pt-[11px]">
               <div>
                 <p className="font-display text-[16px] font-bold text-ink">{pb.sold}</p>

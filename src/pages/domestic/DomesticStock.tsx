@@ -131,7 +131,7 @@ export function DomesticStock() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader segment="domestic" onOpenAccount={() => setAccountOpen(true)} />
+      <AppHeader view="domestic" onOpenAccount={() => setAccountOpen(true)} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
 
       <div className="p-5 pt-1">
