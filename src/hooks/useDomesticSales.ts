@@ -5,7 +5,7 @@ import type { Transaction } from '../types/db'
 export interface DomesticBill {
   billId: string
   createdAt: string
-  method: 'cash' | 'upi' | null
+  method: 'cash' | 'upi' | 'vitran' | null
   note: string | null
   total: number
   lines: Transaction[]

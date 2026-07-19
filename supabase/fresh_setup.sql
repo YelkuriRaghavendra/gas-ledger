@@ -150,7 +150,7 @@ group by c.id;
 
 -- ==== migrations/004_payment_method.sql ====
 
-alter table transactions add column method text check (method in ('cash','upi'));
+alter table transactions add column method text check (method in ('cash','upi','vitran'));
 
 
 -- ==== migrations/005_starting_empties.sql ====

@@ -10,7 +10,7 @@ export interface Profile {
 }
 
 export type TransactionType = 'sale' | 'return' | 'payment'
-export type PaymentMethod = 'cash' | 'upi'
+export type PaymentMethod = 'cash' | 'upi' | 'vitran'
 export type ProductKind = 'cylinder' | 'accessory' | 'service'
 
 export interface PriceOption {

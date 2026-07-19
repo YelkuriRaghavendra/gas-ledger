@@ -7,11 +7,11 @@ import { useBundleComponents } from '../../hooks/useBundleComponents'
 import { NewBillTable, type BillRow } from '../../components/NewBillTable'
 import { combineDateWithNow, todayInputValue } from '../../utils/format'
 import { ChevronLeftIcon } from '../../components/icons'
+import type { PaymentMethod } from '../../types/db'
 
 // One counter bill, many items. No customer, no credit — domestic
-// sales are always settled on the spot. Payment method is not
-// tracked at the till; the column is kept for reporting parity
-// with commercial sales but is always null here.
+// sales are always settled on the spot. Payment method (cash, UPI,
+// or vitran) is recorded per bill for reporting parity with commercial sales.
 export function DomesticNewBill() {
   const navigate = useNavigate()
   const { session } = useAuth()
@@ -42,6 +42,7 @@ export function DomesticNewBill() {
   const [matchByKey, setMatchByKey] = useState<Record<string, boolean>>({})
   const [priceByKey, setPriceByKey] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
+  const [method, setMethod] = useState<PaymentMethod>('cash')
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -112,7 +113,7 @@ export function DomesticNewBill() {
       empties: l.empties,
       amount: l.qty * l.price,
       paid: true,
-      method: null,
+      method,
       note: note.trim() || null,
       bill_id: billId,
       created_by: session?.user.id,
@@ -129,6 +130,13 @@ export function DomesticNewBill() {
 
   const fieldInput =
     'h-[38px] rounded-[12px] border border-borderMuted bg-surface px-[12px] text-[12.5px] font-bold text-ink shadow-card'
+
+  const segBtn = (active: boolean) =>
+    `flex-1 rounded-[12px] py-[11px] text-[13.5px] font-bold transition ${
+      active
+        ? 'bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] text-white shadow-[0_10px_22px_-12px_rgba(46,139,87,0.7)]'
+        : 'text-muted'
+    }`
 
   return (
     <div className="p-5 pb-10 pt-3">
@@ -164,6 +172,23 @@ export function DomesticNewBill() {
           comboHint={comboHint}
           billTotal={billTotal}
         />
+
+        <div className="mt-4">
+          <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">
+            Payment mode
+          </p>
+          <div className="flex gap-2 rounded-[14px] bg-cream p-[5px]">
+            <button type="button" onClick={() => setMethod('cash')} className={segBtn(method === 'cash')}>
+              Cash
+            </button>
+            <button type="button" onClick={() => setMethod('upi')} className={segBtn(method === 'upi')}>
+              UPI
+            </button>
+            <button type="button" onClick={() => setMethod('vitran')} className={segBtn(method === 'vitran')}>
+              Vitran
+            </button>
+          </div>
+        </div>
 
         <div className="mt-4 flex h-[46px] items-center rounded-[14px] border border-borderMuted bg-surface px-[14px]">
           <input
