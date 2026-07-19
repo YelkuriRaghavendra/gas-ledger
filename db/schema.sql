@@ -82,7 +82,7 @@ create table if not exists public.transactions (
   empties       numeric     not null default 0,
   amount        numeric     not null default 0,
   paid          boolean     not null default false,
-  method        text        check (method in ('cash', 'upi')),
+  method        text        check (method in ('cash', 'upi', 'vitran')),
   note          text,
   bill_id       uuid,
   outright      boolean     not null default false,
