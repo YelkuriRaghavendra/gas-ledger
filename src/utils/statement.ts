@@ -1,9 +1,9 @@
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
 import { formatCurrency, formatDate } from './format'
-import type { Transaction } from '../types/db'
+import type { Bill } from '../types/db'
 
-export type HistoryEntry = Transaction & { balanceAfter: number; productName: string | null }
+export type HistoryEntry = Bill & { balanceAfter: number; productName: string | null; qty: number; empties: number; amount: number }
 
 export interface HistoryGroup {
   key: string
@@ -14,7 +14,7 @@ export interface HistoryGroup {
   collected: number
 }
 
-export function historyTitle(t: Transaction, productName?: string | null) {
+export function historyTitle(t: HistoryEntry, productName?: string | null) {
   if (t.type === 'sale') return productName ? `${t.qty} × ${productName} sold` : `${t.qty} cylinders sold`
   if (t.type === 'return') return productName ? `${t.qty} × ${productName} returned` : `${t.qty} empties returned`
   return 'Payment received'

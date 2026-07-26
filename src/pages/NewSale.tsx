@@ -5,19 +5,20 @@ import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { useProducts } from '../hooks/useProducts'
 import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
-import { useTransactions } from '../hooks/useTransactions'
+import { useBills } from '../hooks/useBills'
 import { Stepper } from '../components/Stepper'
 import { combineDateWithNow, dateInputValue, emptiesOwed, formatCurrency, todayInputValue } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
 import type { PaymentMethod } from '../types/db'
+import { nextBillNumber } from '../utils/billNumber'
 
 export function NewSale() {
-  const { id, txId } = useParams()
+  const { id, billId } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: customers } = useCustomerBalances()
   const { data: products } = useProducts()
-  const { data: transactions } = useTransactions(id ? Number(id) : 0)
+  const { data: bills } = useBills(id ? Number(id) : 0)
   const [customerId, setCustomerId] = useState<number | null>(id ? Number(id) : null)
   const { data: productBalances } = useCustomerProductBalances(customerId ?? 0)
 
@@ -25,7 +26,7 @@ export function NewSale() {
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
   const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({})
   const [emptiesByProduct, setEmptiesByProduct] = useState<Record<number, number>>({})
-  const [outrightByProduct, setOutrightByProduct] = useState<Record<number, boolean>>({})
+  const [surrenderByProduct, setSurrenderByProduct] = useState<Record<number, boolean>>({})
 
   const [received, setReceived] = useState(false)
   const [method, setMethod] = useState<PaymentMethod>('cash')
@@ -37,7 +38,7 @@ export function NewSale() {
   const [editProductId, setEditProductId] = useState<number | null>(null)
   const [originalEmpties, setOriginalEmpties] = useState(0)
   const [loadedEdit, setLoadedEdit] = useState(false)
-  const editing = Boolean(txId)
+  const editing = Boolean(billId)
 
   // Each size starts as a slim row; tapping "+ Add to sale" expands it into a
   // full entry line. In edit mode the single line is always expanded.
@@ -60,7 +61,7 @@ export function NewSale() {
       delete n[pid]
       return n
     })
-    setOutrightByProduct((s) => {
+    setSurrenderByProduct((s) => {
       const n = { ...s }
       delete n[pid]
       return n
@@ -91,27 +92,28 @@ export function NewSale() {
 
   useEffect(() => {
     if (!editing || loadedEdit) return
-    const tx = transactions.find((t) => t.id === Number(txId))
-    if (!tx || tx.product_id === null) return
-    setEditProductId(tx.product_id)
-    setQtyByProduct({ [tx.product_id]: tx.qty })
-    setEmptiesByProduct({ [tx.product_id]: tx.empties })
-    setOutrightByProduct({ [tx.product_id]: tx.outright })
-    setPriceByProduct({ [tx.product_id]: tx.qty > 0 ? String(tx.amount / tx.qty) : String(tx.amount) })
-    setOriginalEmpties(tx.empties)
-    setDate(dateInputValue(tx.created_at))
-    setReceived(tx.paid)
-    setMethod(tx.method ?? 'cash')
-    setNote(tx.note ?? '')
+    const bill = bills.find((b) => b.id === Number(billId))
+    if (!bill || bill.bill_lines.length === 0) return
+    const line = bill.bill_lines[0]
+    setEditProductId(line.product_id)
+    setQtyByProduct({ [line.product_id]: line.qty })
+    setEmptiesByProduct({ [line.product_id]: line.empties })
+    setSurrenderByProduct({ [line.product_id]: bill.surrender })
+    setPriceByProduct({ [line.product_id]: line.qty > 0 ? String(line.amount / line.qty) : String(line.amount) })
+    setOriginalEmpties(line.empties)
+    setDate(dateInputValue(bill.created_at))
+    setReceived(bill.paid)
+    setMethod(bill.method ?? 'cash')
+    setNote(bill.note ?? '')
     setLoadedEdit(true)
-  }, [editing, loadedEdit, transactions, txId])
+  }, [editing, loadedEdit, bills, billId])
 
   const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
 
   const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
   const setEmpties = (pid: number, v: number) => setEmptiesByProduct((s) => ({ ...s, [pid]: v }))
   const setPrice = (pid: number, v: string) => setPriceByProduct((s) => ({ ...s, [pid]: v }))
-  const setOutright = (pid: number, v: boolean) => setOutrightByProduct((s) => ({ ...s, [pid]: v }))
+  const setSurrender = (pid: number, v: boolean) => setSurrenderByProduct((s) => ({ ...s, [pid]: v }))
 
   function ownedFor(pid: number) {
     const bal = productBalances.find((b) => b.product_id === pid)?.empties_outstanding ?? 0
@@ -131,14 +133,14 @@ export function NewSale() {
     }
     const lines = shownProducts
       .map((p) => {
-        const outright = outrightByProduct[p.id] ?? false
+        const surrender = surrenderByProduct[p.id] ?? false
         return {
           productId: p.id,
           name: p.name,
           qty: qtyByProduct[p.id] ?? 0,
           price: Number(priceByProduct[p.id] || 0),
-          empties: outright ? 0 : emptiesByProduct[p.id] ?? 0,
-          outright,
+          empties: surrender ? 0 : emptiesByProduct[p.id] ?? 0,
+          surrender,
         }
       })
       .filter((l) => l.qty > 0)
@@ -157,50 +159,88 @@ export function NewSale() {
     setSaving(true)
     setError(null)
     const timestamp = combineDateWithNow(date)
+    const totalAmount = lines.reduce((sum, l) => sum + l.qty * l.price, 0)
 
     if (editing && editProductId !== null) {
       const l = lines[0]
-      const { error } = await supabase
-        .from('transactions')
+      // Update bill header
+      const { error: billError } = await supabase
+        .from('bills')
         .update({
-          qty: l.qty,
-          empties: l.empties,
-          amount: l.qty * l.price,
+          total_amount: l.qty * l.price,
           paid: received,
           method: received ? method : null,
           note: note.trim() || null,
           created_at: timestamp,
           updated_by: session?.user.id,
-          outright: l.outright,
+          surrender: l.surrender,
         })
-        .eq('id', Number(txId))
-      setSaving(false)
-      if (error) {
-        setError(error.message)
+        .eq('id', Number(billId))
+      if (billError) {
+        setSaving(false)
+        setError(billError.message)
         return
       }
+      // Update bill line
+      const bill = bills.find((b) => b.id === Number(billId))
+      if (bill && bill.bill_lines.length > 0) {
+        const { error: lineError } = await supabase
+          .from('bill_lines')
+          .update({
+            qty: l.qty,
+            empties: l.empties,
+            amount: l.qty * l.price,
+            updated_by: session?.user.id,
+          })
+          .eq('id', bill.bill_lines[0].id)
+        if (lineError) {
+          setSaving(false)
+          setError(lineError.message)
+          return
+        }
+      }
+      setSaving(false)
       navigate(`/commercial/customers/${customerId}`)
       return
     }
 
-    const rows = lines.map((l) => ({
-      customer_id: customerId,
-      type: 'sale' as const,
+    // INSERT: create bill header first, then bill_lines
+    const billNumber = await nextBillNumber()
+    const { data: billRow, error: billError } = await supabase
+      .from('bills')
+      .insert({
+        bill_number: billNumber,
+        customer_id: customerId,
+        type: 'sale' as const,
+        total_amount: totalAmount,
+        paid: received,
+        method: received ? method : null,
+        note: note.trim() || null,
+        surrender: lines.some((l) => l.surrender),
+        created_by: session?.user.id,
+        created_at: timestamp,
+      })
+      .select('id')
+      .single()
+    if (billError || !billRow) {
+      setSaving(false)
+      setError(billError?.message ?? 'Failed to create bill')
+      return
+    }
+
+    const lineRows = lines.map((l) => ({
+      bill_id: billRow.id,
       product_id: l.productId,
       qty: l.qty,
       empties: l.empties,
       amount: l.qty * l.price,
-      paid: received,
-      method: received ? method : null,
-      note: note.trim() || null,
       created_by: session?.user.id,
       created_at: timestamp,
-      outright: l.outright,
     }))
-    const { error } = await supabase.from('transactions').insert(rows)
+    const { error: linesError } = await supabase.from('bill_lines').insert(lineRows)
     setSaving(false)
-    if (error) {
-      setError(error.message)
+    if (linesError) {
+      setError(linesError.message)
       return
     }
     navigate(`/commercial/customers/${customerId}`)
@@ -258,7 +298,7 @@ export function NewSale() {
             const isOpen = editing || expanded.has(p.id)
             const qty = qtyByProduct[p.id] ?? 0
             const lineTotal = qty * Number(priceByProduct[p.id] || 0)
-            const outright = outrightByProduct[p.id] ?? false
+            const surrender = surrenderByProduct[p.id] ?? false
             return (
               <div key={p.id} className={i > 0 ? 'mt-[10px]' : ''}>
                 {!isOpen ? (
@@ -301,7 +341,7 @@ export function NewSale() {
                         <p className={fieldLabel}>Sold</p>
                         <Stepper value={qtyByProduct[p.id] ?? 0} onChange={(v) => setQty(p.id, v)} min={editing ? 1 : 0} tone="surface" size="sm" />
                       </div>
-                      {!outright && (
+                      {!surrender && (
                         <div className="min-w-0 flex-1">
                           <p className={fieldLabel}>Empties taken</p>
                           <Stepper value={emptiesByProduct[p.id] ?? 0} onChange={(v) => setEmpties(p.id, v)} min={0} variant="secondary" tone="surface" size="sm" />
@@ -323,16 +363,16 @@ export function NewSale() {
                       <label className="mt-3 flex cursor-pointer items-center gap-[8px] text-[12px] font-semibold text-muted">
                         <input
                           type="checkbox"
-                          checked={outright}
-                          onChange={(e) => setOutright(p.id, e.target.checked)}
+                          checked={surrender}
+                          onChange={(e) => setSurrender(p.id, e.target.checked)}
                           className="h-[16px] w-[16px] accent-[#E4571B]"
                         />
-                        Customer keeps cylinder (outright sale)
+                        New connection
                       </label>
                     )}
-                    {outright ? (
+                    {surrender ? (
                       <p className="mt-2 text-[12px] font-semibold text-muted">
-                        Customer owns this cylinder — not counted as empties owed.
+                        New connection — no empties expected from customer.
                       </p>
                     ) : (() => {
                       const e = emptiesOwed(ownedFor(p.id))

@@ -3,19 +3,19 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useProducts } from '../hooks/useProducts'
-import { usePurchases } from '../hooks/usePurchases'
+import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { Stepper } from '../components/Stepper'
 import { combineDateWithNow, dateInputValue, formatCurrency, todayInputValue } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
+import { nextPoNumber } from '../utils/billNumber'
 
 export function RecordPurchase() {
-  const { txId } = useParams()
+  const { billId } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: products } = useProducts()
-  const { data: purchases } = usePurchases()
+  const { data: purchaseOrders } = usePurchaseOrders()
 
-  // A single bill can buy any number of sizes: qty received + price each per product.
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
   const [emptiesByProduct, setEmptiesByProduct] = useState<Record<number, number>>({})
   const [matchEmptiesByProduct, setMatchEmptiesByProduct] = useState<Record<number, boolean>>({})
@@ -24,12 +24,12 @@ export function RecordPurchase() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  const [editOrderId, setEditOrderId] = useState<number | null>(null)
+  const [editLineId, setEditLineId] = useState<number | null>(null)
   const [editProductId, setEditProductId] = useState<number | null>(null)
   const [loadedEdit, setLoadedEdit] = useState(false)
-  const editing = Boolean(txId)
+  const editing = Boolean(billId)
 
-  // Prefill each size's price from the product default. Return prev unchanged
-  // when nothing is added so the effect never triggers a redundant re-render.
   useEffect(() => {
     if (editing) return
     setPriceByProduct((prev) => {
@@ -47,16 +47,19 @@ export function RecordPurchase() {
 
   useEffect(() => {
     if (!editing || loadedEdit) return
-    const purchase = purchases.find((p) => p.id === Number(txId))
-    if (!purchase) return
-    setEditProductId(purchase.product_id)
-    setQtyByProduct({ [purchase.product_id]: purchase.qty })
-    setEmptiesByProduct({ [purchase.product_id]: purchase.empties_given })
-    setMatchEmptiesByProduct({ [purchase.product_id]: purchase.empties_given === purchase.qty })
-    setPriceByProduct({ [purchase.product_id]: purchase.qty > 0 ? String(purchase.amount / purchase.qty) : String(purchase.amount) })
-    setDate(dateInputValue(purchase.created_at))
+    const order = purchaseOrders.find((o) => o.id === Number(billId))
+    if (!order || order.purchase_lines.length === 0) return
+    const line = order.purchase_lines[0]
+    setEditOrderId(order.id)
+    setEditLineId(line.id)
+    setEditProductId(line.product_id)
+    setQtyByProduct({ [line.product_id]: line.qty })
+    setEmptiesByProduct({ [line.product_id]: line.empties_given })
+    setMatchEmptiesByProduct({ [line.product_id]: line.empties_given === line.qty })
+    setPriceByProduct({ [line.product_id]: line.qty > 0 ? String(line.amount / line.qty) : String(line.amount) })
+    setDate(dateInputValue(order.created_at))
     setLoadedEdit(true)
-  }, [editing, loadedEdit, purchases, txId])
+  }, [editing, loadedEdit, purchaseOrders, billId])
 
   const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
 
@@ -105,12 +108,16 @@ export function RecordPurchase() {
     setError(null)
     const timestamp = combineDateWithNow(date)
 
-    if (editing && editProductId !== null) {
+    if (editing && editOrderId !== null && editLineId !== null) {
       const l = lines[0]
+      await supabase
+        .from('purchase_orders')
+        .update({ total_amount: l.qty * l.price, created_at: timestamp, updated_by: session?.user.id })
+        .eq('id', editOrderId)
       const { error } = await supabase
-        .from('purchases')
-        .update({ qty: l.qty, empties_given: l.empties, amount: l.qty * l.price, created_at: timestamp, updated_by: session?.user.id })
-        .eq('id', Number(txId))
+        .from('purchase_lines')
+        .update({ qty: l.qty, empties_given: l.empties, amount: l.qty * l.price })
+        .eq('id', editLineId)
       setSaving(false)
       if (error) {
         setError(error.message)
@@ -120,16 +127,37 @@ export function RecordPurchase() {
       return
     }
 
-    const rows = lines.map((l) => ({
+    const totalAmount = lines.reduce((sum, l) => sum + l.qty * l.price, 0)
+    const poNumber = await nextPoNumber(timestamp)
+    const { data: order, error: orderErr } = await supabase
+      .from('purchase_orders')
+      .insert({
+        po_number: poNumber,
+        type: 'purchase',
+        total_amount: totalAmount,
+        paid: true,
+        created_by: session?.user.id,
+        created_at: timestamp,
+      })
+      .select('id')
+      .single()
+
+    if (orderErr || !order) {
+      setSaving(false)
+      setError(orderErr?.message ?? 'Failed to create purchase order')
+      return
+    }
+
+    const lineRows = lines.map((l) => ({
+      purchase_order_id: order.id,
       product_id: l.productId,
       qty: l.qty,
       empties_given: l.empties,
       amount: l.qty * l.price,
-      paid: true,
       created_by: session?.user.id,
       created_at: timestamp,
     }))
-    const { error } = await supabase.from('purchases').insert(rows)
+    const { error } = await supabase.from('purchase_lines').insert(lineRows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -178,7 +206,7 @@ export function RecordPurchase() {
                       {p.name}
                     </span>
                     {qty > 0 && (
-                      <span className="text-[11px] font-bold text-muted">×{qty} · {formatCurrency(lineTotal)}</span>
+                      <span className="text-[11px] font-bold text-muted">&times;{qty} · {formatCurrency(lineTotal)}</span>
                     )}
                   </div>
                   <div className="mt-3 flex gap-3">

@@ -8,9 +8,6 @@ export interface EmptiesNetRate {
   net_rate_per_day: number
 }
 
-// Trailing 14-day net accumulation rate of empties in the godown, per product.
-// empties_in = sale.empties + return.qty (customers handing back / owing empties)
-// empties_out = purchases.empties_given (handed back to the supplier)
 export function useEmptiesNetRate() {
   const [data, setData] = useState<EmptiesNetRate[]>([])
   const [loading, setLoading] = useState(true)
@@ -20,17 +17,20 @@ export function useEmptiesNetRate() {
     setLoading(true)
     const since = new Date(Date.now() - WINDOW_DAYS * 86400000).toISOString()
 
-    const [txRes, purchaseRes] = await Promise.all([
+    const [billRes, purchaseRes] = await Promise.all([
       supabase
-        .from('transactions')
-        .select('product_id, type, qty, empties')
-        .in('type', ['sale', 'return'])
+        .from('bill_lines')
+        .select('product_id, qty, empties, bills!inner(type)')
+        .in('bills.type', ['sale', 'return'])
         .gte('created_at', since),
-      supabase.from('purchases').select('product_id, empties_given').gte('created_at', since),
+      supabase
+        .from('purchase_lines')
+        .select('product_id, empties_given')
+        .gte('created_at', since),
     ])
 
-    if (txRes.error) {
-      setError(txRes.error.message)
+    if (billRes.error) {
+      setError(billRes.error.message)
       setLoading(false)
       return
     }
@@ -41,10 +41,11 @@ export function useEmptiesNetRate() {
     }
 
     const inByProduct = new Map<number, number>()
-    for (const t of txRes.data ?? []) {
-      if (t.product_id === null) continue
-      const amount = t.type === 'sale' ? t.empties : t.qty
-      inByProduct.set(t.product_id, (inByProduct.get(t.product_id) ?? 0) + amount)
+    for (const row of billRes.data ?? []) {
+      const r = row as any
+      const billType = r.bills?.type
+      const amount = billType === 'sale' ? r.empties : r.qty
+      inByProduct.set(r.product_id, (inByProduct.get(r.product_id) ?? 0) + amount)
     }
 
     const outByProduct = new Map<number, number>()

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { QuickAddSheet } from './QuickAddSheet'
-import { HomeIcon, UsersIcon, TruckIcon, ActivityIcon, PlusIcon } from './icons'
+import { HomeIcon, UsersIcon, TruckIcon, BoxIcon, PlusIcon } from './icons'
 
 const ACTIVE = '#E4571B'
 const INACTIVE = '#B0A594'
@@ -12,7 +12,7 @@ const leftTabs = [
 ]
 const rightTabs = [
   { to: '/commercial/purchases', label: 'Purchases', Icon: TruckIcon, end: false },
-  { to: '/commercial/activity', label: 'Activity', Icon: ActivityIcon, end: false },
+  { to: '/commercial/godown', label: 'Godown', Icon: BoxIcon, end: false },
 ]
 
 export function BottomNav() {

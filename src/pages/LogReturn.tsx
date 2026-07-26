@@ -5,32 +5,34 @@ import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { useProducts } from '../hooks/useProducts'
 import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
-import { useTransactions } from '../hooks/useTransactions'
+import { useBills } from '../hooks/useBills'
 import { Stepper } from '../components/Stepper'
 import { ChevronLeftIcon } from '../components/icons'
 import { combineDateWithNow, dateInputValue, emptiesOwed, todayInputValue } from '../utils/format'
+import { nextBillNumber } from '../utils/billNumber'
 
 export function LogReturn() {
-  const { id, txId } = useParams()
+  const { id, billId } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: customers } = useCustomerBalances()
   const { data: products } = useProducts()
-  const { data: transactions } = useTransactions(id ? Number(id) : 0)
+  const { data: bills } = useBills(id ? Number(id) : 0)
   const [customerId, setCustomerId] = useState<number | null>(id ? Number(id) : null)
   const { data: productBalances } = useCustomerProductBalances(customerId ?? 0)
 
-  // A return can cover any number of sizes at once: qty of empties returned per product.
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({})
-  const [outrightByProduct, setOutrightByProduct] = useState<Record<number, boolean>>({})
+  const [surrenderByProduct, setSurrenderByProduct] = useState<Record<number, boolean>>({})
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  const [editBillId, setEditBillId] = useState<number | null>(null)
+  const [editLineId, setEditLineId] = useState<number | null>(null)
   const [editProductId, setEditProductId] = useState<number | null>(null)
   const [originalQty, setOriginalQty] = useState(0)
   const [loadedEdit, setLoadedEdit] = useState(false)
-  const editing = Boolean(txId)
+  const editing = Boolean(billId)
 
   useEffect(() => {
     if (customerId === null && customers.length > 0) setCustomerId(customers[0].id)
@@ -38,20 +40,23 @@ export function LogReturn() {
 
   useEffect(() => {
     if (!editing || loadedEdit) return
-    const tx = transactions.find((t) => t.id === Number(txId))
-    if (!tx || tx.product_id === null) return
-    setEditProductId(tx.product_id)
-    setQtyByProduct({ [tx.product_id]: tx.qty })
-    setOutrightByProduct({ [tx.product_id]: tx.outright })
-    setOriginalQty(tx.qty)
-    setDate(dateInputValue(tx.created_at))
+    const bill = bills.find((b) => b.id === Number(billId))
+    if (!bill || bill.bill_lines.length === 0) return
+    const line = bill.bill_lines[0]
+    setEditBillId(bill.id)
+    setEditLineId(line.id)
+    setEditProductId(line.product_id)
+    setQtyByProduct({ [line.product_id]: line.qty })
+    setSurrenderByProduct({ [line.product_id]: bill.surrender })
+    setOriginalQty(line.qty)
+    setDate(dateInputValue(bill.created_at))
     setLoadedEdit(true)
-  }, [editing, loadedEdit, transactions, txId])
+  }, [editing, loadedEdit, bills, billId])
 
   const shownProducts = editing ? products.filter((p) => p.id === editProductId) : products
 
   const setQty = (pid: number, v: number) => setQtyByProduct((s) => ({ ...s, [pid]: v }))
-  const setOutright = (pid: number, v: boolean) => setOutrightByProduct((s) => ({ ...s, [pid]: v }))
+  const setSurrender = (pid: number, v: boolean) => setSurrenderByProduct((s) => ({ ...s, [pid]: v }))
 
   function ownedFor(pid: number) {
     const bal = productBalances.find((b) => b.product_id === pid)?.empties_outstanding ?? 0
@@ -73,7 +78,7 @@ export function LogReturn() {
         productId: p.id,
         name: p.name,
         qty: qtyByProduct[p.id] ?? 0,
-        outright: outrightByProduct[p.id] ?? false,
+        surrender: surrenderByProduct[p.id] ?? false,
       }))
       .filter((l) => l.qty > 0)
 
@@ -86,16 +91,20 @@ export function LogReturn() {
     setError(null)
     const timestamp = combineDateWithNow(date)
 
-    if (editing && editProductId !== null) {
-      const { error } = await supabase
-        .from('transactions')
+    if (editing && editBillId !== null && editLineId !== null) {
+      const l = lines[0]
+      await supabase
+        .from('bills')
         .update({
-          qty: lines[0].qty,
           created_at: timestamp,
           updated_by: session?.user.id,
-          outright: lines[0].outright,
+          surrender: l.surrender,
         })
-        .eq('id', Number(txId))
+        .eq('id', editBillId)
+      const { error } = await supabase
+        .from('bill_lines')
+        .update({ qty: l.qty })
+        .eq('id', editLineId)
       setSaving(false)
       if (error) {
         setError(error.message)
@@ -105,18 +114,38 @@ export function LogReturn() {
       return
     }
 
-    const rows = lines.map((l) => ({
-      customer_id: customerId,
-      type: 'return' as const,
+    const billNumber = await nextBillNumber(timestamp)
+    const { data: bill, error: billErr } = await supabase
+      .from('bills')
+      .insert({
+        bill_number: billNumber,
+        customer_id: customerId,
+        type: 'return',
+        total_amount: 0,
+        paid: false,
+        surrender: lines.some((l) => l.surrender),
+        created_by: session?.user.id,
+        created_at: timestamp,
+      })
+      .select('id')
+      .single()
+
+    if (billErr || !bill) {
+      setSaving(false)
+      setError(billErr?.message ?? 'Failed to create bill')
+      return
+    }
+
+    const lineRows = lines.map((l) => ({
+      bill_id: bill.id,
       product_id: l.productId,
       qty: l.qty,
       empties: 0,
       amount: 0,
       created_by: session?.user.id,
       created_at: timestamp,
-      outright: l.outright,
     }))
-    const { error } = await supabase.from('transactions').insert(rows)
+    const { error } = await supabase.from('bill_lines').insert(lineRows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -170,7 +199,7 @@ export function LogReturn() {
 
           <div className="flex gap-3">
             {shownProducts.map((p) => {
-              const outright = outrightByProduct[p.id] ?? false
+              const surrender = surrenderByProduct[p.id] ?? false
               return (
                 <div key={p.id} className="min-w-0 flex-1">
                   <p className={fieldLabel}>{p.name}</p>
@@ -185,14 +214,14 @@ export function LogReturn() {
                     <label className="mt-2 flex cursor-pointer items-center gap-[6px] text-[11px] font-semibold text-muted">
                       <input
                         type="checkbox"
-                        checked={outright}
-                        onChange={(e) => setOutright(p.id, e.target.checked)}
+                        checked={surrender}
+                        onChange={(e) => setSurrender(p.id, e.target.checked)}
                         className="h-[14px] w-[14px] accent-[#E4571B]"
                       />
-                      Owned cylinder (bought outright)
+                      Surrendered cylinder
                     </label>
                   )}
-                  {outright ? (
+                  {surrender ? (
                     <p className="mt-2 text-[11px] font-semibold text-muted">Not counted against empties owed.</p>
                   ) : (() => {
                     const e = emptiesOwed(ownedFor(p.id))

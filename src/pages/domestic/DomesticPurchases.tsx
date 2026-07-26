@@ -1,77 +1,40 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
-import { usePurchases } from '../../hooks/usePurchases'
+import { usePurchaseOrders, type PurchaseOrderWithLines } from '../../hooks/usePurchaseOrders'
 import { useProfiles } from '../../hooks/useProfiles'
 import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../../utils/format'
 import { PlusIcon } from '../../components/icons'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
-import type { Purchase } from '../../types/db'
 
-interface PurchaseBill {
-  billId: string
-  createdAt: string
-  total: number
-  lines: Purchase[]
-}
-
-function groupIntoBills(rows: Purchase[]): PurchaseBill[] {
-  const byBill = new Map<string, Purchase[]>()
-  for (const p of rows) {
-    const key = p.bill_id ?? `pu-${p.id}`
-    const list = byBill.get(key)
-    if (list) list.push(p)
-    else byBill.set(key, [p])
-  }
-  return Array.from(byBill.entries()).map(([billId, lines]) => ({
-    billId,
-    createdAt: lines[0].created_at,
-    total: lines.reduce((sum, l) => sum + l.amount, 0),
-    lines,
-  }))
-}
-
-function billRows(bill: PurchaseBill, productNameById: Map<number, string>) {
-  const rows = bill.lines.map((l) => ({
+function billRows(order: PurchaseOrderWithLines, productNameById: Map<number, string>) {
+  const rows = order.purchase_lines.map((l) => ({
     k: `${l.qty} × ${productNameById.get(l.product_id) ?? 'item'}`,
     v: l.amount > 0 ? formatCurrency(l.amount) : '—',
   }))
-  const empties = bill.lines.reduce((sum, l) => sum + l.empties_given, 0)
+  const empties = order.purchase_lines.reduce((sum, l) => sum + l.empties_given, 0)
   if (empties > 0) rows.push({ k: 'Empties given', v: String(empties) })
   return rows
 }
 
-function billCreatedAt(bill: PurchaseBill) {
-  return bill.lines.reduce((min, l) => (l.created_at < min ? l.created_at : min), bill.lines[0].created_at)
-}
-
-function billUpdatedAt(bill: PurchaseBill) {
-  return bill.lines.reduce((max, l) => (l.updated_at > max ? l.updated_at : max), bill.lines[0].updated_at)
-}
-
-function billUpdatedBy(bill: PurchaseBill) {
-  return bill.lines.reduce((latest, l) => (l.updated_at > latest.updated_at ? l : latest), bill.lines[0]).updated_by
-}
-
 export function DomesticPurchases() {
   const [accountOpen, setAccountOpen] = useState(false)
-  const [selected, setSelected] = useState<PurchaseBill | null>(null)
+  const [selected, setSelected] = useState<PurchaseOrderWithLines | null>(null)
   const profileNames = useProfiles()
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
   const { data: products } = useProducts('domestic')
-  const { data: purchases, refresh } = usePurchases('domestic')
+  const { data: orders, refresh } = usePurchaseOrders('domestic')
   const productNameById = new Map(products.map((p) => [p.id, p.name]))
-  const bills = groupIntoBills(purchases)
 
-  async function handleDeleteBill(bill: PurchaseBill) {
+  async function handleDeleteBill(order: PurchaseOrderWithLines) {
     if (!confirm('Delete this stock-in entry?')) return
-    const ids = bill.lines.map((l) => l.id)
-    const { error } = await supabase.from('purchases').delete().in('id', ids)
+    const { error } = await supabase.from('purchase_orders').delete().eq('id', order.id)
     if (!error) {
       setSelected(null)
       refresh()
@@ -95,23 +58,23 @@ export function DomesticPurchases() {
         </div>
 
         <ul className="flex flex-col gap-[11px]">
-          {bills.map((b) => (
-            <li key={b.billId}>
+          {orders.map((o) => (
+            <li key={o.id}>
               <button
                 type="button"
-                onClick={() => setSelected(b)}
+                onClick={() => setSelected(o)}
                 className="flex w-full flex-col rounded-[18px] bg-surface p-[15px] text-left shadow-card transition active:scale-[0.99]"
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-[12px] font-bold uppercase tracking-[0.4px] text-subtle">
-                    {formatRelativeDate(b.createdAt)}
+                    {formatRelativeDate(o.created_at)}
                   </p>
-                  {b.total > 0 && (
-                    <p className="font-display text-[15px] font-bold text-[#2E8B57]">{formatCurrency(b.total)}</p>
+                  {o.total_amount > 0 && (
+                    <p className="font-display text-[15px] font-bold text-[#2E8B57]">{formatCurrency(o.total_amount)}</p>
                   )}
                 </div>
                 <ul className="mt-[10px] flex flex-col gap-[6px]">
-                  {b.lines.map((l) => (
+                  {o.purchase_lines.map((l) => (
                     <li key={l.id} className="flex items-baseline justify-between gap-2">
                       <p className="text-[13.5px] font-bold text-ink">
                         {l.qty} × {productNameById.get(l.product_id) ?? 'item'}
@@ -126,7 +89,7 @@ export function DomesticPurchases() {
             </li>
           ))}
         </ul>
-        {bills.length === 0 && (
+        {orders.length === 0 && (
           <p className="rounded-[18px] bg-surface px-4 py-8 text-center text-sm font-medium text-subtle shadow-card">
             No stock received yet
           </p>
@@ -141,22 +104,31 @@ export function DomesticPurchases() {
           iconBg="#E7F3EC"
           iconColor="#2E8B57"
           title="Stock received"
-          subtitle={formatDate(selected.createdAt)}
-          amount={selected.total > 0 ? formatCurrency(selected.total) : undefined}
+          subtitle={formatDate(selected.created_at)}
+          amount={selected.total_amount > 0 ? formatCurrency(selected.total_amount) : undefined}
           rows={billRows(selected, productNameById)}
-          created={formatDate(billCreatedAt(selected))}
-          createdBy={selected.lines[0].created_by ? profileNames.get(selected.lines[0].created_by) : undefined}
-          updated={formatUpdated(billUpdatedAt(selected), billCreatedAt(selected))}
-          updatedBy={billUpdatedBy(selected) ? profileNames.get(billUpdatedBy(selected)!) : undefined}
+          created={formatDate(selected.created_at)}
+          createdBy={selected.created_by ? profileNames.get(selected.created_by) : undefined}
+          updated={formatUpdated(selected.updated_at, selected.created_at)}
+          updatedBy={selected.updated_by ? profileNames.get(selected.updated_by) : undefined}
           actions={
             isOwner ? (
-              <button
-                type="button"
-                onClick={() => handleDeleteBill(selected)}
-                className="flex h-[48px] w-full items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
-              >
-                Delete
-              </button>
+              <>
+                <Link
+                  to={`/domestic/purchases/${selected.id}/edit`}
+                  onClick={() => setSelected(null)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] font-bold text-white shadow-[0_10px_22px_-12px_rgba(46,139,87,0.7)] transition active:scale-[0.99]"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteBill(selected)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
+                >
+                  Delete
+                </button>
+              </>
             ) : undefined
           }
         />

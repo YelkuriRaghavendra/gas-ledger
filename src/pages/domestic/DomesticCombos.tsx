@@ -15,8 +15,11 @@ export function DomesticCombos() {
   const { data: bundles, refresh } = useBundleComponents()
 
   const [editing, setEditing] = useState<Product | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPrice, setEditPrice] = useState('')
   const [qtyByComponent, setQtyByComponent] = useState<Record<number, number>>({})
   const [ncFlag, setNcFlag] = useState(false)
+  const [pendingFlag, setPendingFlag] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,7 +40,10 @@ export function DomesticCombos() {
     const current: Record<number, number> = {}
     for (const c of componentsOf(p.id)) current[c.component_product_id] = c.qty
     setQtyByComponent(current)
+    setEditName(p.name)
+    setEditPrice(String(p.price))
     setNcFlag(p.is_new_connection)
+    setPendingFlag(p.pending_delivery)
     setError(null)
     setEditing(p)
   }
@@ -119,6 +125,7 @@ export function DomesticCombos() {
       .from('bundle_components')
       .delete()
       .eq('bundle_product_id', editing.id)
+      .gt('qty', 0)
     if (delError) {
       setError(delError.message)
       setSaving(false)
@@ -135,9 +142,15 @@ export function DomesticCombos() {
         return
       }
     }
+    const trimmed = editName.trim()
+    if (!trimmed) {
+      setError('Name is required')
+      setSaving(false)
+      return
+    }
     const { error: prodError } = await supabase
       .from('products')
-      .update({ is_new_connection: ncFlag })
+      .update({ name: trimmed, price: Number(editPrice || 0), is_new_connection: ncFlag, pending_delivery: pendingFlag })
       .eq('id', editing.id)
     if (prodError) {
       setError(prodError.message)
@@ -249,8 +262,27 @@ export function DomesticCombos() {
       <BottomSheet open={editing !== null} onClose={() => setEditing(null)} slideUp>
         {editing && (
           <div>
-            <h2 className="mb-1 font-display text-[19px] font-bold text-ink">{editing.name}</h2>
-            <p className="mb-4 text-[12.5px] font-semibold text-subtle">What does this combo include?</p>
+            <h2 className="mb-4 font-display text-[19px] font-bold text-ink">Edit combo</h2>
+            <div className="mb-3">
+              <p className={fieldLabel}>Name</p>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className={fieldInput}
+              />
+            </div>
+            <div className="mb-4">
+              <p className={fieldLabel}>Price (₹)</p>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
+                className={fieldInput}
+              />
+            </div>
+            <p className="mb-3 text-[12.5px] font-semibold text-subtle">What does this combo include?</p>
             <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto pb-1">
               {componentCandidates.map((c) => (
                 <div key={c.id} className="flex items-center justify-between gap-3">
@@ -276,6 +308,15 @@ export function DomesticCombos() {
                 className="h-[16px] w-[16px] accent-[#2E8B57]"
               />
               Count as New Connection
+            </label>
+            <label className="mt-2 flex cursor-pointer items-center gap-[8px] text-[12px] font-semibold text-muted">
+              <input
+                type="checkbox"
+                checked={pendingFlag}
+                onChange={(e) => setPendingFlag(e.target.checked)}
+                className="h-[16px] w-[16px] accent-[#E67E22]"
+              />
+              Mark as pending delivery
             </label>
             {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
             <div className="mt-4 flex gap-2">

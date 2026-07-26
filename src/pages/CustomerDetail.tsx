@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useCustomerBalance } from '../hooks/useCustomerBalance'
 import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useProducts } from '../hooks/useProducts'
-import { useTransactions } from '../hooks/useTransactions'
+import { useBills } from '../hooks/useBills'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { useProfiles } from '../hooks/useProfiles'
 import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
@@ -15,17 +15,15 @@ import { Avatar } from '../components/Avatar'
 import { StatementDialog } from '../components/StatementDialog'
 import { DetailModal } from '../components/DetailModal'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon } from '../components/icons'
-import type { Transaction } from '../types/db'
+import type { Bill, BillLine } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
 
-function historyAmount(t: Transaction) {
-  // Outright returns are cylinders the customer owns — they don't reduce
-  // empties owed, so no misleading minus sign.
-  if (t.type === 'return') return t.outright ? `${t.qty}` : `−${t.qty}`
+function historyAmount(t: HistoryEntry) {
+  if (t.type === 'return') return t.surrender ? `${t.qty}` : `−${t.qty}`
   return formatCurrency(t.amount)
 }
 
-function transactionEditPath(t: Transaction) {
+function billEditPath(t: HistoryEntry) {
   return `/commercial/customers/${t.customer_id}/${t.type}/${t.id}/edit`
 }
 
@@ -34,14 +32,47 @@ function dayKey(iso: string) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
 
-function buildHistoryGroups(transactions: Transaction[], productNameById: Map<number, string>): HistoryGroup[] {
-  const chronological = [...transactions].reverse()
+interface BillWithLines extends Bill {
+  bill_lines: BillLine[]
+}
+
+function flattenBills(bills: BillWithLines[], productNameById: Map<number, string>): HistoryEntry[] {
+  const entries: HistoryEntry[] = []
+  for (const bill of bills) {
+    if (bill.type === 'payment' || bill.bill_lines.length === 0) {
+      entries.push({
+        ...bill,
+        balanceAfter: 0,
+        productName: null,
+        qty: 0,
+        empties: 0,
+        amount: bill.total_amount,
+      })
+    } else {
+      const line = bill.bill_lines[0]
+      const totalQty = bill.bill_lines.reduce((s, l) => s + l.qty, 0)
+      const totalEmpties = bill.bill_lines.reduce((s, l) => s + l.empties, 0)
+      entries.push({
+        ...bill,
+        balanceAfter: 0,
+        productName: line.product_id ? productNameById.get(line.product_id) ?? null : null,
+        qty: totalQty,
+        empties: totalEmpties,
+        amount: bill.total_amount,
+      })
+    }
+  }
+  return entries
+}
+
+function buildHistoryGroups(bills: BillWithLines[], productNameById: Map<number, string>): HistoryGroup[] {
+  const flat = flattenBills(bills, productNameById)
+  const chronological = [...flat].reverse()
   let running = 0
   const withBalance: HistoryEntry[] = chronological.map((t) => {
     if (t.type === 'sale' && !t.paid) running += t.amount
     else if (t.type === 'payment') running -= t.amount
-    const productName = t.product_id !== null ? productNameById.get(t.product_id) ?? null : null
-    return { ...t, balanceAfter: running, productName }
+    return { ...t, balanceAfter: running }
   })
   const newestFirst = [...withBalance].reverse()
 
@@ -75,14 +106,12 @@ function detailRows(t: HistoryEntry): { k: string; v: string }[] {
   if (t.productName) rows.push({ k: 'Product', v: t.productName })
   if (t.type === 'sale') {
     rows.push({ k: 'Quantity sold', v: String(t.qty) })
-    // Commercial outright sale = a New Connection (customer buys & keeps the
-    // cylinder, no empty collected).
-    if (t.outright) rows.push({ k: 'Type', v: 'New Connection' })
+    if (t.surrender) rows.push({ k: 'Type', v: 'New Connection' })
     else rows.push({ k: 'Empties collected', v: String(t.empties) })
     rows.push({ k: 'Payment', v: t.paid ? `Paid${t.method ? ` · ${t.method === 'upi' ? 'UPI' : 'Cash'}` : ''}` : 'On credit' })
   } else if (t.type === 'return') {
     rows.push({ k: 'Quantity', v: String(t.qty) })
-    if (t.outright) rows.push({ k: 'Outright', v: 'Customer owns cylinder' })
+    if (t.surrender) rows.push({ k: 'Surrender', v: 'Customer surrendered cylinder' })
   } else if (t.type === 'payment' && t.method) {
     rows.push({ k: 'Method', v: t.method === 'upi' ? 'UPI' : 'Cash' })
   }
@@ -100,7 +129,7 @@ export function CustomerDetail() {
   const { data: balance, loading, error, refresh: refreshBalance } = useCustomerBalance(customerId)
   const { data: productBalances, refresh: refreshProductBalances } = useCustomerProductBalances(customerId)
   const { data: products } = useProducts()
-  const { data: transactions, refresh: refreshTx } = useTransactions(customerId)
+  const { data: bills, refresh: refreshBills } = useBills(customerId)
   const { data: agencySettings } = useAgencySettings()
   const [editing, setEditing] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -108,8 +137,6 @@ export function CustomerDetail() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
-  const [startingEmpties, setStartingEmpties] = useState('')
-  const [startingEmptiesProductId, setStartingEmptiesProductId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
@@ -122,13 +149,6 @@ export function CustomerDetail() {
     setName(balance.name)
     setPhone(balance.phone ?? '')
     setAddress(balance.address ?? '')
-    setStartingEmpties(String(balance.starting_empties_owed))
-    const { data } = await supabase
-      .from('customers')
-      .select('starting_empties_product_id')
-      .eq('id', customerId)
-      .single()
-    setStartingEmptiesProductId(data?.starting_empties_product_id ?? products[0]?.id ?? null)
     setEditing(true)
   }
 
@@ -146,8 +166,6 @@ export function CustomerDetail() {
         name: name.trim(),
         phone: phone.trim() || null,
         address: address.trim() || null,
-        starting_empties_owed: Number(startingEmpties || 0),
-        starting_empties_product_id: startingEmptiesProductId,
       })
       .eq('id', customerId)
       .select()
@@ -166,7 +184,7 @@ export function CustomerDetail() {
   }
 
   async function handleDeleteCustomer() {
-    if (!confirm('Delete this customer and all their transactions?')) return
+    if (!confirm('Delete this customer and all their bills?')) return
     setActionError(null)
     const { error } = await supabase.from('customers').delete().eq('id', customerId)
     if (error) {
@@ -176,15 +194,15 @@ export function CustomerDetail() {
     navigate('/commercial/customers')
   }
 
-  async function handleDeleteTransaction(txId: number) {
+  async function handleDeleteBill(billId: number) {
     if (!confirm('Delete this entry?')) return
     setActionError(null)
-    const { error } = await supabase.from('transactions').delete().eq('id', txId)
+    const { error } = await supabase.from('bills').delete().eq('id', billId)
     if (error) {
       setActionError(error.message)
       return
     }
-    refreshTx()
+    refreshBills()
     refreshBalance()
     refreshProductBalances()
   }
@@ -192,20 +210,21 @@ export function CustomerDetail() {
   if (loading) return <p className="p-4 text-muted">Loading…</p>
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
 
-  const historyGroups = buildHistoryGroups(transactions, productNameById)
+  const historyGroups = buildHistoryGroups(bills as BillWithLines[], productNameById)
   const totalEmptiesOut = productBalances.reduce((sum, pb) => sum + pb.empties_outstanding, 0)
 
-  // Outright sales are "New Connections"; outright returns are owned-cylinder
-  // returns. customer_product_balances excludes outright, so derive these
-  // per-product counts from the raw transactions.
   const ncByProduct = new Map<number, { sold: number; returned: number }>()
-  for (const t of transactions) {
-    if (!t.outright || t.product_id == null) continue
-    const cur = ncByProduct.get(t.product_id) ?? { sold: 0, returned: 0 }
-    if (t.type === 'sale') cur.sold += t.qty
-    else if (t.type === 'return') cur.returned += t.qty
-    ncByProduct.set(t.product_id, cur)
+  for (const bill of bills as BillWithLines[]) {
+    if (!bill.surrender) continue
+    for (const line of bill.bill_lines) {
+      if (line.product_id == null) continue
+      const cur = ncByProduct.get(line.product_id) ?? { sold: 0, returned: 0 }
+      if (bill.type === 'sale') cur.sold += line.qty
+      else if (bill.type === 'return') cur.returned += line.qty
+      ncByProduct.set(line.product_id, cur)
+    }
   }
+
   const agencyAddress = agencySettings
     ? [agencySettings.address_line1, agencySettings.address_line2, agencySettings.city, agencySettings.pincode].filter(Boolean).join(', ') ||
       agencySettings.business_address
@@ -283,30 +302,6 @@ export function CustomerDetail() {
             onChange={(e) => setAddress(e.target.value)}
             className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
-          <div>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                min="0"
-                placeholder="Empties already owed"
-                value={startingEmpties}
-                onChange={(e) => setStartingEmpties(e.target.value)}
-                className="w-full flex-1 rounded-[14px] border-[1.5px] border-borderMuted px-3 py-2 font-semibold text-ink"
-              />
-              <select
-                value={startingEmptiesProductId ?? ''}
-                onChange={(e) => setStartingEmptiesProductId(Number(e.target.value))}
-                className="w-32 shrink-0 appearance-none rounded-[14px] border-[1.5px] border-borderMuted px-2 py-2 font-bold text-ink"
-              >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="mt-1 text-xs text-muted">Starting empties-owed balance (not from a sale in this app)</p>
-          </div>
           <div className="flex gap-2 pt-1">
             <button
               type="submit"
@@ -408,7 +403,7 @@ export function CustomerDetail() {
                 </div>
                 <div>
                   <p className="font-display text-[16px] font-bold text-ink">{nc.returned}</p>
-                  <p className="mt-[2px] text-[10px] font-semibold text-subtle">outright ret</p>
+                  <p className="mt-[2px] text-[10px] font-semibold text-subtle">surrender ret</p>
                 </div>
               </div>
             )}
@@ -444,8 +439,8 @@ export function CustomerDetail() {
                       <p className="truncate text-sm font-bold text-ink">{historyTitle(t, t.productName)}</p>
                       <p className="mt-[2px] truncate text-xs font-semibold text-[#9A8F80]">
                         {formatRelativeDate(t.created_at)}
-                        {t.outright && t.type === 'sale' ? ' · New Connection' : ''}
-                        {t.outright && t.type === 'return' ? ' · Outright' : ''}
+                        {t.surrender && t.type === 'sale' ? ' · New Connection' : ''}
+                        {t.surrender && t.type === 'return' ? ' · Surrender' : ''}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
@@ -464,7 +459,7 @@ export function CustomerDetail() {
           </ul>
         </div>
       ))}
-      {transactions.length === 0 && <p className="text-muted">No transactions yet.</p>}
+      {bills.length === 0 && <p className="text-muted">No transactions yet.</p>}
 
       <StatementDialog
         open={statementOpen}
@@ -494,7 +489,7 @@ export function CustomerDetail() {
             isOwner ? (
               <>
                 <Link
-                  to={transactionEditPath(viewingTx)}
+                  to={billEditPath(viewingTx)}
                   onClick={() => setViewingTx(null)}
                   className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
                 >
@@ -503,9 +498,9 @@ export function CustomerDetail() {
                 <button
                   type="button"
                   onClick={() => {
-                    const txId = viewingTx.id
+                    const billId = viewingTx.id
                     setViewingTx(null)
-                    handleDeleteTransaction(txId)
+                    handleDeleteBill(billId)
                   }}
                   className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
                 >

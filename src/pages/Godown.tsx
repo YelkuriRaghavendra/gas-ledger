@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useGodownStock } from '../hooks/useGodownStock'
-import { useEmptiesNetRate } from '../hooks/useEmptiesNetRate'
-import { usePurchases } from '../hooks/usePurchases'
-import { predictDaysUntilFull } from '../utils/godownPrediction'
+import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { AppHeader } from '../components/AppHeader'
 import { AccountMenu } from '../components/AccountMenu'
 
 export function Godown() {
-  const { data: stock, loading } = useGodownStock()
-  const { data: rates } = useEmptiesNetRate()
-  const { data: purchases } = usePurchases()
+  const { data: stock, loading } = useGodownStock('all')
+  const { data: purchaseOrders } = usePurchaseOrders()
   const [accountOpen, setAccountOpen] = useState(false)
-  const hasAdjustment = purchases.some((p) => p.note === 'Opening stock adjustment')
+  const hasAdjustment = purchaseOrders.some((p) => p.type === 'opening')
 
   if (loading) return <p className="p-4 text-muted">Loading…</p>
 
@@ -35,10 +32,6 @@ export function Godown() {
 
         <div className="grid grid-cols-1 gap-3">
           {stock.map((s) => {
-            const netRate = rates.find((r) => r.product_id === s.product_id)?.net_rate_per_day ?? 0
-            const prediction =
-              s.godown_capacity !== null ? predictDaysUntilFull(s.godown_capacity, s.empty_cylinders, netRate) : null
-
             return (
               <div key={s.product_id} className="rounded-[18px] bg-surface p-[18px] shadow-card">
                 <span className="inline-block rounded-lg bg-ink px-[10px] py-[4px] font-display text-[13px] font-bold text-white">
@@ -61,22 +54,6 @@ export function Godown() {
                     <p className="mt-[3px] text-[11px] font-semibold text-subtle">to return to plant</p>
                   </div>
                 </div>
-
-                {prediction && (
-                  <div className="mt-4 border-t border-borderMuted pt-3">
-                    {prediction.kind === 'not_approaching' && (
-                      <p className="text-[13px] font-semibold text-subtle">Not approaching capacity</p>
-                    )}
-                    {prediction.kind === 'at_capacity' && (
-                      <p className="text-[13px] font-bold text-[#C23B22]">Godown is already at or over capacity</p>
-                    )}
-                    {prediction.kind === 'days_until_full' && (
-                      <p className="text-[13px] font-semibold text-muted">
-                        <span className="font-display font-bold text-accent">~{prediction.days} days</span> until full at current pace
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
             )
           })}

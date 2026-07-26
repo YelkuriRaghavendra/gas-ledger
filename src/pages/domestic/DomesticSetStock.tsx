@@ -1,18 +1,18 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
-import { supabase } from '../lib/supabase'
-import { useProducts } from '../hooks/useProducts'
-import { useGodownStock } from '../hooks/useGodownStock'
-import { Stepper } from '../components/Stepper'
-import { ChevronLeftIcon } from '../components/icons'
-import { nextPoNumber } from '../utils/billNumber'
+import { useAuth } from '../../auth/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { useProducts } from '../../hooks/useProducts'
+import { useGodownStock } from '../../hooks/useGodownStock'
+import { Stepper } from '../../components/Stepper'
+import { ChevronLeftIcon } from '../../components/icons'
+import { nextPoNumber } from '../../utils/billNumber'
 
-export function SetCurrentStock() {
+export function DomesticSetStock() {
   const navigate = useNavigate()
   const { session } = useAuth()
-  const { data: products } = useProducts()
-  const { data: stock, loading } = useGodownStock()
+  const { data: products } = useProducts('domestic')
+  const { data: stock, loading } = useGodownStock('domestic')
 
   const [fullByProduct, setFullByProduct] = useState<Record<number, number>>({})
   const [emptyByProduct, setEmptyByProduct] = useState<Record<number, number>>({})
@@ -101,7 +101,7 @@ export function SetCurrentStock() {
       }
 
       if (lineRows.length === 0) {
-        navigate('/commercial/godown')
+        navigate('/domestic/stock')
         return
       }
 
@@ -142,7 +142,7 @@ export function SetCurrentStock() {
         return
       }
 
-      navigate('/commercial/godown')
+      navigate('/domestic/stock')
     } catch (err: any) {
       setError(err.message ?? 'Something went wrong')
       setSaving(false)
@@ -153,7 +153,7 @@ export function SetCurrentStock() {
 
   return (
     <div className="p-5 pb-[110px] pt-3">
-      <Link to="/commercial/godown" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
+      <Link to="/domestic/stock" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
       <h1 className="mb-2 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Set current stock</h1>
@@ -179,16 +179,18 @@ export function SetCurrentStock() {
                     size="sm"
                   />
                 </div>
-                <div>
-                  <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Empty cylinders</p>
-                  <Stepper
-                    value={emptyByProduct[p.id] ?? 0}
-                    onChange={(v) => setEmptyByProduct((s) => ({ ...s, [p.id]: v }))}
-                    min={0}
-                    tone="surface"
-                    size="sm"
-                  />
-                </div>
+                {p.kind === 'cylinder' && (
+                  <div>
+                    <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Empty cylinders</p>
+                    <Stepper
+                      value={emptyByProduct[p.id] ?? 0}
+                      onChange={(v) => setEmptyByProduct((s) => ({ ...s, [p.id]: v }))}
+                      min={0}
+                      tone="surface"
+                      size="sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -199,7 +201,7 @@ export function SetCurrentStock() {
         <button
           type="submit"
           disabled={saving}
-          className="mt-5 h-[56px] w-full rounded-[16px] bg-gradient-to-br from-accentSoft to-accent text-[15px] font-bold text-white shadow-glow transition active:scale-[0.99] disabled:opacity-50"
+          className="mt-5 h-[56px] w-full rounded-[16px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] text-[15px] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save stock'}
         </button>

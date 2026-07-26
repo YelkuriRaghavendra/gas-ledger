@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useGodownStock } from '../../hooks/useGodownStock'
@@ -13,14 +13,24 @@ import type { Product, ProductKind, PriceOption } from '../../types/db'
 export function DomesticStock() {
   const navigate = useNavigate()
   const [accountOpen, setAccountOpen] = useState(false)
-  const { data: stock, loading, error, refresh: refreshStock } = useGodownStock('domestic')
+  const { data: stock, loading, error, refresh: refreshStock } = useGodownStock('all')
   const { data: products, refresh: refreshProducts } = useProducts('domestic')
+
+  const [pendingCount, setPendingCount] = useState(0)
+  const loadPendingCount = useCallback(async () => {
+    const { count } = await supabase
+      .from('bill_lines')
+      .select('id, products!inner(pending_delivery)', { count: 'exact', head: true })
+      .eq('products.pending_delivery', true)
+      .eq('delivered', false)
+    setPendingCount(count ?? 0)
+  }, [])
+  useEffect(() => { loadPendingCount() }, [loadPendingCount])
 
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [kind, setKind] = useState<ProductKind>('accessory')
   const [price, setPrice] = useState('')
-  const [capacity, setCapacity] = useState('')
   const [unit, setUnit] = useState('pc')
   const [priceOptions, setPriceOptions] = useState<PriceOption[]>([])
   const [saving, setSaving] = useState(false)
@@ -33,7 +43,6 @@ export function DomesticStock() {
     setName('')
     setKind('accessory')
     setPrice('')
-    setCapacity('')
     setUnit('pc')
     setPriceOptions([])
     setFormError(null)
@@ -55,7 +64,6 @@ export function DomesticStock() {
       sort_order: maxSort + 1,
       price_options: kind === 'service' ? [] : cleanOptions(priceOptions),
     }
-    if (kind === 'cylinder' && capacity.trim()) payload.godown_capacity = Number(capacity)
     const { data: created, error: insError } = await supabase.from('products').insert(payload).select().single()
     setSaving(false)
     if (insError) {
@@ -168,6 +176,26 @@ export function DomesticStock() {
             <PlusIcon size={15} strokeWidth={2.4} color="#2E8B57" /> Add item
           </button>
         </div>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-2">
+        <Link
+          to="/domestic/stock/set-stock"
+          className="flex h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-[#2E8B57] bg-[#EAF6EF] text-[14px] font-bold text-[#2E8B57]"
+        >
+          Set current stock
+        </Link>
+        {pendingCount > 0 && (
+          <Link
+            to="/domestic/pending-deliveries"
+            className="flex h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-[#E67E22] bg-[#FFF8F0] text-[14px] font-bold text-[#E67E22]"
+          >
+            Pending deliveries
+            <span className="rounded-full bg-[#E67E22] px-[8px] py-[1px] text-[12px] font-bold text-white">
+              {pendingCount}
+            </span>
+          </Link>
+        )}
       </div>
 
       {loading && <p className="mb-4 text-muted">Loading…</p>}
@@ -299,20 +327,6 @@ export function DomesticStock() {
               />
             </div>
           </div>
-
-          {kind === 'cylinder' && (
-            <div className="mb-1">
-              <p className="mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted">Godown capacity (optional)</p>
-              <input
-                type="number"
-                min="0"
-                placeholder="e.g. 300"
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                className="h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink"
-              />
-            </div>
-          )}
 
           {kind !== 'service' && <PriceOptionsEditor value={priceOptions} onChange={setPriceOptions} />}
 
