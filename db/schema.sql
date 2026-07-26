@@ -351,7 +351,8 @@ select
   b.total_amount as amount, b.note, b.created_by, b.created_at, b.updated_at, b.updated_by,
   (select bl.product_id from bill_lines bl where bl.bill_id = b.id limit 1) as product_id,
   (select p.name from bill_lines bl join products p on p.id = bl.product_id where bl.bill_id = b.id limit 1) as product_name,
-  b.surrender as outright, 'commercial' as segment
+  b.surrender as outright, 'commercial' as segment,
+  b.bill_number, b.method, b.paid
 from bills b
 join customers c on c.id = b.customer_id
 where b.type in ('sale', 'return', 'payment')
@@ -366,7 +367,8 @@ select
   (select pl.product_id from purchase_lines pl where pl.purchase_order_id = po.id limit 1) as product_id,
   (select p.name from purchase_lines pl join products p on p.id = pl.product_id where pl.purchase_order_id = po.id limit 1) as product_name,
   false as outright,
-  (select p.segment from purchase_lines pl join products p on p.id = pl.product_id where pl.purchase_order_id = po.id limit 1) as segment
+  (select p.segment from purchase_lines pl join products p on p.id = pl.product_id where pl.purchase_order_id = po.id limit 1) as segment,
+  po.po_number as bill_number, null::text as method, po.paid
 from purchase_orders po
 where po.type = 'purchase'
 order by created_at desc;

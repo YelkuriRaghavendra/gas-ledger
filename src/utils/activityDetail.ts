@@ -29,18 +29,28 @@ export function detailTitle(entry: FeedItem) {
   return `${TYPE_LABEL[entry.type]} · ${counterparty}`
 }
 
+function methodLabel(m: string | null) {
+  if (!m) return null
+  if (m === 'upi') return 'UPI'
+  if (m === 'vitran') return 'Vitran'
+  return 'Cash'
+}
+
 export function detailRows(entry: FeedItem): { k: string; v: string }[] {
   const rows: { k: string; v: string }[] = []
+  if (entry.bill_number) rows.push({ k: 'Bill number', v: entry.bill_number })
   if (entry.type === 'sale') {
     if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })
     rows.push({ k: 'Quantity sold', v: String(entry.qty) })
     if (entry.outright) rows.push({ k: 'Surrender', v: 'Customer surrendered cylinder' })
     else rows.push({ k: 'Empties collected', v: String(entry.empties) })
+    rows.push({ k: 'Payment', v: entry.paid ? `Paid${entry.method ? ` · ${methodLabel(entry.method)}` : ''}` : 'On credit' })
     if (entry.note) rows.push({ k: 'Note', v: entry.note })
   } else if (entry.type === 'purchase') {
     if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })
     rows.push({ k: 'Quantity in', v: String(entry.qty) })
     rows.push({ k: 'Empties given', v: String(entry.empties) })
+    if (entry.method) rows.push({ k: 'Payment method', v: methodLabel(entry.method)! })
     if (entry.note) rows.push({ k: 'Note', v: entry.note })
   } else if (entry.type === 'return') {
     if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })
@@ -48,6 +58,8 @@ export function detailRows(entry: FeedItem): { k: string; v: string }[] {
     if (entry.outright) rows.push({ k: 'Surrender', v: 'Customer surrendered cylinder' })
   } else if (entry.type === 'payment') {
     rows.push({ k: 'Amount', v: formatCurrency(entry.amount) })
+    if (entry.method) rows.push({ k: 'Method', v: methodLabel(entry.method)! })
+    if (entry.note) rows.push({ k: 'Note', v: entry.note })
   }
   return rows
 }

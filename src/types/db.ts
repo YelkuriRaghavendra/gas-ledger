@@ -142,6 +142,9 @@ export interface ActivityEntry {
   updated_by: string | null
   outright: boolean
   segment: Segment
+  bill_number: string
+  method: PaymentMethod | null
+  paid: boolean
 }
 
 export interface AgencySettings {

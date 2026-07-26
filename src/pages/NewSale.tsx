@@ -367,12 +367,12 @@ export function NewSale() {
                           onChange={(e) => setSurrender(p.id, e.target.checked)}
                           className="h-[16px] w-[16px] accent-[#E4571B]"
                         />
-                        Customer surrenders cylinder
+                        New connection
                       </label>
                     )}
                     {surrender ? (
                       <p className="mt-2 text-[12px] font-semibold text-muted">
-                        Customer surrendered this cylinder — not counted as empties owed.
+                        New connection — no empties expected from customer.
                       </p>
                     ) : (() => {
                       const e = emptiesOwed(ownedFor(p.id))
