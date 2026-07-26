@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { getMode } from './mode'
+import { getMode, setMode } from './mode'
 
 // Routes each signed-in user to the segment they're allowed to see:
 //   - single-segment staff are pinned to their segment
@@ -16,7 +16,6 @@ export function ModeGate() {
   // shared / mode-neutral — reachable from either side, so the gate leaves
   // them alone.
   const inAccount = location.pathname.startsWith('/account')
-  const inStock = location.pathname === '/stock'
 
   if (loading || !profile) {
     return <div className="flex h-screen items-center justify-center text-ink">Loading…</div>
@@ -24,14 +23,17 @@ export function ModeGate() {
 
   const access = profile.segment_access
 
-  if (inAccount || inStock) return <Outlet />
+  if (inAccount) return <Outlet />
 
   if (access === 'commercial' && (inDomestic || inChooser)) return <Navigate to="/commercial" replace />
   if (access === 'domestic' && !inDomestic) return <Navigate to="/domestic" replace />
 
   if (access === 'both' && !inChooser) {
     const mode = getMode()
-    if (!mode) return <Navigate to="/choose" replace />
+    if (!mode) {
+      setMode('commercial')
+      return <Navigate to="/commercial" replace />
+    }
     if (mode === 'domestic' && !inDomestic) return <Navigate to="/domestic" replace />
     if (mode === 'commercial' && !inCommercial) return <Navigate to="/commercial" replace />
   }

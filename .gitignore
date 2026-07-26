@@ -5,3 +5,6 @@ dist
 *.tsbuildinfo
 .claude/
 .superpowers/
+.agents/
+backup-*.sql
+skills-lock.json

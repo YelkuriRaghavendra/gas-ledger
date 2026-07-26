@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { TransactionType } from '../types/db'
+import type { BillType } from '../types/db'
 
 // A gas cylinder that inherits the surrounding tint colour via currentColor.
 function CylinderGlyph() {
@@ -11,14 +11,14 @@ function CylinderGlyph() {
   )
 }
 
-export function getActivityIcon(type: TransactionType | 'purchase'): ReactNode {
+export function getActivityIcon(type: BillType | 'purchase'): ReactNode {
   if (type === 'sale') return <CylinderGlyph />
   if (type === 'return') return '↩'
   if (type === 'purchase') return '🚚'
   return '₹'
 }
 
-export function getActivityTint(type: TransactionType | 'purchase'): { bg: string; color: string } {
+export function getActivityTint(type: BillType | 'purchase'): { bg: string; color: string } {
   if (type === 'sale') return { bg: '#FBEDE4', color: '#E4571B' }
   if (type === 'return') return { bg: '#EAF4EE', color: '#2E8B57' }
   if (type === 'purchase') return { bg: '#FDE7C9', color: '#B26A00' }

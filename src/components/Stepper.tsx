@@ -4,12 +4,13 @@ interface StepperProps {
   value: number
   onChange: (value: number) => void
   min?: number
+  max?: number
   variant?: 'primary' | 'secondary'
   tone?: 'cream' | 'surface'
   size?: 'md' | 'sm'
 }
 
-export function Stepper({ value, onChange, min = 0, variant = 'primary', tone = 'cream', size = 'md' }: StepperProps) {
+export function Stepper({ value, onChange, min = 0, max, variant = 'primary', tone = 'cream', size = 'md' }: StepperProps) {
   const [text, setText] = useState(String(value))
 
   useEffect(() => {
@@ -20,7 +21,8 @@ export function Stepper({ value, onChange, min = 0, variant = 'primary', tone = 
     const digits = raw.replace(/\D/g, '')
     setText(digits)
     if (digits === '') return
-    onChange(Math.max(min, Number(digits)))
+    const clamped = max !== undefined ? Math.min(max, Math.max(min, Number(digits))) : Math.max(min, Number(digits))
+    onChange(clamped)
   }
 
   function handleBlur() {

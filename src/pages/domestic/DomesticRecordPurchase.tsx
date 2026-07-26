@@ -1,16 +1,18 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
 import { Stepper } from '../../components/Stepper'
 import { combineDateWithNow, formatCurrency, todayInputValue } from '../../utils/format'
 import { ChevronLeftIcon } from '../../components/icons'
+import type { PurchaseLine } from '../../types/db'
+import { nextPoNumber } from '../../utils/billNumber'
 
-// Stock received from the plant/supplier — one bill, many items.
-// Cylinders also record how many empties went back on the truck.
 export function DomesticRecordPurchase() {
   const navigate = useNavigate()
+  const { billId } = useParams<{ billId?: string }>()
+  const editing = Boolean(billId)
   const { session } = useAuth()
   const { data: allProducts } = useProducts('domestic')
   const products = allProducts.filter((p) => p.kind !== 'service')
@@ -22,6 +24,44 @@ export function DomesticRecordPurchase() {
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [editLoaded, setEditLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!billId || products.length === 0 || editLoaded) return
+    supabase
+      .from('purchase_orders')
+      .select('*, purchase_lines(*)')
+      .eq('id', Number(billId))
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        const order = data as any
+        const lines = (order.purchase_lines ?? []) as PurchaseLine[]
+        const d = new Date(order.created_at)
+        setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+
+        const newQty: Record<number, number> = {}
+        const newEmpties: Record<number, number> = {}
+        const newPrice: Record<number, string> = {}
+        const newMatch: Record<number, boolean> = {}
+
+        for (const line of lines) {
+          newQty[line.product_id] = line.qty
+          newEmpties[line.product_id] = line.empties_given
+          const perUnit = line.qty > 0 ? Math.round(line.amount / line.qty) : 0
+          newPrice[line.product_id] = perUnit > 0 ? String(perUnit) : ''
+          const product = products.find((p) => p.id === line.product_id)
+          if (product?.kind === 'cylinder') {
+            newMatch[line.product_id] = line.empties_given === line.qty
+          }
+        }
+        setQtyByProduct(newQty)
+        setEmptiesByProduct(newEmpties)
+        setPriceByProduct((prev) => ({ ...prev, ...newPrice }))
+        setMatchByProduct(newMatch)
+        setEditLoaded(true)
+      })
+  }, [billId, products, editLoaded])
 
   useEffect(() => {
     setPriceByProduct((prev) => {
@@ -71,20 +111,65 @@ export function DomesticRecordPurchase() {
 
     setSaving(true)
     setError(null)
-    const billId = crypto.randomUUID()
     const timestamp = combineDateWithNow(date)
-    const rows = lines.map((l) => ({
+    const totalAmount = lines.reduce((sum, l) => sum + l.qty * l.price, 0)
+
+    if (editing) {
+      const orderId = Number(billId)
+      await supabase.from('purchase_lines').delete().eq('purchase_order_id', orderId)
+      await supabase
+        .from('purchase_orders')
+        .update({ total_amount: totalAmount, created_at: timestamp, updated_by: session?.user.id })
+        .eq('id', orderId)
+      const lineRows = lines.map((l) => ({
+        purchase_order_id: orderId,
+        product_id: l.product.id,
+        qty: l.qty,
+        empties_given: l.empties,
+        amount: l.qty * l.price,
+        created_by: session?.user.id,
+        created_at: timestamp,
+      }))
+      const { error } = await supabase.from('purchase_lines').insert(lineRows)
+      setSaving(false)
+      if (error) {
+        setError(error.message)
+        return
+      }
+      navigate('/domestic/purchases')
+      return
+    }
+
+    const poNumber = await nextPoNumber(timestamp)
+    const { data: order, error: orderErr } = await supabase
+      .from('purchase_orders')
+      .insert({
+        po_number: poNumber,
+        type: 'purchase',
+        total_amount: totalAmount,
+        paid: true,
+        created_by: session?.user.id,
+        created_at: timestamp,
+      })
+      .select('id')
+      .single()
+
+    if (orderErr || !order) {
+      setSaving(false)
+      setError(orderErr?.message ?? 'Failed to create purchase order')
+      return
+    }
+
+    const lineRows = lines.map((l) => ({
+      purchase_order_id: order.id,
       product_id: l.product.id,
       qty: l.qty,
       empties_given: l.empties,
       amount: l.qty * l.price,
-      paid: true,
-      method: null,
-      bill_id: billId,
       created_by: session?.user.id,
       created_at: timestamp,
     }))
-    const { error } = await supabase.from('purchases').insert(rows)
+    const { error } = await supabase.from('purchase_lines').insert(lineRows)
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -101,7 +186,7 @@ export function DomesticRecordPurchase() {
       <Link to="/domestic/purchases" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Back
       </Link>
-      <h1 className="mb-[18px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Stock in</h1>
+      <h1 className="mb-[18px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit stock in' : 'Stock in'}</h1>
 
       <form onSubmit={handleSubmit}>
         <div className="rounded-[24px] bg-surface p-5 shadow-card">
@@ -189,7 +274,7 @@ export function DomesticRecordPurchase() {
           disabled={saving}
           className="mt-4 h-[56px] w-full rounded-[16px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] text-[15px] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save stock in'}
+          {saving ? 'Saving…' : editing ? 'Update stock in' : 'Save stock in'}
         </button>
       </form>
     </div>

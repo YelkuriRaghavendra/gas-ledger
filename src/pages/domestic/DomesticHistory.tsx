@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
@@ -44,12 +45,17 @@ function groupByDay(bills: DomesticBill[]): DayGroup[] {
 }
 
 function billRows(bill: DomesticBill, productNameById: Map<number, string>) {
-  const rows = bill.lines.map((l) => ({
-    k: `${l.qty} × ${l.product_id !== null ? productNameById.get(l.product_id) ?? 'item' : 'item'}`,
-    v: formatCurrency(l.amount),
-  }))
+  const rows: { k: string; v: string }[] = []
+  rows.push({ k: 'Bill number', v: bill.billNumber })
+  if (bill.method) rows.push({ k: 'Payment', v: bill.method === 'upi' ? 'UPI' : bill.method === 'vitran' ? 'Vitran' : 'Cash' })
+  for (const l of bill.lines) {
+    const name = l.product_id !== null ? productNameById.get(l.product_id) ?? 'item' : 'item'
+    const delivered = l.delivered ? '' : ' (pending)'
+    rows.push({ k: `${l.qty} × ${name}${delivered}`, v: formatCurrency(l.amount) })
+  }
   const empties = bill.lines.reduce((sum, l) => sum + l.empties, 0)
   if (empties > 0) rows.push({ k: 'Empties received', v: String(empties) })
+  if (bill.note) rows.push({ k: 'Note', v: bill.note })
   return rows
 }
 
@@ -81,8 +87,7 @@ export function DomesticHistory() {
 
   async function handleDelete(bill: DomesticBill) {
     if (!confirm('Delete this bill?')) return
-    const ids = bill.lines.map((l) => l.id)
-    const { error } = await supabase.from('transactions').delete().in('id', ids)
+    const { error } = await supabase.from('bills').delete().eq('id', bill.billId)
     if (!error) {
       setSelected(null)
       refresh()
@@ -167,13 +172,22 @@ export function DomesticHistory() {
           updatedBy={billUpdatedBy(selected) ? profileNames.get(billUpdatedBy(selected)!) : undefined}
           actions={
             isOwner ? (
-              <button
-                type="button"
-                onClick={() => handleDelete(selected)}
-                className="flex h-[48px] w-full items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
-              >
-                Delete
-              </button>
+              <>
+                <Link
+                  to={`/domestic/bill/${selected.billId}/edit`}
+                  onClick={() => setSelected(null)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] font-bold text-white shadow-[0_10px_22px_-12px_rgba(46,139,87,0.7)] transition active:scale-[0.99]"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(selected)}
+                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
+                >
+                  Delete
+                </button>
+              </>
             ) : undefined
           }
         />

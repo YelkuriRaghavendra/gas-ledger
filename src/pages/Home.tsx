@@ -35,9 +35,9 @@ export function Home() {
     if (!confirm('Delete this entry?')) return
     setSelected(null)
     if (entry.type === 'purchase') {
-      await supabase.from('purchases').delete().eq('id', entry.id)
+      await supabase.from('purchase_orders').delete().eq('id', entry.id)
     } else {
-      await supabase.from('transactions').delete().eq('id', entry.id)
+      await supabase.from('bills').delete().eq('id', entry.id)
     }
     refreshActivity()
   }
@@ -58,7 +58,7 @@ export function Home() {
       emptiesOut: emptiesOutByProduct.get(p.id) ?? 0,
       full: g?.full_cylinders ?? 0,
       empty: g?.empty_cylinders ?? 0,
-      capacity: g?.godown_capacity ?? null,
+      capacity: null,
     }
   })
 

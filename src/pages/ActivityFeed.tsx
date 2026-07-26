@@ -23,9 +23,9 @@ export function ActivityFeed() {
     if (!confirm('Delete this entry?')) return
     setSelected(null)
     if (entry.type === 'purchase') {
-      await supabase.from('purchases').delete().eq('id', entry.id)
+      await supabase.from('purchase_orders').delete().eq('id', entry.id)
     } else {
-      await supabase.from('transactions').delete().eq('id', entry.id)
+      await supabase.from('bills').delete().eq('id', entry.id)
     }
     refresh()
   }

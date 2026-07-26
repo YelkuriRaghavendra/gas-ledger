@@ -3,17 +3,18 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
-import { useTransactions } from '../hooks/useTransactions'
+import { useBills } from '../hooks/useBills'
 import { combineDateWithNow, dateInputValue, formatCurrency, todayInputValue } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
 import type { PaymentMethod } from '../types/db'
+import { nextBillNumber } from '../utils/billNumber'
 
 export function RecordPayment() {
-  const { id, txId } = useParams()
+  const { id, billId } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
   const { data: customers } = useCustomerBalances()
-  const { data: transactions } = useTransactions(id ? Number(id) : 0)
+  const { data: bills } = useBills(id ? Number(id) : 0)
   const [customerId, setCustomerId] = useState<number | null>(id ? Number(id) : null)
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(todayInputValue())
@@ -24,7 +25,7 @@ export function RecordPayment() {
   const [loadedEdit, setLoadedEdit] = useState(false)
   const [originalAmount, setOriginalAmount] = useState(0)
 
-  const editing = Boolean(txId)
+  const editing = Boolean(billId)
 
   useEffect(() => {
     if (customerId === null && customers.length > 0) setCustomerId(customers[0].id)
@@ -32,15 +33,15 @@ export function RecordPayment() {
 
   useEffect(() => {
     if (!editing || loadedEdit) return
-    const tx = transactions.find((t) => t.id === Number(txId))
-    if (!tx) return
-    setAmount(String(tx.amount))
-    setOriginalAmount(tx.amount)
-    setDate(dateInputValue(tx.created_at))
-    setMethod(tx.method ?? 'cash')
-    setNote(tx.note ?? '')
+    const bill = bills.find((b) => b.id === Number(billId))
+    if (!bill) return
+    setAmount(String(bill.total_amount))
+    setOriginalAmount(bill.total_amount)
+    setDate(dateInputValue(bill.created_at))
+    setMethod(bill.method ?? 'cash')
+    setNote(bill.note ?? '')
     setLoadedEdit(true)
-  }, [editing, loadedEdit, transactions, txId])
+  }, [editing, loadedEdit, bills, billId])
 
   const customer = customers.find((c) => c.id === customerId)
   const currentlyDue = (customer?.amount_due ?? 0) + originalAmount
@@ -64,9 +65,9 @@ export function RecordPayment() {
 
     if (editing) {
       const { error } = await supabase
-        .from('transactions')
-        .update({ amount: amountNum, created_at: timestamp, method, note: note.trim() || null, updated_by: session?.user.id })
-        .eq('id', Number(txId))
+        .from('bills')
+        .update({ total_amount: amountNum, created_at: timestamp, method, note: note.trim() || null, updated_by: session?.user.id })
+        .eq('id', Number(billId))
       setSaving(false)
       if (error) {
         setError(error.message)
@@ -76,16 +77,18 @@ export function RecordPayment() {
       return
     }
 
-    const { error } = await supabase.from('transactions').insert({
+    const billNumber = await nextBillNumber()
+    const { error } = await supabase.from('bills').insert({
+      bill_number: billNumber,
       customer_id: customerId,
       type: 'payment',
-      qty: 0,
-      empties: 0,
-      amount: amountNum,
+      total_amount: amountNum,
+      paid: true,
       created_by: session?.user.id,
       created_at: timestamp,
       method,
       note: note.trim() || null,
+      surrender: false,
     })
     setSaving(false)
     if (error) {

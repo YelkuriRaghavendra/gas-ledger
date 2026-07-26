@@ -9,7 +9,8 @@ export interface Profile {
   segment_access: SegmentAccess
 }
 
-export type TransactionType = 'sale' | 'return' | 'payment'
+export type BillType = 'sale' | 'return' | 'payment' | 'opening'
+export type PurchaseOrderType = 'purchase' | 'opening'
 export type PaymentMethod = 'cash' | 'upi' | 'vitran'
 export type ProductKind = 'cylinder' | 'accessory' | 'service'
 
@@ -23,12 +24,12 @@ export interface Product {
   name: string
   price: number
   price_options: PriceOption[]
-  godown_capacity: number | null
   segment: Segment
   kind: ProductKind
   unit: string
   active: boolean
   is_new_connection: boolean
+  pending_delivery: boolean
   sort_order: number
   created_at: string
 }
@@ -38,28 +39,63 @@ export interface Customer {
   name: string
   phone: string | null
   address: string | null
-  starting_empties_owed: number
-  starting_empties_product_id: number
   created_at: string
 }
 
-export interface Transaction {
+export interface Bill {
   id: number
+  bill_number: string
   customer_id: number | null
-  type: TransactionType
-  product_id: number | null
-  qty: number
-  empties: number
-  amount: number
+  type: BillType
+  total_amount: number
   paid: boolean
   method: PaymentMethod | null
   note: string | null
-  bill_id: string | null
+  surrender: boolean
   created_by: string | null
   created_at: string
   updated_at: string
   updated_by: string | null
-  outright: boolean
+}
+
+export interface BillLine {
+  id: number
+  bill_id: number
+  product_id: number
+  qty: number
+  empties: number
+  amount: number
+  delivered: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  updated_by: string | null
+}
+
+export interface PurchaseOrder {
+  id: number
+  po_number: string
+  type: PurchaseOrderType
+  total_amount: number
+  paid: boolean
+  note: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  updated_by: string | null
+}
+
+export interface PurchaseLine {
+  id: number
+  purchase_order_id: number
+  product_id: number
+  qty: number
+  empties_given: number
+  amount: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  updated_by: string | null
 }
 
 export interface CustomerBalance {
@@ -67,7 +103,6 @@ export interface CustomerBalance {
   name: string
   phone: string | null
   address: string | null
-  starting_empties_owed: number
   amount_due: number
 }
 
@@ -80,29 +115,12 @@ export interface CustomerProductBalance {
   empties_outstanding: number
 }
 
-export interface Purchase {
-  id: number
-  product_id: number
-  qty: number
-  empties_given: number
-  amount: number
-  paid: boolean
-  method: PaymentMethod | null
-  note: string | null
-  bill_id: string | null
-  created_by: string | null
-  created_at: string
-  updated_at: string
-  updated_by: string | null
-}
-
 export interface GodownStock {
   product_id: number
   product_name: string
   segment: Segment
   kind: ProductKind
   unit: string
-  godown_capacity: number | null
   full_cylinders: number
   empty_cylinders: number
 }
@@ -140,12 +158,6 @@ export interface AgencySettings {
   updated_at: string
 }
 
-// --- Phase 3: reporting & insights ---
-// DailyPurchaseSummary/purchase figures below describe rows from a view that
-// reads Phase 2's `purchases` table. Defined locally (not imported from a
-// Phase 2 types module) since this worktree doesn't carry Phase 2's
-// TypeScript types — only the SQL view may or may not exist at runtime. See
-// useDailySummary for how a missing view degrades gracefully.
 export interface DailyProductSummary {
   day: string
   product_id: number

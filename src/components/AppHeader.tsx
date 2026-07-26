@@ -5,10 +5,7 @@ import { InitialsBadge } from './InitialsBadge'
 import { SwapIcon } from './icons'
 import { setMode } from '../mode/mode'
 
-export type HeaderView = 'commercial' | 'domestic' | 'stock'
-
-// The switch button cycles through the three views in order.
-const ORDER: HeaderView[] = ['commercial', 'stock', 'domestic']
+export type HeaderView = 'commercial' | 'domestic'
 
 const initials = (s: string) => s.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -19,18 +16,16 @@ export function AppHeader({ view, onOpenAccount, title }: { view: HeaderView; on
   const canSwitch = profile?.segment_access === 'both'
   const biz = data?.business_name || 'Cylinder Tracker'
 
-  const label = view === 'commercial' ? 'Commercial' : view === 'domestic' ? 'Domestic' : 'Godown Inventory'
+  const label = view === 'commercial' ? 'Commercial' : 'Domestic'
   const badge =
     view === 'commercial'
       ? 'bg-gradient-to-br from-accentSoft to-accent'
-      : view === 'domestic'
-      ? 'bg-gradient-to-br from-[#3DA06A] to-[#2E8B57]'
-      : 'bg-gradient-to-br from-inkSoft to-ink'
+      : 'bg-gradient-to-br from-[#3DA06A] to-[#2E8B57]'
 
   function switchSide() {
-    const next = ORDER[(ORDER.indexOf(view) + 1) % ORDER.length]
-    if (next !== 'stock') setMode(next)
-    navigate(next === 'commercial' ? '/' : next === 'domestic' ? '/domestic' : '/stock', { replace: true })
+    const next = view === 'commercial' ? 'domestic' : 'commercial'
+    setMode(next)
+    navigate(next === 'commercial' ? '/' : '/domestic', { replace: true })
   }
 
   return (

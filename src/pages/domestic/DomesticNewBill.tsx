@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useProducts } from '../../hooks/useProducts'
@@ -7,13 +7,13 @@ import { useBundleComponents } from '../../hooks/useBundleComponents'
 import { NewBillTable, type BillRow } from '../../components/NewBillTable'
 import { combineDateWithNow, todayInputValue } from '../../utils/format'
 import { ChevronLeftIcon } from '../../components/icons'
-import type { PaymentMethod } from '../../types/db'
+import type { PaymentMethod, BillLine } from '../../types/db'
+import { nextBillNumber } from '../../utils/billNumber'
 
-// One counter bill, many items. No customer, no credit — domestic
-// sales are always settled on the spot. Payment method (cash, UPI,
-// or vitran) is recorded per bill for reporting parity with commercial sales.
 export function DomesticNewBill() {
   const navigate = useNavigate()
+  const { billId } = useParams<{ billId?: string }>()
+  const editing = Boolean(billId)
   const { session } = useAuth()
   const { data: products } = useProducts('domestic')
   const { data: bundles } = useBundleComponents()
@@ -46,6 +46,56 @@ export function DomesticNewBill() {
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [editLoaded, setEditLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!billId || products.length === 0 || editLoaded) return
+    supabase
+      .from('bills')
+      .select('*, bill_lines(*)')
+      .eq('id', Number(billId))
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        const bill = data as any
+        const lines = (bill.bill_lines ?? []) as BillLine[]
+        setMethod(bill.method ?? 'cash')
+        setNote(bill.note ?? '')
+        const d = new Date(bill.created_at)
+        setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+
+        const newQty: Record<string, number> = {}
+        const newEmpties: Record<string, number> = {}
+        const newPrice: Record<string, string> = {}
+        const newMatch: Record<string, boolean> = {}
+
+        for (const line of lines) {
+          if (!line.product_id) continue
+          const product = products.find((p) => p.id === line.product_id)
+          if (!product) continue
+          const perUnit = line.qty > 0 ? Math.round(line.amount / line.qty) : 0
+          const opts = product.price_options ?? []
+          let key: string
+          if (opts.length === 0) {
+            key = String(product.id)
+          } else {
+            const optIdx = opts.findIndex((o) => o.amount === perUnit)
+            key = optIdx >= 0 ? `${product.id}#${optIdx}` : `${product.id}#d`
+          }
+          newQty[key] = (newQty[key] ?? 0) + line.qty
+          newEmpties[key] = (newEmpties[key] ?? 0) + line.empties
+          newPrice[key] = String(perUnit || product.price)
+          if (product.kind === 'cylinder') {
+            newMatch[key] = newEmpties[key] === newQty[key]
+          }
+        }
+        setQtyByKey(newQty)
+        setEmptiesByKey(newEmpties)
+        setPriceByKey((prev) => ({ ...prev, ...newPrice }))
+        setMatchByKey(newMatch)
+        setEditLoaded(true)
+      })
+  }, [billId, products, editLoaded])
 
   useEffect(() => {
     setPriceByKey((prev) => {
@@ -103,29 +153,96 @@ export function DomesticNewBill() {
 
     setSaving(true)
     setError(null)
-    const billId = crypto.randomUUID()
     const timestamp = combineDateWithNow(date)
-    const txRows = lines.map((l) => ({
-      customer_id: null,
-      type: 'sale' as const,
-      product_id: l.product.id,
-      qty: l.qty,
-      empties: l.empties,
-      amount: l.qty * l.price,
-      paid: true,
-      method,
-      note: note.trim() || null,
-      bill_id: billId,
-      created_by: session?.user.id,
-      created_at: timestamp,
-    }))
-    const { error } = await supabase.from('transactions').insert(txRows)
-    setSaving(false)
-    if (error) {
-      setError(error.message)
-      return
+    const totalAmount = lines.reduce((sum, l) => sum + l.qty * l.price, 0)
+
+    if (editing) {
+      // Update the bill header
+      const { error: updErr } = await supabase
+        .from('bills')
+        .update({
+          total_amount: totalAmount,
+          paid: true,
+          method,
+          note: note.trim() || null,
+          created_at: timestamp,
+        })
+        .eq('id', Number(billId))
+      if (updErr) {
+        setError(updErr.message)
+        setSaving(false)
+        return
+      }
+      // Delete old bill_lines (will reinsert below)
+      const { error: delErr } = await supabase
+        .from('bill_lines')
+        .delete()
+        .eq('bill_id', Number(billId))
+      if (delErr) {
+        setError(delErr.message)
+        setSaving(false)
+        return
+      }
+      // Insert new bill_lines
+      const lineRows = lines.map((l) => ({
+        bill_id: Number(billId),
+        product_id: l.product.id,
+        qty: l.qty,
+        empties: l.empties,
+        amount: l.qty * l.price,
+        delivered: l.product.pending_delivery ? false : l.product.kind !== 'service',
+        created_by: session?.user.id,
+        created_at: timestamp,
+      }))
+      const { error: insErr } = await supabase.from('bill_lines').insert(lineRows)
+      setSaving(false)
+      if (insErr) {
+        setError(insErr.message)
+        return
+      }
+    } else {
+      // Generate bill number
+      const billNumber = await nextBillNumber()
+      // Insert bill header
+      const { data: newBill, error: billErr } = await supabase
+        .from('bills')
+        .insert({
+          bill_number: billNumber,
+          customer_id: null,
+          type: 'sale' as const,
+          total_amount: totalAmount,
+          paid: true,
+          method,
+          note: note.trim() || null,
+          created_by: session?.user.id,
+          created_at: timestamp,
+        })
+        .select('id')
+        .single()
+      if (billErr || !newBill) {
+        setError(billErr?.message ?? 'Failed to create bill')
+        setSaving(false)
+        return
+      }
+      // Insert bill_lines
+      const lineRows = lines.map((l) => ({
+        bill_id: newBill.id,
+        product_id: l.product.id,
+        qty: l.qty,
+        empties: l.empties,
+        amount: l.qty * l.price,
+        delivered: l.product.pending_delivery ? false : l.product.kind !== 'service',
+        created_by: session?.user.id,
+        created_at: timestamp,
+      }))
+      const { error: linesErr } = await supabase.from('bill_lines').insert(lineRows)
+      setSaving(false)
+      if (linesErr) {
+        setError(linesErr.message)
+        return
+      }
     }
-    navigate('/domestic')
+    navigate(editing ? '/domestic/history' : '/domestic')
   }
 
   const fieldInput =
@@ -142,13 +259,13 @@ export function DomesticNewBill() {
     <div className="p-5 pb-10 pt-3">
       <div className="mb-[14px] flex items-center justify-between">
         <Link
-          to="/domestic"
+          to={editing ? '/domestic/history' : '/domestic'}
           aria-label="Back"
           className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-surface text-muted shadow-card"
         >
           <ChevronLeftIcon size={18} />
         </Link>
-        <h1 className="font-display text-[20px] font-bold tracking-[-0.5px] text-ink">New bill</h1>
+        <h1 className="font-display text-[20px] font-bold tracking-[-0.5px] text-ink">{editing ? 'Edit bill' : 'New bill'}</h1>
         <input
           type="date"
           value={date}
@@ -205,7 +322,7 @@ export function DomesticNewBill() {
           disabled={saving}
           className="mt-4 h-[56px] w-full rounded-[16px] bg-gradient-to-br from-[#3DA06A] to-[#2E8B57] text-[15px] font-bold text-white shadow-[0_12px_26px_-10px_rgba(46,139,87,0.65)] transition active:scale-[0.99] disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save bill'}
+          {saving ? 'Saving…' : editing ? 'Update bill' : 'Save bill'}
         </button>
       </form>
     </div>
