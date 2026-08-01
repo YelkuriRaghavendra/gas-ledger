@@ -190,7 +190,7 @@ export function DomesticNewBill() {
         qty: l.qty,
         empties: l.empties,
         amount: l.qty * l.price,
-        delivered: true,
+        delivered: !l.product.pending_delivery,
         created_by: session?.user.id,
         created_at: timestamp,
       }))
@@ -225,7 +225,7 @@ export function DomesticNewBill() {
         qty: l.qty,
         empties: l.empties,
         amount: l.qty * l.price,
-        delivered: true,
+        delivered: !l.product.pending_delivery,
         created_by: session?.user.id,
         created_at: timestamp,
       }))

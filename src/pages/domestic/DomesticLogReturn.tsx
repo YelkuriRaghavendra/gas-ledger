@@ -104,15 +104,17 @@ export function DomesticLogReturn() {
 
           <div className="flex flex-col gap-4">
             {returnableProducts.map((p) => (
-              <div key={p.id} className="flex items-center justify-between">
-                <span className="text-[13px] font-bold text-ink">{p.name}</span>
-                <Stepper
-                  value={qtyByProduct[p.id] ?? 0}
-                  onChange={(v) => setQty(p.id, v)}
-                  min={0}
-                  variant="secondary"
-                  size="sm"
-                />
+              <div key={p.id} className="flex items-center justify-between gap-3">
+                <span className="min-w-[80px] shrink-0 text-[13px] font-bold text-ink">{p.name}</span>
+                <div className="w-[160px] shrink-0">
+                  <Stepper
+                    value={qtyByProduct[p.id] ?? 0}
+                    onChange={(v) => setQty(p.id, v)}
+                    min={0}
+                    variant="secondary"
+                    size="sm"
+                  />
+                </div>
               </div>
             ))}
           </div>
