@@ -7,20 +7,28 @@ function datePrefix(date: Date | string): string {
 
 export async function nextBillNumber(date?: Date | string): Promise<string> {
   const prefix = 'B-' + datePrefix(date ?? new Date())
-  const { count } = await supabase
+  const { data } = await supabase
     .from('bills')
-    .select('id', { count: 'exact', head: true })
+    .select('bill_number')
     .like('bill_number', prefix + '%')
-  const seq = String((count ?? 0) + 1).padStart(4, '0')
+    .order('bill_number', { ascending: false })
+    .limit(1)
+  const last = data?.[0]?.bill_number
+  const lastSeq = last ? parseInt(last.slice(-4), 10) : 0
+  const seq = String(lastSeq + 1).padStart(4, '0')
   return `${prefix}-${seq}`
 }
 
 export async function nextPoNumber(date?: Date | string): Promise<string> {
   const prefix = 'PO-' + datePrefix(date ?? new Date())
-  const { count } = await supabase
+  const { data } = await supabase
     .from('purchase_orders')
-    .select('id', { count: 'exact', head: true })
+    .select('po_number')
     .like('po_number', prefix + '%')
-  const seq = String((count ?? 0) + 1).padStart(4, '0')
+    .order('po_number', { ascending: false })
+    .limit(1)
+  const last = data?.[0]?.po_number
+  const lastSeq = last ? parseInt(last.slice(-4), 10) : 0
+  const seq = String(lastSeq + 1).padStart(4, '0')
   return `${prefix}-${seq}`
 }
