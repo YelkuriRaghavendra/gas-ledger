@@ -282,6 +282,13 @@ select
         join bundle_components bc on bc.bundle_product_id = bl.product_id
         where bc.component_product_id = p.id and b.type = 'sale' and bl.delivered
       ), 0)
+    + coalesce((
+        select sum(bl.qty)
+        from bill_lines bl
+        join bills b on b.id = bl.bill_id
+        join products pr on pr.id = bl.product_id
+        where bl.product_id = p.id and b.type = 'return' and pr.kind != 'cylinder'
+      ), 0)
     as full_cylinders,
   (coalesce((
       select sum(bl.empties)
@@ -304,12 +311,15 @@ select
         select sum(bl.qty)
         from bill_lines bl
         join bills b on b.id = bl.bill_id
-        where bl.product_id = p.id and b.type = 'return'
+        join products pr on pr.id = bl.product_id
+        where bl.product_id = p.id and b.type = 'return' and pr.kind = 'cylinder'
       ), 0))
-    - coalesce(sum(pl.empties_given), 0)
+    + coalesce(sum(pl.empties_given) filter (where po.type = 'opening'), 0)
+    - coalesce(sum(pl.empties_given) filter (where po.type != 'opening'), 0)
     as empty_cylinders
 from products p
 left join purchase_lines pl on pl.product_id = p.id
+left join purchase_orders po on po.id = pl.purchase_order_id
 where p.active
 group by p.id, p.name, p.segment, p.kind, p.unit;
 

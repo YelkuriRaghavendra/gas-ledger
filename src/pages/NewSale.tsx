@@ -10,7 +10,7 @@ import { Stepper } from '../components/Stepper'
 import { combineDateWithNow, dateInputValue, emptiesOwed, formatCurrency, todayInputValue } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
 import type { PaymentMethod } from '../types/db'
-import { nextBillNumber } from '../utils/billNumber'
+import { insertBillWithRetry } from '../utils/billNumber'
 
 export function NewSale() {
   const { id, billId } = useParams()
@@ -205,11 +205,9 @@ export function NewSale() {
     }
 
     // INSERT: create bill header first, then bill_lines
-    const billNumber = await nextBillNumber()
-    const { data: billRow, error: billError } = await supabase
-      .from('bills')
-      .insert({
-        bill_number: billNumber,
+    let billRow: { id: number }
+    try {
+      billRow = await insertBillWithRetry({
         customer_id: customerId,
         type: 'sale' as const,
         total_amount: totalAmount,
@@ -220,9 +218,7 @@ export function NewSale() {
         created_by: session?.user.id,
         created_at: timestamp,
       })
-      .select('id')
-      .single()
-    if (billError || !billRow) {
+    } catch (billError: any) {
       setSaving(false)
       setError(billError?.message ?? 'Failed to create bill')
       return

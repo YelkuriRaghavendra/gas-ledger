@@ -9,7 +9,7 @@ import { useBills } from '../hooks/useBills'
 import { Stepper } from '../components/Stepper'
 import { ChevronLeftIcon } from '../components/icons'
 import { combineDateWithNow, dateInputValue, emptiesOwed, todayInputValue } from '../utils/format'
-import { nextBillNumber } from '../utils/billNumber'
+import { insertBillWithRetry } from '../utils/billNumber'
 
 export function LogReturn() {
   const { id, billId } = useParams()
@@ -114,11 +114,9 @@ export function LogReturn() {
       return
     }
 
-    const billNumber = await nextBillNumber(timestamp)
-    const { data: bill, error: billErr } = await supabase
-      .from('bills')
-      .insert({
-        bill_number: billNumber,
+    let bill: { id: number }
+    try {
+      bill = await insertBillWithRetry({
         customer_id: customerId,
         type: 'return',
         total_amount: 0,
@@ -126,11 +124,8 @@ export function LogReturn() {
         surrender: lines.some((l) => l.surrender),
         created_by: session?.user.id,
         created_at: timestamp,
-      })
-      .select('id')
-      .single()
-
-    if (billErr || !bill) {
+      }, timestamp)
+    } catch (billErr: any) {
       setSaving(false)
       setError(billErr?.message ?? 'Failed to create bill')
       return

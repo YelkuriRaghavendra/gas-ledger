@@ -28,6 +28,7 @@ import { DomesticRecordPurchase } from './pages/domestic/DomesticRecordPurchase'
 import { DomesticHistory } from './pages/domestic/DomesticHistory'
 import { DomesticCombos } from './pages/domestic/DomesticCombos'
 import { DomesticPendingDeliveries } from './pages/domestic/DomesticPendingDeliveries'
+import { DomesticLogReturn } from './pages/domestic/DomesticLogReturn'
 
 export default function App() {
   const location = useLocation()
@@ -76,6 +77,7 @@ export default function App() {
             <Route path="/domestic/purchases" element={<DomesticPurchases />} />
             <Route path="/domestic/purchases/new" element={<DomesticRecordPurchase />} />
             <Route path="/domestic/purchases/:billId/edit" element={<DomesticRecordPurchase />} />
+            <Route path="/domestic/return" element={<DomesticLogReturn />} />
             <Route path="/domestic/history" element={<DomesticHistory />} />
             <Route path="/domestic/pending-deliveries" element={<DomesticPendingDeliveries />} />
             <Route path="/domestic/combos" element={<DomesticCombos />} />

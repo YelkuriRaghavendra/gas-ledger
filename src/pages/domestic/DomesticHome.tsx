@@ -7,6 +7,7 @@ import { useGodownStock } from '../../hooks/useGodownStock'
 import { useDomesticSales, type DomesticBill } from '../../hooks/useDomesticSales'
 import { useProfiles } from '../../hooks/useProfiles'
 import { formatCurrency, formatDate, formatUpdated } from '../../utils/format'
+import { getActivityIcon, getActivityTint } from '../../utils/activityIcon'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
@@ -159,13 +160,21 @@ export function DomesticHome() {
               </Link>
             </div>
             <ul className="flex flex-col gap-[10px]">
-              {bills.map((b) => (
+              {bills.map((b) => {
+                const tint = getActivityTint(b.type)
+                return (
                 <li key={b.billId}>
                   <button
                     type="button"
                     onClick={() => setSelected(b)}
-                    className="flex w-full items-center gap-3 rounded-[18px] bg-surface px-[15px] py-[13px] text-left shadow-card transition active:scale-[0.99]"
+                    className="flex w-full items-center gap-[13px] rounded-[18px] bg-surface px-[15px] py-[13px] text-left shadow-card transition active:scale-[0.99]"
                   >
+                    <div
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-lg"
+                      style={{ backgroundColor: tint.bg, color: tint.color }}
+                    >
+                      {getActivityIcon(b.type)}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-bold text-ink">
                         {b.lines
@@ -176,10 +185,11 @@ export function DomesticHome() {
                         {new Date(b.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
-                    <p className="shrink-0 font-display text-[15px] font-bold text-[#2E8B57]">{formatCurrency(b.total)}</p>
+                    <p className="shrink-0 font-display text-[15px] font-bold" style={{ color: tint.color }}>{formatCurrency(b.total)}</p>
                   </button>
                 </li>
-              ))}
+                )
+              })}
               {bills.length === 0 && (
                 <li className="rounded-[18px] bg-surface px-[15px] py-8 text-center text-sm font-medium text-subtle shadow-card">
                   No sales yet today

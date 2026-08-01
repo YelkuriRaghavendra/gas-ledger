@@ -8,7 +8,7 @@ import { NewBillTable, type BillRow } from '../../components/NewBillTable'
 import { combineDateWithNow, todayInputValue } from '../../utils/format'
 import { ChevronLeftIcon } from '../../components/icons'
 import type { PaymentMethod, BillLine } from '../../types/db'
-import { nextBillNumber } from '../../utils/billNumber'
+import { insertBillWithRetry } from '../../utils/billNumber'
 
 export function DomesticNewBill() {
   const navigate = useNavigate()
@@ -190,7 +190,7 @@ export function DomesticNewBill() {
         qty: l.qty,
         empties: l.empties,
         amount: l.qty * l.price,
-        delivered: l.product.pending_delivery ? false : l.product.kind !== 'service',
+        delivered: true,
         created_by: session?.user.id,
         created_at: timestamp,
       }))
@@ -201,13 +201,9 @@ export function DomesticNewBill() {
         return
       }
     } else {
-      // Generate bill number
-      const billNumber = await nextBillNumber()
-      // Insert bill header
-      const { data: newBill, error: billErr } = await supabase
-        .from('bills')
-        .insert({
-          bill_number: billNumber,
+      let newBill: { id: number }
+      try {
+        newBill = await insertBillWithRetry({
           customer_id: null,
           type: 'sale' as const,
           total_amount: totalAmount,
@@ -217,9 +213,7 @@ export function DomesticNewBill() {
           created_by: session?.user.id,
           created_at: timestamp,
         })
-        .select('id')
-        .single()
-      if (billErr || !newBill) {
+      } catch (billErr: any) {
         setError(billErr?.message ?? 'Failed to create bill')
         setSaving(false)
         return
@@ -231,7 +225,7 @@ export function DomesticNewBill() {
         qty: l.qty,
         empties: l.empties,
         amount: l.qty * l.price,
-        delivered: l.product.pending_delivery ? false : l.product.kind !== 'service',
+        delivered: true,
         created_by: session?.user.id,
         created_at: timestamp,
       }))

@@ -7,7 +7,7 @@ import { useBills } from '../hooks/useBills'
 import { combineDateWithNow, dateInputValue, formatCurrency, todayInputValue } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
 import type { PaymentMethod } from '../types/db'
-import { nextBillNumber } from '../utils/billNumber'
+import { insertBillWithRetry } from '../utils/billNumber'
 
 export function RecordPayment() {
   const { id, billId } = useParams()
@@ -77,24 +77,24 @@ export function RecordPayment() {
       return
     }
 
-    const billNumber = await nextBillNumber()
-    const { error } = await supabase.from('bills').insert({
-      bill_number: billNumber,
-      customer_id: customerId,
-      type: 'payment',
-      total_amount: amountNum,
-      paid: true,
-      created_by: session?.user.id,
-      created_at: timestamp,
-      method,
-      note: note.trim() || null,
-      surrender: false,
-    })
-    setSaving(false)
-    if (error) {
+    try {
+      await insertBillWithRetry({
+        customer_id: customerId,
+        type: 'payment',
+        total_amount: amountNum,
+        paid: true,
+        created_by: session?.user.id,
+        created_at: timestamp,
+        method,
+        note: note.trim() || null,
+        surrender: false,
+      })
+    } catch (error: any) {
+      setSaving(false)
       setError(error.message)
       return
     }
+    setSaving(false)
     navigate(`/commercial/customers/${customerId}`)
   }
 

@@ -19,6 +19,24 @@ export async function nextBillNumber(date?: Date | string): Promise<string> {
   return `${prefix}-${seq}`
 }
 
+export async function insertBillWithRetry(
+  bill: Record<string, unknown>,
+  date?: Date | string,
+  retries = 3
+): Promise<{ id: number }> {
+  for (let i = 0; i < retries; i++) {
+    const billNumber = await nextBillNumber(date)
+    const { data, error } = await supabase
+      .from('bills')
+      .insert({ ...bill, bill_number: billNumber })
+      .select('id')
+      .single()
+    if (data) return data
+    if (error?.code !== '23505') throw error
+  }
+  throw new Error('Failed to generate unique bill number after retries')
+}
+
 export async function nextPoNumber(date?: Date | string): Promise<string> {
   const prefix = 'PO-' + datePrefix(date ?? new Date())
   const { data } = await supabase
