@@ -171,7 +171,10 @@ begin
     -- though it had been edited (created 3 Sep, "updated" 4 Sep). Callers read
     -- updated_at = created_at as "never edited".
     new.updated_at := new.created_at;
-    if new.updated_by is null then new.updated_by := coalesce(new.created_by, auth.uid()); end if;
+    -- Prefer the real actor over anything the client sent, so a spoofed
+    -- created_by cannot propagate into updated_by. Falls back to the supplied
+    -- value only when there is no auth context (service-role data import).
+    new.updated_by := coalesce(auth.uid(), new.updated_by, new.created_by);
   else
     new.updated_at := now();
     new.updated_by := coalesce(auth.uid(), new.updated_by);
