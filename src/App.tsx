@@ -5,7 +5,6 @@ import { BottomNav } from './components/BottomNav'
 import { DomesticNav } from './components/DomesticNav'
 import { ConnectionBanner } from './components/ConnectionBanner'
 import { Login } from './pages/Login'
-import { ModeSelect } from './pages/ModeSelect'
 import { Home } from './pages/Home'
 import { Customers } from './pages/Customers'
 import { AddCustomer } from './pages/AddCustomer'
@@ -15,7 +14,6 @@ import { LogReturn } from './pages/LogReturn'
 import { RecordPayment } from './pages/RecordPayment'
 import { ActivityFeed } from './pages/ActivityFeed'
 import { BusinessDetails } from './pages/BusinessDetails'
-import { CylinderPricing } from './pages/CylinderPricing'
 import { Purchases } from './pages/Purchases'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { AllStock } from './pages/AllStock'
@@ -33,7 +31,7 @@ import { DomesticLogReturn } from './pages/domestic/DomesticLogReturn'
 export default function App() {
   const location = useLocation()
   const isDomestic = location.pathname.startsWith('/domestic')
-  const hideNav = location.pathname === '/login' || location.pathname === '/choose'
+  const hideNav = location.pathname === '/login'
 
   return (
     <div className="min-h-screen bg-cream pb-16">
@@ -42,8 +40,6 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<ModeGate />}>
-            <Route path="/choose" element={<ModeSelect />} />
-
             {/* Commercial (all under /commercial, mirroring /domestic) */}
             <Route path="/" element={<Navigate to="/commercial" replace />} />
             <Route path="/commercial" element={<Home />} />
@@ -61,7 +57,6 @@ export default function App() {
             <Route path="/commercial/customers/:id/payment/:billId/edit" element={<RecordPayment />} />
             <Route path="/commercial/activity" element={<ActivityFeed />} />
             <Route path="/account/business" element={<BusinessDetails />} />
-            <Route path="/account/pricing" element={<CylinderPricing />} />
             <Route path="/commercial/purchases" element={<Purchases />} />
             <Route path="/commercial/purchases/new" element={<RecordPurchase />} />
             <Route path="/commercial/purchases/:billId/edit" element={<RecordPurchase />} />

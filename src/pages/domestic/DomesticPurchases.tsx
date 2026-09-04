@@ -11,6 +11,7 @@ import { PlusIcon } from '../../components/icons'
 import { AppHeader } from '../../components/AppHeader'
 import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
+import { getActivityIcon } from '../../utils/activityIcon'
 
 function billRows(order: PurchaseOrderWithLines, productNameById: Map<number, string>) {
   const rows = order.purchase_lines.map((l) => ({
@@ -100,7 +101,7 @@ export function DomesticPurchases() {
         <DetailModal
           open={selected !== null}
           onClose={() => setSelected(null)}
-          icon="📦"
+          icon={getActivityIcon('purchase')}
           iconBg="#E7F3EC"
           iconColor="#2E8B57"
           title="Stock received"

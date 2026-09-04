@@ -2,19 +2,11 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getMode, setMode } from './mode'
 
-// Routes each signed-in user to the segment they're allowed to see:
-//   - single-segment staff are pinned to their segment
-//   - owners ('both') pick a mode per session via /choose
-// Wraps all protected routes; assumes ProtectedRoute already ran.
 export function ModeGate() {
   const { profile, loading } = useAuth()
   const location = useLocation()
   const inDomestic = location.pathname.startsWith('/domestic')
   const inCommercial = location.pathname.startsWith('/commercial')
-  const inChooser = location.pathname === '/choose'
-  // Account pages (business details, pricing) and the all-stock screen are
-  // shared / mode-neutral — reachable from either side, so the gate leaves
-  // them alone.
   const inAccount = location.pathname.startsWith('/account')
 
   if (loading || !profile) {
@@ -25,10 +17,10 @@ export function ModeGate() {
 
   if (inAccount) return <Outlet />
 
-  if (access === 'commercial' && (inDomestic || inChooser)) return <Navigate to="/commercial" replace />
+  if (access === 'commercial' && inDomestic) return <Navigate to="/commercial" replace />
   if (access === 'domestic' && !inDomestic) return <Navigate to="/domestic" replace />
 
-  if (access === 'both' && !inChooser) {
+  if (access === 'both') {
     const mode = getMode()
     if (!mode) {
       setMode('commercial')

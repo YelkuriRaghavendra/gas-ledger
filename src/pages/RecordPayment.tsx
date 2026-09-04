@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { AlertDialog } from '../components/AlertDialog'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -21,15 +22,12 @@ export function RecordPayment() {
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [alert, setAlert] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loadedEdit, setLoadedEdit] = useState(false)
   const [originalAmount, setOriginalAmount] = useState(0)
 
   const editing = Boolean(billId)
-
-  useEffect(() => {
-    if (customerId === null && customers.length > 0) setCustomerId(customers[0].id)
-  }, [customers, customerId])
 
   useEffect(() => {
     if (!editing || loadedEdit) return
@@ -50,12 +48,16 @@ export function RecordPayment() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!customerId || amountNum <= 0) {
-      setError('Amount must be greater than zero')
+    if (!customerId) {
+      setAlert('Select a customer')
+      return
+    }
+    if (amountNum <= 0) {
+      setAlert('Amount must be greater than zero')
       return
     }
     if (amountNum > currentlyDue) {
-      setError(`Amount can't exceed the ${formatCurrency(currentlyDue)} currently due.`)
+      setAlert(`Amount can't exceed the ${formatCurrency(currentlyDue)} currently due.`)
       return
     }
     setSaving(true)
@@ -119,10 +121,11 @@ export function RecordPayment() {
               <p className={fieldLabel}>Customer</p>
               <select
                 value={customerId ?? ''}
-                onChange={(e) => setCustomerId(Number(e.target.value))}
+                onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : null)}
                 disabled={editing}
                 className={`${fieldInput} appearance-none disabled:opacity-60`}
               >
+                <option value="">Select customer</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -207,6 +210,12 @@ export function RecordPayment() {
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save payment'}
         </button>
       </form>
+
+      <AlertDialog
+        open={alert !== null}
+        onClose={() => setAlert(null)}
+        title={alert ?? ''}
+      />
     </div>
   )
 }

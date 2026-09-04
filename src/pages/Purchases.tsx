@@ -10,6 +10,7 @@ import { PlusIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
 import { AccountMenu } from '../components/AccountMenu'
 import { DetailModal } from '../components/DetailModal'
+import { getActivityIcon } from '../utils/activityIcon'
 
 function purchaseTitle(po: PurchaseOrderWithLines, productNameById: Map<number, string>) {
   const lines = po.purchase_lines
@@ -86,7 +87,7 @@ export function Purchases() {
                     className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[12px] text-[16px]"
                     style={{ backgroundColor: '#FBEDE4', color: '#E4571B' }}
                   >
-                    📦
+                    {getActivityIcon('purchase')}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-bold text-ink">{purchaseTitle(po, productNameById)}</p>
@@ -111,7 +112,7 @@ export function Purchases() {
         <DetailModal
           open={selected !== null}
           onClose={() => setSelected(null)}
-          icon="📦"
+          icon={getActivityIcon('purchase')}
           iconBg="#FBEDE4"
           iconColor="#E4571B"
           title={purchaseTitle(selected, productNameById)}

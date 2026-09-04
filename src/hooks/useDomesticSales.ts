@@ -7,6 +7,12 @@ export interface DomesticBill {
   billNumber: string
   type: 'sale' | 'return'
   createdAt: string
+  // Audit fields come from the bill header, not the lines: editing a bill
+  // deletes and reinserts its lines, so line timestamps always look freshly
+  // created. The header is updated in place and is the honest record.
+  createdBy: string | null
+  updatedAt: string
+  updatedBy: string | null
   method: 'cash' | 'upi' | 'vitran' | null
   note: string | null
   total: number
@@ -19,6 +25,9 @@ function toBills(bills: (Bill & { bill_lines: BillLine[] })[]): DomesticBill[] {
     billNumber: b.bill_number,
     type: b.type as 'sale' | 'return',
     createdAt: b.created_at,
+    createdBy: b.created_by,
+    updatedAt: b.updated_at,
+    updatedBy: b.updated_by,
     method: b.method,
     note: b.note,
     total: b.total_amount,

@@ -60,18 +60,6 @@ function billRows(bill: DomesticBill, productNameById: Map<number, string>) {
   return rows
 }
 
-function billCreatedAt(bill: DomesticBill) {
-  return bill.lines.reduce((min, l) => (l.created_at < min ? l.created_at : min), bill.lines[0].created_at)
-}
-
-function billUpdatedAt(bill: DomesticBill) {
-  return bill.lines.reduce((max, l) => (l.updated_at > max ? l.updated_at : max), bill.lines[0].updated_at)
-}
-
-function billUpdatedBy(bill: DomesticBill) {
-  return bill.lines.reduce((latest, l) => (l.updated_at > latest.updated_at ? l : latest), bill.lines[0]).updated_by
-}
-
 export function DomesticHistory() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<DomesticBill | null>(null)
@@ -176,10 +164,10 @@ export function DomesticHistory() {
           subtitle={formatDate(selected.createdAt)}
           amount={formatCurrency(selected.total)}
           rows={billRows(selected, productNameById)}
-          created={formatDate(billCreatedAt(selected))}
-          createdBy={selected.lines[0].created_by ? profileNames.get(selected.lines[0].created_by) : undefined}
-          updated={formatUpdated(billUpdatedAt(selected), billCreatedAt(selected))}
-          updatedBy={billUpdatedBy(selected) ? profileNames.get(billUpdatedBy(selected)!) : undefined}
+          created={formatDate(selected.createdAt)}
+          createdBy={selected.createdBy ? profileNames.get(selected.createdBy) : undefined}
+          updated={formatUpdated(selected.updatedAt, selected.createdAt)}
+          updatedBy={selected.updatedBy ? profileNames.get(selected.updatedBy) : undefined}
           actions={
             isOwner ? (
               <>

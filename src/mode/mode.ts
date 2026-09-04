@@ -13,6 +13,3 @@ export function setMode(mode: AppMode) {
   sessionStorage.setItem(KEY, mode)
 }
 
-export function clearMode() {
-  sessionStorage.removeItem(KEY)
-}
