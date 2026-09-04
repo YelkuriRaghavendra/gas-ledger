@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { AlertDialog } from '../components/AlertDialog'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -33,6 +34,7 @@ export function NewSale() {
   const [note, setNote] = useState('')
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
+  const [alert, setAlert] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const [editProductId, setEditProductId] = useState<number | null>(null)
@@ -68,10 +70,6 @@ export function NewSale() {
     })
     setPriceByProduct((s) => ({ ...s, [pid]: String(products.find((p) => p.id === pid)?.price || '') }))
   }
-
-  useEffect(() => {
-    if (customerId === null && customers.length > 0) setCustomerId(customers[0].id)
-  }, [customers, customerId])
 
   useEffect(() => {
     if (editing) return
@@ -128,7 +126,7 @@ export function NewSale() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!customerId) {
-      setError('Select a customer')
+      setAlert('Select a customer')
       return
     }
     const lines = shownProducts
@@ -146,12 +144,12 @@ export function NewSale() {
       .filter((l) => l.qty > 0)
 
     if (lines.length === 0) {
-      setError('Enter a quantity for at least one product')
+      setAlert('Enter a quantity for at least one product')
       return
     }
     for (const l of lines) {
       if (l.price <= 0) {
-        setError(`Enter a price for ${l.name}`)
+        setAlert(`Enter a price for ${l.name}`)
         return
       }
     }
@@ -263,10 +261,11 @@ export function NewSale() {
               <p className={fieldLabel}>Customer</p>
               <select
                 value={customerId ?? ''}
-                onChange={(e) => setCustomerId(Number(e.target.value))}
+                onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : null)}
                 disabled={editing}
                 className={`${fieldInput} appearance-none disabled:opacity-60`}
               >
+                <option value="">Select customer</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -442,6 +441,12 @@ export function NewSale() {
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save sale'}
         </button>
       </form>
+
+      <AlertDialog
+        open={alert !== null}
+        onClose={() => setAlert(null)}
+        title={alert ?? ''}
+      />
     </div>
   )
 }

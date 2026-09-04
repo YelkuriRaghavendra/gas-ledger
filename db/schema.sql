@@ -166,8 +166,12 @@ returns trigger language plpgsql as $$
 begin
   if tg_op = 'INSERT' then
     if new.created_by is null then new.created_by := auth.uid(); end if;
-    new.updated_at := now();
-    if new.updated_by is null then new.updated_by := auth.uid(); end if;
+    -- Mirror created_at rather than stamping now(): created_at is user-supplied
+    -- for backdated entries, so now() would leave a brand-new row looking as
+    -- though it had been edited (created 3 Sep, "updated" 4 Sep). Callers read
+    -- updated_at = created_at as "never edited".
+    new.updated_at := new.created_at;
+    if new.updated_by is null then new.updated_by := coalesce(new.created_by, auth.uid()); end if;
   else
     new.updated_at := now();
     new.updated_by := coalesce(auth.uid(), new.updated_by);

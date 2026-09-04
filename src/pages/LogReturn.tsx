@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { AlertDialog } from '../components/AlertDialog'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -25,6 +26,7 @@ export function LogReturn() {
   const [surrenderByProduct, setSurrenderByProduct] = useState<Record<number, boolean>>({})
   const [date, setDate] = useState(todayInputValue())
   const [error, setError] = useState<string | null>(null)
+  const [alert, setAlert] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const [editBillId, setEditBillId] = useState<number | null>(null)
@@ -33,10 +35,6 @@ export function LogReturn() {
   const [originalQty, setOriginalQty] = useState(0)
   const [loadedEdit, setLoadedEdit] = useState(false)
   const editing = Boolean(billId)
-
-  useEffect(() => {
-    if (customerId === null && customers.length > 0) setCustomerId(customers[0].id)
-  }, [customers, customerId])
 
   useEffect(() => {
     if (!editing || loadedEdit) return
@@ -70,7 +68,7 @@ export function LogReturn() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!customerId) {
-      setError('Select a customer')
+      setAlert('Select a customer')
       return
     }
     const lines = shownProducts
@@ -83,7 +81,7 @@ export function LogReturn() {
       .filter((l) => l.qty > 0)
 
     if (lines.length === 0) {
-      setError('Enter a quantity for at least one size')
+      setAlert('Enter a quantity for at least one size')
       return
     }
 
@@ -165,10 +163,11 @@ export function LogReturn() {
             <p className={fieldLabel}>Customer</p>
             <select
               value={customerId ?? ''}
-              onChange={(e) => setCustomerId(Number(e.target.value))}
+              onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : null)}
               disabled={editing}
               className={`${fieldInput} appearance-none disabled:opacity-60`}
             >
+              <option value="">Select customer</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -254,6 +253,12 @@ export function LogReturn() {
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Save return'}
         </button>
       </form>
+
+      <AlertDialog
+        open={alert !== null}
+        onClose={() => setAlert(null)}
+        title={alert ?? ''}
+      />
     </div>
   )
 }

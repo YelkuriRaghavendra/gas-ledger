@@ -224,15 +224,9 @@ export function DomesticHome() {
             ...(selected.note ? [{ k: 'Note', v: selected.note }] : []),
           ]}
           created={formatDate(selected.createdAt)}
-          createdBy={selected.lines[0].created_by ? profileNames.get(selected.lines[0].created_by) : undefined}
-          updated={formatUpdated(
-            selected.lines.reduce((max, l) => (l.updated_at > max ? l.updated_at : max), selected.lines[0].updated_at),
-            selected.createdAt,
-          )}
-          updatedBy={(() => {
-            const latest = selected.lines.reduce((a, b) => (b.updated_at > a.updated_at ? b : a), selected.lines[0])
-            return latest.updated_by ? profileNames.get(latest.updated_by) : undefined
-          })()}
+          createdBy={selected.createdBy ? profileNames.get(selected.createdBy) : undefined}
+          updated={formatUpdated(selected.updatedAt, selected.createdAt)}
+          updatedBy={selected.updatedBy ? profileNames.get(selected.updatedBy) : undefined}
           actions={
             isOwner ? (
               <>

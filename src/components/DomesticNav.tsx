@@ -31,7 +31,7 @@ export function DomesticNav() {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 flex items-center justify-around border-t border-[#EBE1D1] bg-cream/[.92] px-1 pb-[10px] backdrop-blur-md"
+        className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-[#EBE1D1] bg-cream/[.92] px-1 pb-[10px] backdrop-blur-md"
         style={{ height: 72 }}
       >
         {/* Home */}
