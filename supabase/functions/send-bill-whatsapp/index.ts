@@ -4,6 +4,8 @@ import { buildTemplateParams, templateForBillType, type BillContext } from './te
 
 const GRAPH_VERSION = 'v25.0'
 const META_TIMEOUT_MS = 15_000
+const STALE_CLAIM_MS = 5 * 60 * 1000
+const UNIQUE_VIOLATION = '23505'
 
 // supabase.functions.invoke() sends Authorization + Content-Type, which makes
 // this a non-simple cross-origin request — the browser preflights it with
@@ -20,6 +22,23 @@ interface Outcome {
   reason: string | null
   message_id: string | null
   template: string
+}
+
+// resolve() no longer always hands the handler a bare Outcome to insert.
+// The claim path (see claimSend) writes and updates its own whatsapp_sends
+// row directly, since the whole point of claiming before sending is to
+// hold exactly one row per bill through the send — a second insert from
+// the handler afterwards would either violate the unique index or create a
+// stray duplicate.
+interface ResolveResult {
+  outcome: Outcome
+  // true: resolve() already wrote (and, for the claim path, attempted to
+  // update) the row itself — the handler must NOT insert another one.
+  alreadyRecorded: boolean
+  // Whether the row genuinely reflects `outcome` right now. Only meaningful
+  // when alreadyRecorded is true; the handler computes its own value from
+  // its insert's result otherwise.
+  recorded: boolean
 }
 
 Deno.serve(async (req: Request) => {
@@ -70,36 +89,41 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'bill_not_found' }, 404)
   }
 
-  const outcome = await resolve(db, bill)
-  // supabase-js does not throw on a failed insert — it resolves with
-  // { error }. A send that truly went out must still be reported as such
-  // even if we failed to record it, but the caller needs to know the send
-  // history is now out of sync (e.g. to avoid re-showing "never sent").
-  const { error: insertError } = await db.from('whatsapp_sends').insert({
-    bill_id: billId,
-    status: outcome.status,
-    reason: outcome.reason,
-    message_id: outcome.message_id,
-    template: outcome.template,
-  })
+  const result = await resolve(db, bill)
 
-  return json({ ...outcome, recorded: !insertError }, 200)
+  let recorded = result.recorded
+  if (!result.alreadyRecorded) {
+    // supabase-js does not throw on a failed insert — it resolves with
+    // { error }. A send that truly went out must still be reported as such
+    // even if we failed to record it, but the caller needs to know the send
+    // history is now out of sync (e.g. to avoid re-showing "never sent").
+    const { error: insertError } = await db.from('whatsapp_sends').insert({
+      bill_id: billId,
+      status: result.outcome.status,
+      reason: result.outcome.reason,
+      message_id: result.outcome.message_id,
+      template: result.outcome.template,
+    })
+    recorded = !insertError
+  }
+
+  return json({ ...result.outcome, recorded }, 200)
 })
 
-async function resolve(db: any, bill: any): Promise<Outcome> {
+async function resolve(db: any, bill: any): Promise<ResolveResult> {
   const template = templateForBillType(bill.type)
   if (!template) {
     // bill.type (e.g. 'opening') is not a template name — the column is
     // not null, so record a placeholder instead of a misleading value.
-    return skip('not_applicable', 'none')
+    return { outcome: skip('not_applicable', 'none'), alreadyRecorded: false, recorded: false }
   }
 
-  // Idempotency: an authenticated caller can invoke this repeatedly for the
-  // same bill. Retries of a FAILED or SKIPPED attempt must still go through
-  // (a later retry-button task depends on that), but a bill already marked
-  // 'sent' must never be sent again — that would message a real customer
-  // twice. If we can't even tell whether it was already sent, don't guess:
-  // fail closed rather than risk a duplicate.
+  // Cheap pre-check: avoids pointless work (customer/phone lookups, the
+  // Meta call) on the common repeat case. This is an optimisation only —
+  // the claim further below, backed by the partial unique index
+  // whatsapp_sends_one_live_per_bill, is the real guarantee against a
+  // double-send. This check alone cannot close that race: two concurrent
+  // callers can both see no 'sent' row before either has written anything.
   const { data: existingSent, error: existingSentError } = await db
     .from('whatsapp_sends')
     .select('id')
@@ -108,14 +132,15 @@ async function resolve(db: any, bill: any): Promise<Outcome> {
     .limit(1)
 
   if (existingSentError) {
-    return { status: 'failed', reason: 'data_error', message_id: null, template }
+    return { outcome: failedDataError(template), alreadyRecorded: false, recorded: false }
   }
   if (existingSent && existingSent.length > 0) {
-    return skip('already_sent', template)
+    return { outcome: skip('already_sent', template), alreadyRecorded: false, recorded: false }
   }
 
+  // Guards below never take a claim — a skip is not an in-flight send.
   if (!bill.customer_id) {
-    return skip('no_customer', template)
+    return { outcome: skip('no_customer', template), alreadyRecorded: false, recorded: false }
   }
 
   const { data: customer } = await db
@@ -124,12 +149,12 @@ async function resolve(db: any, bill: any): Promise<Outcome> {
     .eq('id', bill.customer_id)
     .single()
 
-  if (!customer) return skip('no_customer', template)
-  if (!customer.whatsapp_enabled) return skip('disabled', template)
-  if (!customer.phone) return skip('no_phone', template)
+  if (!customer) return { outcome: skip('no_customer', template), alreadyRecorded: false, recorded: false }
+  if (!customer.whatsapp_enabled) return { outcome: skip('disabled', template), alreadyRecorded: false, recorded: false }
+  if (!customer.phone) return { outcome: skip('no_phone', template), alreadyRecorded: false, recorded: false }
 
   const to = normalizeIndianPhone(customer.phone)
-  if (!to) return skip('invalid_phone', template)
+  if (!to) return { outcome: skip('invalid_phone', template), alreadyRecorded: false, recorded: false }
 
   const { data: lines, error: linesError } = await db
     .from('bill_lines')
@@ -152,7 +177,7 @@ async function resolve(db: any, bill: any): Promise<Outcome> {
   // that fails to send is recoverable; a bill that sends the wrong number
   // is not.
   if (linesError || balanceError || productBalancesError) {
-    return { status: 'failed', reason: 'data_error', message_id: null, template }
+    return { outcome: failedDataError(template), alreadyRecorded: false, recorded: false }
   }
 
   const emptiesOutstanding = (productBalances ?? [])
@@ -172,7 +197,112 @@ async function resolve(db: any, bill: any): Promise<Outcome> {
     emptiesOutstanding,
   }
 
-  return await send(to, template, buildTemplateParams(template, ctx))
+  // CLAIM: take a 'pending' row for this bill before calling Meta. See
+  // claimSend for how the partial unique index makes this the actual
+  // guarantee against a double-send, not just the pre-check above.
+  const claim = await claimSend(db, bill.id, template)
+  if (claim.claimId === null) {
+    return { outcome: claim.outcome!, alreadyRecorded: false, recorded: false }
+  }
+
+  const sendOutcome = await send(to, template, buildTemplateParams(template, ctx))
+
+  // Update the row we already claimed rather than inserting a new one — the
+  // claim and the final result must be the same row, or the unique index
+  // would reject a second insert while the pending row still sat there.
+  const { error: updateError } = await db
+    .from('whatsapp_sends')
+    .update({
+      status: sendOutcome.status,
+      reason: sendOutcome.reason,
+      message_id: sendOutcome.message_id,
+    })
+    .eq('id', claim.claimId)
+
+  return { outcome: sendOutcome, alreadyRecorded: true, recorded: !updateError }
+}
+
+interface ClaimResult {
+  // Row id to update once the send finishes, or null if no send should be
+  // attempted — in which case `outcome` is already the final result.
+  claimId: number | null
+  outcome: Outcome | null
+}
+
+async function claimSend(db: any, billId: number, template: string): Promise<ClaimResult> {
+  const { data: claimRow, error: claimError } = await db
+    .from('whatsapp_sends')
+    .insert({ bill_id: billId, status: 'pending', reason: null, message_id: null, template })
+    .select('id')
+    .single()
+
+  if (!claimError && claimRow) {
+    return { claimId: claimRow.id, outcome: null }
+  }
+
+  if (claimError?.code !== UNIQUE_VIOLATION) {
+    // A real DB error, not a conflict with another claim — no row was
+    // written, nothing to send.
+    return { claimId: null, outcome: failedDataError(template) }
+  }
+
+  // Conflict: whatsapp_sends_one_live_per_bill already has a 'pending' or
+  // 'sent' row for this bill. It might be a live in-flight send, an
+  // already-succeeded one, or an abandoned claim left by a process that
+  // crashed between claiming and recording its result.
+  const { data: rows, error: readError } = await db
+    .from('whatsapp_sends')
+    .select('id, status, created_at')
+    .eq('bill_id', billId)
+    .in('status', ['pending', 'sent'])
+    .limit(1)
+
+  if (readError || !rows || rows.length === 0) {
+    // Couldn't read the conflicting row — fail closed rather than guess
+    // whether it's safe to send.
+    return { claimId: null, outcome: failedDataError(template) }
+  }
+
+  const existing = rows[0]
+  const staleThresholdIso = new Date(Date.now() - STALE_CLAIM_MS).toISOString()
+  const looksStale = existing.status === 'pending' &&
+    new Date(existing.created_at).getTime() < Date.now() - STALE_CLAIM_MS
+
+  if (!looksStale) {
+    // Either already sent, or a pending claim that is still fresh (a
+    // concurrent request is genuinely in flight right now). Do not send
+    // again — the Meta call times out at 15s, so nothing genuinely live
+    // can ever be mistaken for stale at the 5-minute mark.
+    return { claimId: null, outcome: skip('already_sent', template) }
+  }
+
+  // Take the abandoned claim over. Repeating the staleness condition in
+  // the UPDATE's own WHERE clause (not just checking it above in
+  // application code) is what makes the takeover atomic: if two requests
+  // race to take over the same abandoned row, only the first to commit
+  // still finds created_at older than the threshold — by the time the
+  // second one's UPDATE runs against the row, the first has already
+  // refreshed created_at, so the second matches zero rows instead of also
+  // believing it won the takeover.
+  const { data: takenOver, error: takeoverError } = await db
+    .from('whatsapp_sends')
+    .update({ created_at: new Date().toISOString() })
+    .eq('id', existing.id)
+    .eq('status', 'pending')
+    .lt('created_at', staleThresholdIso)
+    .select('id')
+
+  if (takeoverError) {
+    return { claimId: null, outcome: failedDataError(template) }
+  }
+  if (!takenOver || takenOver.length === 0) {
+    // Someone else's send resolved (or took the row over) between our read
+    // and this update — it's no longer an abandoned claim. Do not touch it,
+    // do not send.
+    return { claimId: null, outcome: skip('already_sent', template) }
+  }
+
+  return { claimId: existing.id, outcome: null }
 }
 
 async function send(to: string, template: string, params: string[]): Promise<Outcome> {
@@ -235,6 +365,10 @@ async function send(to: string, template: string, params: string[]): Promise<Out
 
 function skip(reason: string, template: string): Outcome {
   return { status: 'skipped', reason, message_id: null, template }
+}
+
+function failedDataError(template: string): Outcome {
+  return { status: 'failed', reason: 'data_error', message_id: null, template }
 }
 
 function json(body: unknown, status: number): Response {

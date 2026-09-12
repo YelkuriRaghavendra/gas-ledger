@@ -102,17 +102,24 @@ create index if not exists idx_bill_lines_bill on public.bill_lines (bill_id);
 
 -- ── whatsapp_sends: WhatsApp bill notification send log ──────
 -- One row per send ATTEMPT, not per bill. A retry appends a row so the
--- history of what failed and why is preserved.
+-- history of what failed and why is preserved. A row is claimed as
+-- 'pending' before the Meta call and updated in place once it resolves, so
+-- the unique index below can guarantee at most one live send per bill.
 create table if not exists public.whatsapp_sends (
   id          bigserial   primary key,
   bill_id     bigint      not null references public.bills(id) on delete cascade,
-  status      text        not null check (status in ('sent', 'failed', 'skipped')),
+  status      text        not null check (status in ('pending', 'sent', 'failed', 'skipped')),
   reason      text,
   message_id  text,
   template    text        not null,
   created_at  timestamptz not null default now()
 );
 create index if not exists idx_whatsapp_sends_bill on public.whatsapp_sends (bill_id);
+-- At most one row that is in-flight or already succeeded per bill. Any
+-- number of 'failed'/'skipped' rows is fine — retries append, as designed.
+create unique index if not exists whatsapp_sends_one_live_per_bill
+  on public.whatsapp_sends (bill_id)
+  where status in ('pending', 'sent');
 
 -- ── purchase_orders: header for purchase / opening ───────────
 -- type=opening: godown opening stock adjustment.

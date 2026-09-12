@@ -186,7 +186,7 @@ export interface DailyPurchaseSummary {
   purchase_amount: number
 }
 
-export type WhatsAppSendStatus = 'sent' | 'failed' | 'skipped'
+export type WhatsAppSendStatus = 'pending' | 'sent' | 'failed' | 'skipped'
 
 export type WhatsAppSkipReason =
   | 'no_customer'
