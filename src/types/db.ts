@@ -194,6 +194,7 @@ export type WhatsAppSkipReason =
   | 'invalid_phone'
   | 'disabled'
   | 'not_applicable'
+  | 'already_sent'
 
 export interface WhatsAppSend {
   id: number

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { buildTemplateParams, templateForBillType, type BillContext } from './templates'
 import { normalizeIndianPhone } from './phone'
 
@@ -14,9 +15,31 @@ const ctx: BillContext = {
 }
 
 describe('edge function copies match the src originals', () => {
+  it('templates.ts is byte-identical to src/utils/whatsappTemplates.ts', () => {
+    expect(readFileSync('supabase/functions/send-bill-whatsapp/templates.ts', 'utf8'))
+      .toBe(readFileSync('src/utils/whatsappTemplates.ts', 'utf8'))
+  })
+
+  it('phone.ts is byte-identical to src/utils/phone.ts', () => {
+    expect(readFileSync('supabase/functions/send-bill-whatsapp/phone.ts', 'utf8'))
+      .toBe(readFileSync('src/utils/phone.ts', 'utf8'))
+  })
+
   it('builds identical sale params', () => {
     expect(buildTemplateParams('bill_sale', ctx)).toEqual([
       'Ramesh Traders', 'S-1042', '13-09-2026', '2 × 19kg Commercial', '4300', '12500',
+    ])
+  })
+
+  it('builds identical payment params', () => {
+    expect(buildTemplateParams('bill_payment', ctx)).toEqual([
+      'Ramesh Traders', '4300', '13-09-2026', 'Cash', '12500',
+    ])
+  })
+
+  it('builds identical return params', () => {
+    expect(buildTemplateParams('bill_return', ctx)).toEqual([
+      'Ramesh Traders', '13-09-2026', '2 × 19kg Commercial', '7',
     ])
   })
 

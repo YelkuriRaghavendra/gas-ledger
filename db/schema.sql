@@ -48,15 +48,18 @@ create table if not exists public.products (
 );
 
 -- ── customers (commercial only) ──────────────────────────────
+-- whatsapp_enabled defaults to false: nothing is sent until a customer is
+-- explicitly opted in.
 create table if not exists public.customers (
-  id          bigserial   primary key,
-  name        text        not null,
-  phone       text,
-  address     text,
-  created_at  timestamptz not null default now(),
-  created_by  uuid,
-  updated_at  timestamptz not null default now(),
-  updated_by  uuid
+  id                bigserial   primary key,
+  name              text        not null,
+  phone             text,
+  address           text,
+  whatsapp_enabled  boolean     not null default false,
+  created_at        timestamptz not null default now(),
+  created_by        uuid,
+  updated_at        timestamptz not null default now(),
+  updated_by        uuid
 );
 
 -- ── bills: header for sale / return / payment / opening ──────
@@ -96,6 +99,20 @@ create table if not exists public.bill_lines (
   updated_by  uuid
 );
 create index if not exists idx_bill_lines_bill on public.bill_lines (bill_id);
+
+-- ── whatsapp_sends: WhatsApp bill notification send log ──────
+-- One row per send ATTEMPT, not per bill. A retry appends a row so the
+-- history of what failed and why is preserved.
+create table if not exists public.whatsapp_sends (
+  id          bigserial   primary key,
+  bill_id     bigint      not null references public.bills(id) on delete cascade,
+  status      text        not null check (status in ('sent', 'failed', 'skipped')),
+  reason      text,
+  message_id  text,
+  template    text        not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_whatsapp_sends_bill on public.whatsapp_sends (bill_id);
 
 -- ── purchase_orders: header for purchase / opening ───────────
 -- type=opening: godown opening stock adjustment.
@@ -211,6 +228,7 @@ alter table public.customers         enable row level security;
 alter table public.bundle_components enable row level security;
 alter table public.bills             enable row level security;
 alter table public.bill_lines        enable row level security;
+alter table public.whatsapp_sends    enable row level security;
 alter table public.purchase_orders   enable row level security;
 alter table public.purchase_lines    enable row level security;
 alter table public.agency_settings   enable row level security;
@@ -246,6 +264,12 @@ create policy "bills_write" on public.bills for all to authenticated using (true
 -- bill_lines
 create policy "bill_lines_read"  on public.bill_lines for select to authenticated using (true);
 create policy "bill_lines_write" on public.bill_lines for all to authenticated using (true) with check (true);
+
+-- whatsapp_sends: read-only for the app. There is deliberately NO insert
+-- policy for authenticated — rows are written solely by the Edge Function
+-- using the service role key, which bypasses RLS. A client able to insert
+-- here could fake a 'sent' status for a bill that was never delivered.
+create policy "whatsapp_sends_read" on public.whatsapp_sends for select to authenticated using (true);
 
 -- purchase_orders
 create policy "purchase_orders_read"  on public.purchase_orders for select to authenticated using (true);

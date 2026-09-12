@@ -5,6 +5,16 @@ import { buildTemplateParams, templateForBillType, type BillContext } from './te
 const GRAPH_VERSION = 'v25.0'
 const META_TIMEOUT_MS = 15_000
 
+// supabase.functions.invoke() sends Authorization + Content-Type, which makes
+// this a non-simple cross-origin request — the browser preflights it with
+// OPTIONS before the real POST. Without these headers on every response
+// (including error paths) the gateway never sees the actual request.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 interface Outcome {
   status: 'sent' | 'failed' | 'skipped'
   reason: string | null
@@ -13,6 +23,10 @@ interface Outcome {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   if (req.method !== 'POST') {
     return json({ error: 'method_not_allowed' }, 405)
   }
@@ -57,7 +71,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const outcome = await resolve(db, bill)
-  await db.from('whatsapp_sends').insert({
+  // supabase-js does not throw on a failed insert — it resolves with
+  // { error }. A send that truly went out must still be reported as such
+  // even if we failed to record it, but the caller needs to know the send
+  // history is now out of sync (e.g. to avoid re-showing "never sent").
+  const { error: insertError } = await db.from('whatsapp_sends').insert({
     bill_id: billId,
     status: outcome.status,
     reason: outcome.reason,
@@ -65,14 +83,37 @@ Deno.serve(async (req: Request) => {
     template: outcome.template,
   })
 
-  return json(outcome, 200)
+  return json({ ...outcome, recorded: !insertError }, 200)
 })
 
 async function resolve(db: any, bill: any): Promise<Outcome> {
   const template = templateForBillType(bill.type)
   if (!template) {
-    return skip('not_applicable', bill.type)
+    // bill.type (e.g. 'opening') is not a template name — the column is
+    // not null, so record a placeholder instead of a misleading value.
+    return skip('not_applicable', 'none')
   }
+
+  // Idempotency: an authenticated caller can invoke this repeatedly for the
+  // same bill. Retries of a FAILED or SKIPPED attempt must still go through
+  // (a later retry-button task depends on that), but a bill already marked
+  // 'sent' must never be sent again — that would message a real customer
+  // twice. If we can't even tell whether it was already sent, don't guess:
+  // fail closed rather than risk a duplicate.
+  const { data: existingSent, error: existingSentError } = await db
+    .from('whatsapp_sends')
+    .select('id')
+    .eq('bill_id', bill.id)
+    .eq('status', 'sent')
+    .limit(1)
+
+  if (existingSentError) {
+    return { status: 'failed', reason: 'data_error', message_id: null, template }
+  }
+  if (existingSent && existingSent.length > 0) {
+    return skip('already_sent', template)
+  }
+
   if (!bill.customer_id) {
     return skip('no_customer', template)
   }
@@ -90,21 +131,29 @@ async function resolve(db: any, bill: any): Promise<Outcome> {
   const to = normalizeIndianPhone(customer.phone)
   if (!to) return skip('invalid_phone', template)
 
-  const { data: lines } = await db
+  const { data: lines, error: linesError } = await db
     .from('bill_lines')
     .select('qty, products(name)')
     .eq('bill_id', bill.id)
 
-  const { data: balance } = await db
+  const { data: balance, error: balanceError } = await db
     .from('customer_balances')
     .select('amount_due')
     .eq('id', customer.id)
     .single()
 
-  const { data: productBalances } = await db
+  const { data: productBalances, error: productBalancesError } = await db
     .from('customer_product_balances')
     .select('empties_outstanding')
     .eq('customer_id', customer.id)
+
+  // A query error here must never fall through to the ?? 0 defaults below —
+  // that would silently tell a real customer their balance is zero. A bill
+  // that fails to send is recoverable; a bill that sends the wrong number
+  // is not.
+  if (linesError || balanceError || productBalancesError) {
+    return { status: 'failed', reason: 'data_error', message_id: null, template }
+  }
 
   const emptiesOutstanding = (productBalances ?? [])
     .reduce((sum: number, r: any) => sum + Number(r.empties_outstanding ?? 0), 0)
@@ -191,6 +240,6 @@ function skip(reason: string, template: string): Outcome {
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
   })
 }
