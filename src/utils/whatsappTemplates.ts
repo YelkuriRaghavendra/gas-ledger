@@ -84,7 +84,7 @@ export function buildTemplateParams(template: TemplateName, ctx: BillContext): s
         name,
         rupees(ctx.totalAmount),
         date,
-        titleCase(ctx.method ?? 'cash'),
+        titleCase(clean(ctx.method ?? 'cash')),
         rupees(ctx.balanceDue),
       ]
     case 'bill_return':

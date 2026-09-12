@@ -81,6 +81,14 @@ describe('buildTemplateParams', () => {
     expect(buildTemplateParams('bill_payment', { ...base, method: null })[3]).toBe('Cash')
   })
 
+  it('never emits a newline or tab from a method containing embedded whitespace', () => {
+    const out = buildTemplateParams('bill_payment', { ...base, method: 'g\npay' })
+    for (const p of out) {
+      expect(p).not.toMatch(/[\n\t]/)
+    }
+    expect(out[3]).toBe('G pay')
+  })
+
   it('builds return params from line quantities', () => {
     expect(buildTemplateParams('bill_return', {
       ...base,
