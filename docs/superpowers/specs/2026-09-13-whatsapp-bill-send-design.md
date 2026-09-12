@@ -38,6 +38,14 @@ Three call sites are wired:
 - `src/pages/RecordPayment.tsx` — payment
 - `src/pages/LogReturn.tsx` — return
 
+Note on return bills: `LogReturn.tsx` writes the returned cylinder count into
+`bill_lines.qty` with `empties` left at `0`, matching how `customer_product_balances`
+computes `returned` (`sum(qty) where type = 'return'`). The `bill_return` template
+therefore reads `qty`, not `empties`.
+
+Note on `RecordPayment.tsx`: it currently discards the result of `insertBillWithRetry`.
+The returned row id must be captured to pass as `bill_id`.
+
 ## Architecture
 
 ```
@@ -214,7 +222,7 @@ matches what the app already displays. Empties outstanding comes from
 | Bill number | `bills.bill_number` verbatim | `S-1042` |
 | Date | `DD-MM-YYYY`, from `bills.created_at` in IST | `13-09-2026` |
 | Items (`bill_sale`) | `qty × product name`, comma-separated, single line | `2 × 19kg Commercial, 1 × 5kg` |
-| Returned (`bill_return`) | same shape, using `bill_lines.empties` | `3 × 19kg Commercial` |
+| Returned (`bill_return`) | same shape, using `bill_lines.qty` | `3 × 19kg Commercial` |
 | Amounts | integer rupees, no decimals, no thousands separator | `4300` |
 | Method | `bills.method` title-cased | `Cash`, `Upi`, `Vitran` |
 
