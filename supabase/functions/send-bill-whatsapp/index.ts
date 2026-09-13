@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { normalizeIndianPhone } from './phone.ts'
 import { buildTemplateParams, templateForBillType, type BillContext } from './templates.ts'
+import { updateWithRetry } from './retryUpdate.ts'
 
 const GRAPH_VERSION = 'v25.0'
 const META_TIMEOUT_MS = 15_000
@@ -210,16 +211,26 @@ async function resolve(db: any, bill: any): Promise<ResolveResult> {
   // Update the row we already claimed rather than inserting a new one — the
   // claim and the final result must be the same row, or the unique index
   // would reject a second insert while the pending row still sat there.
-  const { error: updateError } = await db
-    .from('whatsapp_sends')
-    .update({
-      status: sendOutcome.status,
-      reason: sendOutcome.reason,
-      message_id: sendOutcome.message_id,
-    })
-    .eq('id', claim.claimId)
+  //
+  // Retried up to 3 times: if this update never lands, the row stays
+  // 'pending' even though the message was already delivered, which reads as
+  // a stale claim after STALE_CLAIM_MS — Retry would then take it over and
+  // send a duplicate. Retrying here closes the transient-DB-error case. It
+  // does NOT close a process teardown between the Meta call above and this
+  // update actually committing; that residual window needs a reconciliation
+  // pass and is intentionally not handled here.
+  const recorded = await updateWithRetry(() =>
+    db
+      .from('whatsapp_sends')
+      .update({
+        status: sendOutcome.status,
+        reason: sendOutcome.reason,
+        message_id: sendOutcome.message_id,
+      })
+      .eq('id', claim.claimId),
+  )
 
-  return { outcome: sendOutcome, alreadyRecorded: true, recorded: !updateError }
+  return { outcome: sendOutcome, alreadyRecorded: true, recorded }
 }
 
 interface ClaimResult {

@@ -227,6 +227,41 @@ create trigger trg_stamp_bundle_components before insert or update on public.bun
 create trigger trg_stamp_agency_settings   before insert or update on public.agency_settings   for each row execute function public.stamp_audit();
 
 -- ============================================================
+-- OWNER-ONLY GUARD: customers.whatsapp_enabled
+-- ============================================================
+-- Enforced here rather than via RLS: a restrictive `with check
+-- (whatsapp_enabled = false or <is owner>)` on customers_write would also
+-- block a staff member from editing the phone number of an already-enabled
+-- customer, since the post-update row still has the flag set. A trigger can
+-- compare old vs new and restrict only a change to the flag itself, leaving
+-- every other column staff-editable as before.
+create or replace function public.enforce_whatsapp_enabled_owner_only()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.whatsapp_enabled and not exists (
+      select 1 from public.profiles where id = auth.uid() and role = 'owner'
+    ) then
+      raise exception 'only an owner can enable WhatsApp for a customer';
+    end if;
+  elsif new.whatsapp_enabled is distinct from old.whatsapp_enabled and not exists (
+    select 1 from public.profiles where id = auth.uid() and role = 'owner'
+  ) then
+    raise exception 'only an owner can change whatsapp_enabled';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_whatsapp_enabled_owner_only on public.customers;
+create trigger trg_whatsapp_enabled_owner_only
+  before insert or update on public.customers
+  for each row execute function public.enforce_whatsapp_enabled_owner_only();
+
+-- ============================================================
 -- ROW-LEVEL SECURITY
 -- ============================================================
 alter table public.profiles          enable row level security;
@@ -287,6 +322,9 @@ create policy "purchase_lines_read"  on public.purchase_lines for select to auth
 create policy "purchase_lines_write" on public.purchase_lines for all to authenticated using (true) with check (true);
 
 -- customers
+-- Any authenticated user can write any column here — EXCEPT
+-- whatsapp_enabled, which trg_whatsapp_enabled_owner_only (see the OWNER-ONLY
+-- GUARD section above) restricts to owners regardless of this policy.
 drop policy if exists "customers_read" on public.customers;
 create policy "customers_read" on public.customers for select to authenticated using (true);
 drop policy if exists "customers_write" on public.customers;

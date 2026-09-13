@@ -113,11 +113,18 @@ No insert policy for `authenticated`. Rows are written only by the Edge Function
 uses the service role key and bypasses RLS. This is deliberate: a client able to insert
 `whatsapp_sends` rows could fake a `sent` status for a bill that was never delivered.
 
-**Toggling `whatsapp_enabled` requires the owner role.** The existing
-`owner update customers` policy restricts all customer updates to owners, and this column
-inherits that. Staff accounts can see the toggle state but cannot change it. If staff need
-to enable customers, that policy must be widened deliberately — which is a separate
-decision, not an incidental part of this change.
+**Toggling `whatsapp_enabled` requires the owner role.** There is no `owner update
+customers` RLS policy — `customers_write` allows any authenticated user to update any
+customer column. The restriction is enforced instead by a trigger,
+`trg_whatsapp_enabled_owner_only` (migration `013_whatsapp_enabled_owner_only.sql`,
+folded into `db/schema.sql`), fired `before insert or update on customers`. It compares
+`old.whatsapp_enabled` to `new.whatsapp_enabled` and raises unless the caller is an owner,
+but only when that flag is actually changing — every other column on an already-enabled
+customer (phone, address, name, …) stays staff-editable, which a blanket RLS `with check`
+on the flag could not do without also blocking those ordinary edits. Staff accounts can see
+the toggle state but cannot change it. If staff need to enable customers, that trigger must
+be relaxed deliberately — which is a separate decision, not an incidental part of this
+change.
 
 ## Opt-in UI
 
