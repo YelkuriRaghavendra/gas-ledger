@@ -12,6 +12,7 @@ import { combineDateWithNow, dateInputValue, emptiesOwed, formatCurrency, todayI
 import { ChevronLeftIcon } from '../components/icons'
 import type { PaymentMethod } from '../types/db'
 import { insertBillWithRetry } from '../utils/billNumber'
+import { sendBillWhatsApp } from '../lib/whatsapp'
 
 export function NewSale() {
   const { id, billId } = useParams()
@@ -237,6 +238,8 @@ export function NewSale() {
       setError(linesError.message)
       return
     }
+    // Lines must exist before sending — the message summarises them.
+    sendBillWhatsApp(billRow.id)
     navigate(`/commercial/customers/${customerId}`)
   }
 

@@ -9,6 +9,7 @@ import { combineDateWithNow, dateInputValue, formatCurrency, todayInputValue } f
 import { ChevronLeftIcon } from '../components/icons'
 import type { PaymentMethod } from '../types/db'
 import { insertBillWithRetry } from '../utils/billNumber'
+import { sendBillWhatsApp } from '../lib/whatsapp'
 
 export function RecordPayment() {
   const { id, billId } = useParams()
@@ -79,8 +80,9 @@ export function RecordPayment() {
       return
     }
 
+    let billRow: { id: number }
     try {
-      await insertBillWithRetry({
+      billRow = await insertBillWithRetry({
         customer_id: customerId,
         type: 'payment',
         total_amount: amountNum,
@@ -97,6 +99,7 @@ export function RecordPayment() {
       return
     }
     setSaving(false)
+    sendBillWhatsApp(billRow.id)
     navigate(`/commercial/customers/${customerId}`)
   }
 
