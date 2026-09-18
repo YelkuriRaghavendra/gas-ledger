@@ -96,8 +96,9 @@ Deno.serve(async (req: Request) => {
   if (!result.alreadyRecorded) {
     // supabase-js does not throw on a failed insert — it resolves with
     // { error }. A send that truly went out must still be reported as such
-    // even if we failed to record it, but the caller needs to know the send
-    // history is now out of sync (e.g. to avoid re-showing "never sent").
+    // even if we failed to record it, but the send history is now out of
+    // sync (e.g. it would re-show as "never sent" and Retry could send a
+    // duplicate).
     const { error: insertError } = await db.from('whatsapp_sends').insert({
       bill_id: billId,
       status: result.outcome.status,
@@ -108,6 +109,11 @@ Deno.serve(async (req: Request) => {
     recorded = !insertError
   }
 
+  // The client (sendBillWhatsApp) fires this and ignores the response body —
+  // `recorded` is not for it. It is a diagnostic for whoever reads the
+  // function's invocation logs: `status: 'sent', recorded: false` is the one
+  // state where a real message went to a customer but whatsapp_sends does
+  // not reflect it, which needs a manual look, not just a retry.
   return json({ ...result.outcome, recorded }, 200)
 })
 

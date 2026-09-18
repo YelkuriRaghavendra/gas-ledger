@@ -188,14 +188,6 @@ export interface DailyPurchaseSummary {
 
 export type WhatsAppSendStatus = 'pending' | 'sent' | 'failed' | 'skipped'
 
-export type WhatsAppSkipReason =
-  | 'no_customer'
-  | 'no_phone'
-  | 'invalid_phone'
-  | 'disabled'
-  | 'not_applicable'
-  | 'already_sent'
-
 export interface WhatsAppSend {
   id: number
   bill_id: number
