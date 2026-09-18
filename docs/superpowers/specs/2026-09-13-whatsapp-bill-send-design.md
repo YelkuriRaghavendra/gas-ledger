@@ -196,12 +196,23 @@ Three, **Utility** category, submitted once in WhatsApp Manager. Utility wording
 any promotional phrasing gets the template reclassified as Marketing at roughly 7.5× the
 per-message cost.
 
+Each template has three components. The **header** and **footer** are static text with no
+variables, so they need no entry in the send payload and no code change — the function
+sends only a `body` component. The header names the event; the footer carries the business
+identity, so the customer knows who the message is from even with the number unsaved.
+
+`<BUSINESS>` and `<PHONE>` below are placeholders to be replaced with the real agency name
+and contact number before submission. They appear only in footers, never in a parameter.
+
 ```
 bill_sale
+
+HEADER  🧾 New bill
+
+BODY
 Namaste *{{1}}* 🙏
 
-*Bill No:* {{2}}
-*Date:* {{3}}
+*Bill No:* {{2}}  |  *Date:* {{3}}
 
 *Delivered*
 {{4}}
@@ -215,10 +226,16 @@ Namaste *{{1}}* 🙏
 
 *Empties Pending:* {{8}}
 *Total Balance Due:* ₹{{9}}
+
+FOOTER  <BUSINESS> · <PHONE>
 ```
 
 ```
 bill_payment
+
+HEADER  ✅ Payment received
+
+BODY
 Namaste *{{1}}* 🙏
 
 *Received:* ₹{{2}}
@@ -227,10 +244,16 @@ Namaste *{{1}}* 🙏
 
 ━━━━━━━━━━━━━━
 *Total Balance Due:* ₹{{5}}
+
+FOOTER  <BUSINESS> · <PHONE>
 ```
 
 ```
 bill_return
+
+HEADER  ♻️ Empties returned
+
+BODY
 Namaste *{{1}}* 🙏
 
 *Date:* {{2}}
@@ -241,7 +264,12 @@ Namaste *{{1}}* 🙏
 ━━━━━━━━━━━━━━
 *Empties Pending:* {{4}}
 *Total Balance Due:* ₹{{5}}
+
+FOOTER  <BUSINESS> · <PHONE>
 ```
+
+Bill number and date share a line: both are reference data the customer scans rather than
+reads, and separate lines make the message taller without making it clearer.
 
 Balance comes from the existing `customer_balances` view (`amount_due`) so the figure
 matches what the app already displays. Empties outstanding comes from
