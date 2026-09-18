@@ -2,7 +2,7 @@ import { BottomSheet } from './BottomSheet'
 import { formatCurrency, formatDate, formatUpdated } from '../utils/format'
 import { emptiesGiven, purchaseTitle } from '../utils/purchases'
 import type { PurchaseOrderWithLines } from '../hooks/usePurchaseOrders'
-import { TruckIcon } from './icons'
+import truckMark from '../assets/truck.png'
 
 interface PurchaseDetailProps {
   purchase: PurchaseOrderWithLines
@@ -34,9 +34,7 @@ export function PurchaseDetail({
   return (
     <BottomSheet open onClose={onClose} slideUp>
       <div className="flex items-center gap-3 pr-10">
-        <div className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[15px] bg-[#FBEDE4]">
-          <TruckIcon size={22} color="#E4571B" strokeWidth={2.1} />
-        </div>
+        <img src={truckMark} alt="" className="h-[46px] w-[46px] shrink-0 object-contain" />
         <div className="min-w-0 flex-1">
           <p className="font-display text-[17px] font-bold leading-tight tracking-[-0.2px] text-ink">
             {purchaseTitle(purchase, productNameById)}

@@ -14,10 +14,11 @@ import {
   purchasesInMonth,
   summarisePurchases,
 } from '../utils/purchases'
-import { ChevronLeftIcon, PlusIcon, TruckIcon } from '../components/icons'
+import { ChevronLeftIcon, PlusIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
 import { AccountMenu } from '../components/AccountMenu'
 import { PurchaseDetail } from '../components/PurchaseDetail'
+import truckMark from '../assets/truck.png'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -147,9 +148,11 @@ export function Purchases() {
                     onClick={() => setSelected(po)}
                     className="flex w-full items-center gap-3 rounded-[16px] bg-surface px-[14px] py-[13px] text-left shadow-card transition active:scale-[0.99]"
                   >
-                    <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[12px] bg-[#FBEDE4]">
-                      <TruckIcon size={19} color="#E4571B" strokeWidth={2.1} />
-                    </div>
+                    <img
+                      src={truckMark}
+                      alt=""
+                      className="h-[38px] w-[38px] shrink-0 object-contain"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13.5px] font-extrabold leading-[1.25] text-ink">
                         {purchaseTitle(po, productNameById)}
@@ -170,9 +173,7 @@ export function Purchases() {
 
         {monthOrders.length === 0 && (
           <div className="flex flex-col items-center px-4 pb-10 pt-12 text-center">
-            <div className="flex h-[84px] w-[84px] items-center justify-center rounded-[28px] bg-[#FBEDE4]">
-              <TruckIcon size={38} color="#E4571B" strokeWidth={1.7} />
-            </div>
+            <img src={truckMark} alt="" className="h-[84px] w-[84px] object-contain" />
             <h2 className="mt-5 font-display text-[19px] font-bold tracking-[-0.2px] text-ink">
               {purchaseOrders.length === 0 ? 'No purchases yet' : `Nothing bought in ${monthLabel}`}
             </h2>
