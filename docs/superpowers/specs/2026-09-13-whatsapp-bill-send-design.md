@@ -198,23 +198,49 @@ per-message cost.
 
 ```
 bill_sale
-Namaste {{1}}, bill {{2}} dated {{3}}.
-Items: {{4}}
-Amount: Rs {{5}}
-Balance due: Rs {{6}}
+Namaste *{{1}}* 🙏
+
+*Bill No:* {{2}}
+*Date:* {{3}}
+
+*Delivered*
+{{4}}
+
+*Empties Collected*
+{{5}}
+
+━━━━━━━━━━━━━━
+*Bill Amount:* ₹{{6}}
+*Payment:* {{7}}
+
+*Empties Pending:* {{8}}
+*Total Balance Due:* ₹{{9}}
 ```
 
 ```
 bill_payment
-Namaste {{1}}, payment of Rs {{2}} received on {{3}} via {{4}}.
-Balance due: Rs {{5}}
+Namaste *{{1}}* 🙏
+
+*Received:* ₹{{2}}
+*Date:* {{3}}
+*Mode:* {{4}}
+
+━━━━━━━━━━━━━━
+*Total Balance Due:* ₹{{5}}
 ```
 
 ```
 bill_return
-Namaste {{1}}, return recorded on {{2}}.
-Returned: {{3}}
-Empties outstanding: {{4}}
+Namaste *{{1}}* 🙏
+
+*Date:* {{2}}
+
+*Returned*
+{{3}}
+
+━━━━━━━━━━━━━━
+*Empties Pending:* {{4}}
+*Total Balance Due:* ₹{{5}}
 ```
 
 Balance comes from the existing `customer_balances` view (`amount_due`) so the figure
@@ -228,14 +254,18 @@ matches what the app already displays. Empties outstanding comes from
 | Customer name | `customers.name` verbatim | `Ramesh Traders` |
 | Bill number | `bills.bill_number` verbatim | `S-1042` |
 | Date | `DD-MM-YYYY`, from `bills.created_at` in IST | `13-09-2026` |
-| Items (`bill_sale`) | `qty × product name`, comma-separated, single line | `2 × 19kg Commercial, 1 × 5kg` |
-| Returned (`bill_return`) | same shape, using `bill_lines.qty` | `3 × 19kg Commercial` |
+| Delivered (`bill_sale` `{{4}}`) | `qty × product name @ ₹rate = ₹total`, ` • `-separated, single line. Rate is `bill_lines.amount / bill_lines.qty` (the actual sale price, not the product's current price). A `qty = 0` line omits the `@ rate = total` part. Empty list → `-` | `2 × 19kg Commercial @ ₹2150 = ₹4300 • 1 × 5kg @ ₹450 = ₹450` |
+| Empties Collected (`bill_sale` `{{5}}`) | `qty × product name` from `bill_lines.empties`, no price, ` • `-separated. Lines with `empties = 0` are omitted. No empties at all → `None` | `2 × 19kg Commercial` |
+| Payment (`bill_sale` `{{7}}`) | From `bills.paid` / `bills.method`: paid + method → `Paid by <Method>`; paid + no method → `Paid`; unpaid → `Not paid` | `Paid by Cash` |
+| Returned (`bill_return` `{{3}}`) | `qty × product name`, ` • `-separated, using `bill_lines.qty`, no price | `3 × 19kg Commercial` |
 | Amounts | integer rupees, no decimals, no thousands separator | `4300` |
-| Method | `bills.method` title-cased | `Cash`, `Upi`, `Vitran` |
+| Method (`bill_payment` `{{4}}`) | `bills.method` title-cased | `Cash`, `Upi`, `Vitran` |
+| Empties Pending / Total Balance Due | existing `emptiesOutstanding` / `balanceDue` fields | `7`, `12500` |
 
-WhatsApp template parameters cannot contain newlines or tabs, so the items list stays on
-one line. Meta rejects the message outright if a parameter contains a newline — this is a
-hard constraint, not a style preference.
+WhatsApp template parameters cannot contain newlines or tabs, so every multi-item list
+stays on one line, joined with ` • ` instead of a line break. Meta rejects the message
+outright if a parameter contains a newline — this is a hard constraint, not a style
+preference. The `•`, `@`, and `₹` characters are fine.
 
 ## Status display
 

@@ -9,7 +9,8 @@ const ctx: BillContext = {
   createdAt: '2026-09-13T06:30:00.000Z',
   totalAmount: 4300,
   method: 'cash',
-  lines: [{ productName: '19kg Commercial', qty: 2 }],
+  paid: true,
+  lines: [{ productName: '19kg Commercial', qty: 2, amount: 4300, empties: 2 }],
   balanceDue: 12500,
   emptiesOutstanding: 7,
 }
@@ -27,7 +28,15 @@ describe('edge function copies match the src originals', () => {
 
   it('builds identical sale params', () => {
     expect(buildTemplateParams('bill_sale', ctx)).toEqual([
-      'Ramesh Traders', 'S-1042', '13-09-2026', '2 × 19kg Commercial', '4300', '12500',
+      'Ramesh Traders',
+      'S-1042',
+      '13-09-2026',
+      '2 × 19kg Commercial @ ₹2150 = ₹4300',
+      '2 × 19kg Commercial',
+      '4300',
+      'Paid by Cash',
+      '7',
+      '12500',
     ])
   })
 
@@ -39,7 +48,7 @@ describe('edge function copies match the src originals', () => {
 
   it('builds identical return params', () => {
     expect(buildTemplateParams('bill_return', ctx)).toEqual([
-      'Ramesh Traders', '13-09-2026', '2 × 19kg Commercial', '7',
+      'Ramesh Traders', '13-09-2026', '2 × 19kg Commercial', '7', '12500',
     ])
   })
 

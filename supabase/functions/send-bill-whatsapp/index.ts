@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: bill, error: billError } = await db
     .from('bills')
-    .select('id, bill_number, type, total_amount, method, created_at, customer_id')
+    .select('id, bill_number, type, total_amount, method, paid, created_at, customer_id')
     .eq('id', billId)
     .single()
 
@@ -159,7 +159,7 @@ async function resolve(db: any, bill: any): Promise<ResolveResult> {
 
   const { data: lines, error: linesError } = await db
     .from('bill_lines')
-    .select('qty, products(name)')
+    .select('qty, amount, empties, products(name)')
     .eq('bill_id', bill.id)
 
   const { data: balance, error: balanceError } = await db
@@ -190,9 +190,12 @@ async function resolve(db: any, bill: any): Promise<ResolveResult> {
     createdAt: bill.created_at,
     totalAmount: Number(bill.total_amount ?? 0),
     method: bill.method,
+    paid: Boolean(bill.paid),
     lines: (lines ?? []).map((l: any) => ({
       productName: l.products?.name ?? 'Item',
       qty: Number(l.qty ?? 0),
+      amount: Number(l.amount ?? 0),
+      empties: Number(l.empties ?? 0),
     })),
     balanceDue: Number(balance?.amount_due ?? 0),
     emptiesOutstanding,
