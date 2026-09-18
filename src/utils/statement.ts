@@ -171,6 +171,56 @@ export function statementFilename(customerName: string): string {
 
 export type StatementPeriod = 'this-month' | 'last-month' | 'all' | 'custom'
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function dayMonthYear(d: Date) {
+  return { day: String(d.getDate()).padStart(2, '0'), month: MONTHS[d.getMonth()], year: d.getFullYear() }
+}
+
+/**
+ * The date span a period actually covers, for the statement preview header —
+ * so the reader can see what they are looking at before they share it.
+ *
+ * `today` is injectable so the relative periods are testable; callers pass
+ * nothing and get the real clock.
+ *
+ * Collapses repeated parts: a range inside one month prints the month once,
+ * and a range inside one year prints the year once.
+ */
+export function periodRangeLabel(
+  period: StatementPeriod,
+  from?: string,
+  to?: string,
+  today: Date = new Date(),
+): string {
+  if (period === 'all') return 'All time'
+
+  let start: Date
+  let end: Date
+
+  if (period === 'this-month') {
+    start = new Date(today.getFullYear(), today.getMonth(), 1)
+    end = today
+  } else if (period === 'last-month') {
+    start = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    // Day 0 of this month is the last day of last month.
+    end = new Date(today.getFullYear(), today.getMonth(), 0)
+  } else {
+    if (!from || !to) return 'All time'
+    const [fy, fm, fd] = from.split('-').map(Number)
+    const [ty, tm, td] = to.split('-').map(Number)
+    start = new Date(fy, fm - 1, fd)
+    end = new Date(ty, tm - 1, td)
+  }
+
+  const a = dayMonthYear(start)
+  const b = dayMonthYear(end)
+
+  if (a.year !== b.year) return `${a.day} ${a.month} ${a.year} – ${b.day} ${b.month} ${b.year}`
+  if (a.month !== b.month) return `${a.day} ${a.month} – ${b.day} ${b.month} ${b.year}`
+  return `${a.day}–${b.day} ${b.month} ${b.year}`
+}
+
 export function filterGroupsByPeriod(
   groups: HistoryGroup[],
   period: StatementPeriod,

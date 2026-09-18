@@ -1,9 +1,15 @@
-import { ReactNode, useEffect, useState } from 'react'
-import { BottomSheet } from './BottomSheet'
-import { DownloadIcon, ChevronLeftIcon } from './icons'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  HistoryGroup,
+  StatementPeriod,
+  filterGroupsByPeriod,
+  generatePdfBlob,
+  generatePdfHtml,
+  periodRangeLabel,
+  statementFilename,
+} from '../utils/statement'
 import { formatCurrency } from '../utils/format'
-import { generatePdfHtml, generatePdfBlob, statementFilename, filterGroupsByPeriod } from '../utils/statement'
-import type { HistoryGroup, StatementPeriod } from '../utils/statement'
+import { ChevronLeftIcon, DownloadIcon } from './icons'
 
 interface StatementDialogProps {
   open: boolean
@@ -30,36 +36,40 @@ function toDateInputValue(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-const PERIOD_LABELS: Record<StatementPeriod, string> = {
-  'this-month': 'this month',
-  'last-month': 'last month',
-  all: 'all time',
-  custom: 'the selected period',
-}
-
 export function StatementDialog({ open, onClose, customerName, amountDue, groups, customer, agency }: StatementDialogProps) {
   const now = new Date()
   const [period, setPeriod] = useState<StatementPeriod>('this-month')
   const [from, setFrom] = useState(toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
   const [to, setTo] = useState(toDateInputValue(now))
-  // The PDF is rasterised from HTML (async), so build it ahead of time and
-  // keep it ready. This also lets the WhatsApp share fire synchronously inside
-  // the user's tap — navigator.share needs an active user gesture, which an
-  // await would consume.
+  // The PDF is rasterised from HTML (async), so build it ahead of time and keep
+  // it ready. This also lets the share fire synchronously inside the user's tap
+  // — navigator.share needs an active user gesture, which an await would consume.
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
   const [building, setBuilding] = useState(false)
 
-  // Refresh the custom-range defaults each time the dialog opens so they don't
+  // Refresh the custom-range defaults each time the screen opens so they don't
   // go stale if the component stays mounted across a month boundary.
   useEffect(() => {
     if (open) {
       const today = new Date()
       setFrom(toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)))
       setTo(toDateInputValue(today))
+      setPeriod('this-month')
     }
   }, [open])
 
-  // Pre-build the PDF whenever the dialog opens or the period changes.
+  const filtered = useMemo(
+    () => filterGroupsByPeriod(groups, period, from, to),
+    [groups, period, from, to],
+  )
+
+  // The preview renders the same markup generatePdfBlob rasterises, so what is
+  // on screen cannot drift from what gets shared, printed or downloaded.
+  const previewHtml = useMemo(
+    () => generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency),
+    [customerName, customer.phone, customer.address, amountDue, filtered, agency],
+  )
+
   useEffect(() => {
     if (!open) {
       setPdfBlob(null)
@@ -68,7 +78,6 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
     let cancelled = false
     setBuilding(true)
     setPdfBlob(null)
-    const filtered = filterGroupsByPeriod(groups, period, from, to)
     generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency)
       .then((blob) => {
         if (!cancelled) setPdfBlob(blob)
@@ -83,21 +92,11 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, period, from, to, amountDue, customerName])
-
-  function openPrintWindow() {
-    const filtered = filterGroupsByPeriod(groups, period, from, to)
-    const html = generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency)
-    const blob = new Blob([html], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const win = window.open(url, '_blank')
-    if (win) setTimeout(() => { win.print(); URL.revokeObjectURL(url) }, 600)
-    else URL.revokeObjectURL(url)
-  }
+  }, [open, filtered, amountDue, customerName])
 
   function summaryText() {
     const business = agency?.name || 'Statement'
-    return `${business} — ${customerName}: ${formatCurrency(amountDue)} due (${PERIOD_LABELS[period]})`
+    return `${business} — ${customerName}: ${formatCurrency(amountDue)} due (${periodRangeLabel(period, from, to)})`
   }
 
   function handleDownloadPdf() {
@@ -112,7 +111,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
     URL.revokeObjectURL(url)
   }
 
-  async function handleWhatsApp() {
+  async function handleShare() {
     if (!pdfBlob) return
     const file = new File([pdfBlob], statementFilename(customerName), { type: 'application/pdf' })
     const business = agency?.name || 'Statement'
@@ -129,134 +128,133 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
   }
 
   function handlePrint() {
-    openPrintWindow()
+    const blob = new Blob([previewHtml], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, '_blank')
+    if (win) setTimeout(() => { win.print(); URL.revokeObjectURL(url) }, 600)
+    else URL.revokeObjectURL(url)
   }
 
-  return (
-    <BottomSheet open={open} onClose={onClose}>
-      <h2 className="pr-8 font-display text-[18px] font-bold text-ink">Share statement</h2>
-      <p className="mb-[14px] mt-[2px] text-[11.5px] font-semibold text-muted">
-        {customerName} · {formatCurrency(amountDue)} due
-      </p>
+  if (!open) return null
 
-      <p className="mb-[7px] text-[10px] font-extrabold uppercase tracking-[0.5px] text-subtle">Period</p>
-      <div className="mb-1.5 flex flex-wrap gap-[7px]">
-        {PERIODS.map((p) => (
-          <button
-            key={p.value}
-            type="button"
-            onClick={() => setPeriod(p.value)}
-            className={`rounded-[11px] border-[1.5px] px-3 py-2 text-xs font-extrabold transition ${
-              period === p.value ? 'border-[#F3C6B2] bg-[#FDE9DE] text-accent' : 'border-borderMuted bg-cream text-muted'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-cream"
+      style={{ animation: 'sheetSlideUp 0.28s ease-out' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Statement for ${customerName}`}
+    >
+      <header className="flex shrink-0 items-center gap-3 border-b border-borderMuted px-4 pb-3 pt-4">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close statement"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-card active:scale-95"
+        >
+          <ChevronLeftIcon size={18} color="#6E655A" strokeWidth={2.4} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-[16px] font-bold leading-tight text-ink">{customerName}</p>
+          <p className="mt-[1px] text-[11px] font-semibold text-muted">
+            {periodRangeLabel(period, from, to)} · {formatCurrency(amountDue)} due
+          </p>
+        </div>
+      </header>
+
+      <div className="shrink-0 px-4 pt-3">
+        <div className="flex flex-wrap gap-[7px]">
+          {PERIODS.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => setPeriod(p.value)}
+              aria-pressed={period === p.value}
+              className={`rounded-[11px] border-[1.5px] px-3 py-2 text-xs font-extrabold transition ${
+                period === p.value ? 'border-[#F3C6B2] bg-[#FDE9DE] text-accent' : 'border-borderMuted bg-surface text-muted'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {period === 'custom' && (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              id="statement-from"
+              type="date"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value)}
+              aria-label="From date"
+              className="h-10 flex-1 rounded-[11px] border-[1.5px] border-borderMuted bg-surface px-[11px] text-xs font-bold text-ink"
+            />
+            <span className="text-xs font-bold text-subtle">→</span>
+            <input
+              id="statement-to"
+              type="date"
+              value={to}
+              min={from}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="To date"
+              className="h-10 flex-1 rounded-[11px] border-[1.5px] border-borderMuted bg-surface px-[11px] text-xs font-bold text-ink"
+            />
+          </div>
+        )}
       </div>
 
-      {period === 'custom' && (
-        <div className="mb-1 mt-2 flex items-center gap-2">
-          <input
-            type="date"
-            value={from}
-            max={to}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-10 flex-1 rounded-[11px] border-[1.5px] border-borderMuted bg-cream px-[11px] text-xs font-bold text-ink"
-          />
-          <span className="text-xs font-bold text-subtle">→</span>
-          <input
-            type="date"
-            value={to}
-            min={from}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-10 flex-1 rounded-[11px] border-[1.5px] border-borderMuted bg-cream px-[11px] text-xs font-bold text-ink"
-          />
-        </div>
-      )}
+      <div className="min-h-0 flex-1 px-4 py-3">
+        <iframe
+          title="Statement preview"
+          srcDoc={previewHtml}
+          className="h-full w-full rounded-[14px] border border-borderMuted bg-white shadow-card"
+        />
+      </div>
 
-      <div className="mt-2">
-        <OptionRow
-          tint="#FDECE3"
-          icon={<DownloadIcon size={17} color="#E4571B" />}
-          title="Download PDF"
-          subtitle={building ? 'Preparing PDF…' : 'Save the statement as a PDF'}
+      <div className="flex shrink-0 gap-2 border-t border-borderMuted bg-surface px-4 pb-5 pt-3">
+        <ActionButton label="Share" onClick={handleShare} disabled={!pdfBlob} primary busy={building} />
+        <ActionButton label="Print" onClick={handlePrint} />
+        <ActionButton
+          label="Download"
           onClick={handleDownloadPdf}
           disabled={!pdfBlob}
-        />
-        <OptionRow
-          tint="#E4F5EA"
-          icon={<WhatsAppGlyph />}
-          title="Share on WhatsApp"
-          subtitle={building ? 'Preparing PDF…' : 'Attach the PDF (on phone)'}
-          onClick={handleWhatsApp}
-          disabled={!pdfBlob}
-        />
-        <OptionRow
-          tint="#EAF0F7"
-          icon={<PrinterGlyph />}
-          title="Print"
-          subtitle="To a connected printer"
-          onClick={handlePrint}
+          busy={building}
+          icon={<DownloadIcon size={15} color="#1F1813" />}
         />
       </div>
-    </BottomSheet>
+    </div>
   )
 }
 
-function OptionRow({
-  icon,
-  tint,
-  title,
-  subtitle,
+function ActionButton({
+  label,
   onClick,
   disabled = false,
+  primary = false,
+  busy = false,
+  icon,
 }: {
-  icon: ReactNode
-  tint: string
-  title: string
-  subtitle: string
+  label: string
   onClick: () => void
   disabled?: boolean
+  primary?: boolean
+  busy?: boolean
+  icon?: React.ReactNode
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center gap-3 border-t border-[#F1E9DB] py-[13px] text-left transition first:border-t-0 disabled:opacity-50"
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded-[14px] py-[13px] text-[13px] font-extrabold transition active:scale-[0.98] disabled:opacity-50 ${
+        primary
+          ? 'bg-gradient-to-br from-accentSoft to-accent text-white shadow-glow'
+          : 'bg-cream text-ink'
+      }`}
     >
-      <div
-        className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[12px]"
-        style={{ backgroundColor: tint }}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold text-ink">{title}</p>
-        <p className="mt-[1px] text-[10.5px] font-semibold text-subtle">{subtitle}</p>
-      </div>
-      <span className="shrink-0 rotate-180">
-        <ChevronLeftIcon size={16} color="#C7BCAB" strokeWidth={2.2} />
-      </span>
+      {icon}
+      {busy && disabled ? 'Preparing…' : label}
     </button>
-  )
-}
-
-function WhatsAppGlyph() {
-  return (
-    <svg width={17} height={17} viewBox="0 0 24 24" fill="#25A05A">
-      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.28-1.39a9.9 9.9 0 0 0 4.76 1.21h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2Zm5.8 14.03c-.24.68-1.4 1.3-1.93 1.34-.5.05-1.02.24-3.43-.72-2.9-1.16-4.76-4.12-4.9-4.31-.14-.19-1.17-1.56-1.17-2.98s.74-2.11 1-2.4c.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.24.58.81 2 .88 2.15.07.14.12.31.02.5-.1.19-.15.31-.3.48-.14.17-.3.38-.43.51-.14.14-.29.29-.13.57.17.29.75 1.24 1.62 2.01 1.11.99 2.05 1.3 2.34 1.44.29.14.46.12.63-.07.17-.19.72-.84.92-1.13.19-.29.38-.24.63-.14.26.09 1.65.78 1.94.92.29.14.48.22.55.34.07.12.07.71-.17 1.39Z" />
-    </svg>
-  )
-}
-
-function PrinterGlyph() {
-  return (
-    <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="#3B6EA5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 9 6 2 18 2 18 9" />
-      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-      <rect x="6" y="14" width="12" height="8" />
-    </svg>
   )
 }
