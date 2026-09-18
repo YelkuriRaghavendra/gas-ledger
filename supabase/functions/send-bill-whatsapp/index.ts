@@ -150,12 +150,17 @@ async function resolve(db: any, bill: any): Promise<ResolveResult> {
     return { outcome: skip('no_customer', template), alreadyRecorded: false, recorded: false }
   }
 
-  const { data: customer } = await db
+  const { data: customer, error: customerError } = await db
     .from('customers')
     .select('id, name, phone, whatsapp_enabled')
     .eq('id', bill.customer_id)
     .single()
 
+  // A failed query must not read the same as a genuinely missing customer —
+  // 'no_customer' looks like a permanent, deliberate skip to whoever reads
+  // it, so a transient DB error hiding behind it would never get retried and
+  // the customer would silently never receive their bill.
+  if (customerError) return { outcome: failedDataError(template), alreadyRecorded: false, recorded: false }
   if (!customer) return { outcome: skip('no_customer', template), alreadyRecorded: false, recorded: false }
   if (!customer.whatsapp_enabled) return { outcome: skip('disabled', template), alreadyRecorded: false, recorded: false }
   if (!customer.phone) return { outcome: skip('no_phone', template), alreadyRecorded: false, recorded: false }
