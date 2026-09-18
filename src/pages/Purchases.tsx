@@ -128,7 +128,6 @@ export function Purchases() {
           <div className="mt-[14px] flex gap-[10px] border-t border-[#3A2F26] pt-[13px]">
             <Stat value={String(summary.cylindersIn)} label="Cylinders in" />
             <Stat value={String(summary.emptiesOut)} label="Empties out" />
-            <Stat value={formatCurrency(summary.avgPerCylinder)} label="Avg / cyl" />
           </div>
         </div>
 

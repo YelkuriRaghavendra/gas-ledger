@@ -153,18 +153,10 @@ describe('summarisePurchases', () => {
     expect(s.emptiesOut).toBe(112)
   })
 
-  it('averages spend per cylinder', () => {
-    expect(summarisePurchases(orders).avgPerCylinder).toBe(900)
-  })
-
-  it('reports zeros for an empty month, without dividing by zero', () => {
+  it('reports zeros for an empty month', () => {
     expect(summarisePurchases([])).toEqual({
-      spend: 0, orderCount: 0, cylindersIn: 0, emptiesOut: 0, avgPerCylinder: 0,
+      spend: 0, orderCount: 0, cylindersIn: 0, emptiesOut: 0,
     })
-  })
-
-  it('avoids NaN when orders exist but no cylinders were bought', () => {
-    expect(summarisePurchases([po(9, '2026-09-18T09:00:00', 500, [])]).avgPerCylinder).toBe(0)
   })
 })
 

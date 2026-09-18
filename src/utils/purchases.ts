@@ -51,7 +51,6 @@ export interface PurchaseSummary {
   orderCount: number
   cylindersIn: number
   emptiesOut: number
-  avgPerCylinder: number
 }
 
 /** Totals over exactly the orders given — the caller decides the period. */
@@ -73,8 +72,6 @@ export function summarisePurchases(orders: PurchaseOrderWithLines[]): PurchaseSu
     orderCount: orders.length,
     cylindersIn,
     emptiesOut,
-    // An order can carry a cost with no cylinders; never divide by zero.
-    avgPerCylinder: cylindersIn > 0 ? Math.round(spend / cylindersIn) : 0,
   }
 }
 
