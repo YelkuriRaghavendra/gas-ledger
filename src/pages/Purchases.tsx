@@ -1,53 +1,42 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useProducts } from '../hooks/useProducts'
 import { usePurchaseOrders, type PurchaseOrderWithLines } from '../hooks/usePurchaseOrders'
 import { useProfiles } from '../hooks/useProfiles'
-import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
+import { formatCurrency } from '../utils/format'
+import { groupPurchases, purchaseSubtitle, purchaseTitle, summarisePurchases } from '../utils/purchases'
 import { PlusIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
 import { AccountMenu } from '../components/AccountMenu'
-import { DetailModal } from '../components/DetailModal'
-import { getActivityIcon } from '../utils/activityIcon'
+import { PurchaseDetail } from '../components/PurchaseDetail'
+import { PurchaseGlyph } from '../components/PurchaseGlyph'
 
-function purchaseTitle(po: PurchaseOrderWithLines, productNameById: Map<number, string>) {
-  const lines = po.purchase_lines
-  if (lines.length === 1) {
-    const name = productNameById.get(lines[0].product_id) ?? 'cylinders'
-    return `${lines[0].qty} × ${name} purchased`
-  }
-  const totalQty = lines.reduce((sum, l) => sum + l.qty, 0)
-  return `${totalQty} cylinders purchased`
-}
-
-function cardSubtitle(po: PurchaseOrderWithLines) {
-  const date = formatRelativeDate(po.created_at)
-  return po.paid ? date : `${date} · On credit`
-}
-
-function purchaseRows(po: PurchaseOrderWithLines, productNameById: Map<number, string>) {
-  const rows: { k: string; v: string }[] = []
-  for (const line of po.purchase_lines) {
-    const name = productNameById.get(line.product_id) ?? 'cylinders'
-    rows.push({ k: 'Product', v: `${line.qty} × ${name}` })
-    if (line.empties_given > 0) rows.push({ k: 'Empties given', v: String(line.empties_given) })
-  }
-  rows.push({ k: 'Payment', v: po.paid ? 'Paid' : 'On credit' })
-  if (po.note) rows.push({ k: 'Note', v: po.note })
-  return rows
-}
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 export function Purchases() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const isOwner = profile?.role === 'owner'
   const { data: products } = useProducts()
   const { data: purchaseOrders, refresh } = usePurchaseOrders()
   const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<PurchaseOrderWithLines | null>(null)
   const profileNames = useProfiles()
-  const productNameById = new Map(products.map((p) => [p.id, p.name]))
+
+  const productNameById = useMemo(
+    () => new Map(products.map((p) => [p.id, p.name])),
+    [products],
+  )
+  const summary = useMemo(() => summarisePurchases(purchaseOrders), [purchaseOrders])
+  const groups = useMemo(() => groupPurchases(purchaseOrders), [purchaseOrders])
+
+  const now = new Date()
+  const monthLabel = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
 
   async function handleDelete(id: number) {
     if (!confirm('Delete this purchase?')) return
@@ -64,87 +53,117 @@ export function Purchases() {
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
 
       <div className="p-5 pt-1">
-        <div className="mb-[22px] flex items-center justify-between">
+        <div className="mb-[14px] flex items-center justify-between">
           <h1 className="font-display text-2xl font-bold tracking-[-0.4px] text-ink">Purchases</h1>
           <Link
             to="/commercial/purchases/new"
+            aria-label="New purchase"
             className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-gradient-to-br from-accentSoft to-accent shadow-glow"
           >
             <PlusIcon size={20} strokeWidth={2.4} color="#fff" />
           </Link>
         </div>
 
-        <ul className="flex flex-col gap-[9px]">
-          {purchaseOrders.map((po) => {
-            return (
-              <li key={po.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelected(po)}
-                  className="flex w-full items-center gap-3 rounded-[16px] bg-surface px-[14px] py-[13px] text-left shadow-card transition active:scale-[0.99]"
-                >
-                  <div
-                    className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[12px] text-[16px]"
-                    style={{ backgroundColor: '#FBEDE4', color: '#E4571B' }}
+        {purchaseOrders.length > 0 && (
+          <div className="mb-[14px] rounded-[20px] bg-ink px-[18px] py-4 text-white">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.7px] text-mutedOnDark">{monthLabel}</p>
+            <p className="mt-2 font-display text-[30px] font-bold leading-none tracking-[-0.7px]">
+              {formatCurrency(summary.spend)}
+            </p>
+            <p className="mt-[5px] text-[11px] font-semibold text-mutedOnDark">
+              across {summary.orderCount} {summary.orderCount === 1 ? 'order' : 'orders'}
+            </p>
+            <div className="mt-[14px] flex gap-[10px] border-t border-[#3A2F26] pt-[13px]">
+              <Stat value={String(summary.cylindersIn)} label="Cylinders in" />
+              <Stat value={String(summary.emptiesOut)} label="Empties out" />
+              <Stat value={formatCurrency(summary.avgPerCylinder)} label="Avg / cyl" />
+            </div>
+          </div>
+        )}
+
+        {groups.map((group) => (
+          <div key={group.key} className="mb-[9px]">
+            <div className="flex items-baseline justify-between px-[2px] pb-[9px] pt-[6px]">
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.7px] text-subtle">
+                {group.label}
+              </span>
+              <span className="text-[10.5px] font-bold text-subtle">{formatCurrency(group.subtotal)}</span>
+            </div>
+            <ul className="flex flex-col gap-[9px]">
+              {group.orders.map((po) => (
+                <li key={po.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(po)}
+                    className="flex w-full items-center gap-3 rounded-[16px] bg-surface px-[14px] py-[13px] text-left shadow-card transition active:scale-[0.99]"
                   >
-                    {getActivityIcon('purchase')}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-bold text-ink">{purchaseTitle(po, productNameById)}</p>
-                    <p className="mt-[2px] text-[10.5px] font-semibold text-subtle">{cardSubtitle(po)}</p>
-                  </div>
-                  <p className="shrink-0 font-display text-[14.5px] font-bold text-[#E4571B]">
-                    {formatCurrency(po.total_amount)}
-                  </p>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+                    <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[12px] bg-[#FBEDE4]">
+                      <PurchaseGlyph />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-extrabold leading-[1.25] text-ink">
+                        {purchaseTitle(po, productNameById)}
+                      </p>
+                      <p className="mt-[3px] truncate text-[10.5px] font-bold text-subtle">
+                        {purchaseSubtitle(po)}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-display text-[14.5px] font-bold text-ink">
+                      {formatCurrency(po.total_amount)}
+                    </p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+
         {purchaseOrders.length === 0 && (
-          <p className="rounded-[18px] bg-surface px-4 py-8 text-center text-sm font-medium text-subtle shadow-card">
-            No purchases yet
-          </p>
+          <div className="flex flex-col items-center px-4 pb-10 pt-16 text-center">
+            <div className="flex h-[84px] w-[84px] items-center justify-center rounded-[28px] bg-[#FBEDE4]">
+              <PurchaseGlyph size={38} />
+            </div>
+            <h2 className="mt-5 font-display text-[19px] font-bold tracking-[-0.2px] text-ink">
+              No purchases yet
+            </h2>
+            <p className="mt-2 max-w-[250px] text-[13px] font-semibold leading-[1.5] text-muted">
+              Record what you buy from the supplier — cylinders in, empties back, and what it cost.
+            </p>
+            <Link
+              to="/commercial/purchases/new"
+              className="mt-[22px] flex h-[50px] items-center gap-2 rounded-[15px] bg-gradient-to-br from-accentSoft to-accent px-6 text-sm font-extrabold text-white shadow-glow transition active:scale-[0.99]"
+            >
+              <PlusIcon size={17} strokeWidth={2.6} color="#fff" />
+              Record a purchase
+            </Link>
+          </div>
         )}
       </div>
 
       {selected && (
-        <DetailModal
-          open={selected !== null}
+        <PurchaseDetail
+          purchase={selected}
+          productNameById={productNameById}
+          profileNames={profileNames}
+          isOwner={isOwner}
           onClose={() => setSelected(null)}
-          icon={getActivityIcon('purchase')}
-          iconBg="#FBEDE4"
-          iconColor="#E4571B"
-          title={purchaseTitle(selected, productNameById)}
-          subtitle={formatDate(selected.created_at)}
-          amount={formatCurrency(selected.total_amount)}
-          rows={purchaseRows(selected, productNameById)}
-          created={formatDate(selected.created_at)}
-          createdBy={selected.created_by ? profileNames.get(selected.created_by) : undefined}
-          updated={formatUpdated(selected.updated_at, selected.created_at)}
-          updatedBy={selected.updated_by ? profileNames.get(selected.updated_by) : undefined}
-          actions={
-            isOwner ? (
-              <>
-                <Link
-                  to={`/commercial/purchases/${selected.id}/edit`}
-                  onClick={() => setSelected(null)}
-                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
-                >
-                  Edit
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(selected.id)}
-                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-[#FBEAE6] font-bold text-[#C23B22] transition active:scale-[0.99]"
-                >
-                  Delete
-                </button>
-              </>
-            ) : undefined
-          }
+          onEdit={() => {
+            const id = selected.id
+            setSelected(null)
+            navigate(`/commercial/purchases/${id}/edit`)
+          }}
+          onDelete={() => handleDelete(selected.id)}
         />
       )}
+    </div>
+  )
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex-1">
+      <p className="font-display text-[17px] font-bold leading-none">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.3px] text-mutedOnDark">{label}</p>
     </div>
   )
 }
