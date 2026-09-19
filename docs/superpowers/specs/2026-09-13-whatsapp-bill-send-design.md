@@ -196,18 +196,28 @@ Three, **Utility** category, submitted once in WhatsApp Manager. Utility wording
 any promotional phrasing gets the template reclassified as Marketing at roughly 7.5× the
 per-message cost.
 
-Each template has three components. The **header** and **footer** are static text with no
-variables, so they need no entry in the send payload and no code change — the function
-sends only a `body` component. The header names the event; the footer carries the business
-identity, so the customer knows who the message is from even with the number unsaved.
+Each template has a static text **header** and a **body**. The header has no variables, so
+it needs no entry in the send payload and no code change — the function sends only a
+`body` component. **No footer**: the customer receives the message inside a thread with the
+business number and can reply there, so the identity line was dropped rather than spending
+a component on it.
 
-`<BUSINESS>` and `<PHONE>` below are placeholders to be replaced with the real agency name
-and contact number before submission. They appear only in footers, never in a parameter.
+An **image header** was considered and rejected. It carries no information the body does
+not, the same image would ride on all three message types, and it would require a `header`
+component on every send — omitting it fails the send outright with `#132000`, so an
+approved image header silently breaks every bill until the function ships the matching
+change.
+
+The body must not begin or end with a variable, and Meta additionally rejects bodies whose
+variable count is high relative to their static text. Both rules bit during submission.
+The closing line `Contact us for any correction.` and the spelled-out labels
+(`Total Bill Amount` rather than `Amount`) are what satisfy them — they are load-bearing,
+not decoration. Removing the closing line reintroduces the trailing-variable rejection.
 
 ```
 bill_sale
 
-HEADER  🧾 New bill
+HEADER  New bill
 
 BODY
 Namaste *{{1}}* 🙏
@@ -217,63 +227,76 @@ Namaste *{{1}}* 🙏
 *Delivered*
 {{4}}
 
-*Empties Collected*
+*Empties Collected Today*
 {{5}}
 
 ━━━━━━━━━━━━━━
-*Bill Amount:* ₹{{6}}
-*Payment:* {{7}}
+*Total Bill Amount:* ₹{{6}}
+*Payment Status:* {{7}}
 
-*Empties Pending:* {{8}}
-*Total Balance Due:* ₹{{9}}
+*Empty Cylinders Pending:* {{8}}
+*Total Account Balance Due:* ₹{{9}}
 
-FOOTER  <BUSINESS> · <PHONE>
+Contact us for any correction.
 ```
 
 ```
 bill_payment
 
-HEADER  ✅ Payment received
+HEADER  Payment received
 
 BODY
 Namaste *{{1}}* 🙏
 
-*Received:* ₹{{2}}
-*Date:* {{3}}
-*Mode:* {{4}}
+*Amount Received:* ₹{{2}}
+*Date of Payment:* {{3}}
+*Payment Mode:* {{4}}
 
 ━━━━━━━━━━━━━━
-*Total Balance Due:* ₹{{5}}
+*Total Account Balance Due:* ₹{{5}}
 
-FOOTER  <BUSINESS> · <PHONE>
+Contact us for any correction.
 ```
 
 ```
 bill_return
 
-HEADER  ♻️ Empties returned
+HEADER  Empties returned
 
 BODY
 Namaste *{{1}}* 🙏
 
-*Date:* {{2}}
+*Date of Return:* {{2}}
 
-*Returned*
+*Cylinders Returned*
 {{3}}
 
 ━━━━━━━━━━━━━━
-*Empties Pending:* {{4}}
-*Total Balance Due:* ₹{{5}}
+*Empty Cylinders Pending:* {{4}}
+*Total Account Balance Due:* ₹{{5}}
 
-FOOTER  <BUSINESS> · <PHONE>
+Contact us for any correction.
 ```
 
 Bill number and date share a line: both are reference data the customer scans rather than
 reads, and separate lines make the message taller without making it clearer.
 
+Two label choices exist to prevent a customer misreading, and should not be shortened:
+`Empties Collected Today` distinguishes today's collection from the running
+`Empty Cylinders Pending` figure directly below it, and `Total Account Balance Due` makes
+clear the balance is account-wide — without it, `Payment Status: Paid by Cash` sitting
+above a non-zero balance reads as a contradiction.
+
 Balance comes from the existing `customer_balances` view (`amount_due`) so the figure
 matches what the app already displays. Empties outstanding comes from
 `customer_product_balances`.
+
+**Message validity period** is a per-template setting in WhatsApp Manager controlling how
+long WhatsApp retries delivery before dropping the message unsent and unbilled. The
+default is 10 minutes, tuned for OTPs. A bill is still useful hours later, and the app
+records a send as `sent` when Meta *accepts* it, not when it is delivered — so an expired
+message leaves a green status in the UI and nothing on the customer's phone. Set the
+custom validity period to the maximum the field allows.
 
 **Parameter formats**, fixed so the function and the approved templates cannot drift:
 
@@ -283,17 +306,17 @@ matches what the app already displays. Empties outstanding comes from
 | Bill number | `bills.bill_number` verbatim | `S-1042` |
 | Date | `DD-MM-YYYY`, from `bills.created_at` in IST | `13-09-2026` |
 | Delivered (`bill_sale` `{{4}}`) | `qty × product name @ ₹rate = ₹total`, ` • `-separated, single line. Rate is `bill_lines.amount / bill_lines.qty` (the actual sale price, not the product's current price). A `qty = 0` line omits the `@ rate = total` part. Empty list → `-` | `2 × 19kg Commercial @ ₹2150 = ₹4300 • 1 × 5kg @ ₹450 = ₹450` |
-| Empties Collected (`bill_sale` `{{5}}`) | `qty × product name` from `bill_lines.empties`, no price, ` • `-separated. Lines with `empties = 0` are omitted. No empties at all → `None` | `2 × 19kg Commercial` |
-| Payment (`bill_sale` `{{7}}`) | From `bills.paid` / `bills.method`: paid + method → `Paid by <Method>`; paid + no method → `Paid`; unpaid → `Not paid` | `Paid by Cash` |
-| Returned (`bill_return` `{{3}}`) | `qty × product name`, ` • `-separated, using `bill_lines.qty`, no price | `3 × 19kg Commercial` |
+| Empties Collected Today (`bill_sale` `{{5}}`) | `qty × product name` from `bill_lines.empties`, no price, ` • `-separated. Lines with `empties = 0` are omitted. No empties at all → `None` | `2 × 19kg Commercial` |
+| Payment Status (`bill_sale` `{{7}}`) | From `bills.paid` / `bills.method`: paid + method → `Paid by <Method>`; paid + no method → `Paid`; unpaid → `Not paid` | `Paid by Cash` |
+| Cylinders Returned (`bill_return` `{{3}}`) | `qty × product name`, ` • `-separated, using `bill_lines.qty`, no price | `3 × 19kg Commercial` |
 | Amounts | integer rupees, no decimals, no thousands separator | `4300` |
-| Method (`bill_payment` `{{4}}`) | `bills.method` title-cased | `Cash`, `Upi`, `Vitran` |
-| Empties Pending / Total Balance Due | existing `emptiesOutstanding` / `balanceDue` fields | `7`, `12500` |
+| Payment Mode (`bill_payment` `{{4}}`) | `bills.method` title-cased | `Cash`, `Upi`, `Vitran` |
+| Empty Cylinders Pending / Total Account Balance Due | existing `emptiesOutstanding` / `balanceDue` fields | `7`, `12500` |
 
 WhatsApp template parameters cannot contain newlines or tabs, so every multi-item list
 stays on one line, joined with ` • ` instead of a line break. Meta rejects the message
 outright if a parameter contains a newline — this is a hard constraint, not a style
-preference. The `•`, `@`, and `₹` characters are fine.
+preference. The `•`, `@`, `₹` and `━` characters are fine.
 
 ## Status display
 
@@ -355,7 +378,8 @@ codebase:
 
 1. Real phone number added to the WABA, verified. Must not be active on WhatsApp or the
    WhatsApp Business app.
-2. Three templates submitted and approved.
+2. Three templates submitted and approved. **Done** — `bill_sale`, `bill_payment`,
+   `bill_return` are approved in `en` with the bodies in "Templates" above.
 3. Permanent System User token generated with `whatsapp_business_messaging` and
    `whatsapp_business_management`, stored in Supabase secrets.
 4. Payment method added in WhatsApp Manager.

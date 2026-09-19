@@ -566,8 +566,17 @@ This task has no code. It is separated because template approval is asynchronous
 **Files:** none.
 
 **Interfaces:**
-- Consumes: nothing.
+- Consumes: the template bodies fixed in the design document (`docs/superpowers/specs/2026-09-13-whatsapp-bill-send-design.md`, "Templates").
 - Produces: three approved Utility templates named `bill_sale`, `bill_payment`, `bill_return` in `en` — the names Task 5 sends.
+
+**The design document is authoritative for the bodies.** The parameter count and order below must match `buildTemplateParams` in Task 3 exactly, because Task 5 sends parameters positionally: `bill_sale` takes 9, `bill_payment` 5, `bill_return` 5. A template approved with a different count or order produces either a Meta rejection at send time or a message with values in the wrong slots.
+
+Each template is a static text **header** plus a **body**. No footer, and no image header — see the design document for why. Only the body carries parameters, which is why the function sends a single `body` component.
+
+Two body rules caused rejections on the first submission and are already accounted for below. Do not "clean up" the text without re-reading them:
+
+- **A body may not begin or end with a variable.** The closing line `Contact us for any correction.` exists to satisfy this. Delete it and the template is rejected.
+- **Variable count is checked against body length.** Spelled-out labels (`Total Bill Amount`, not `Amount`) keep the ratio acceptable. Shortening labels can trip `This template has too many variables for its length`.
 
 - [ ] **Step 1: Open WhatsApp Manager**
 
@@ -575,50 +584,95 @@ Go to https://business.facebook.com/ → WhatsApp Manager → Message Templates 
 
 - [ ] **Step 2: Create `bill_sale`**
 
-- Category: **Utility** (not Marketing — Marketing is roughly 7.5× the cost)
+- Category: **Utility** (not Marketing — Marketing is roughly 7.5× the cost, and promotional wording gets a Utility template reclassified)
 - Name: `bill_sale`
-- Language: English
+- Language: English (`en`)
+- Header: **Text**, `New bill`
+- Footer: none
 - Body:
 
 ```
-Namaste {{1}}, bill {{2}} dated {{3}}.
-Items: {{4}}
-Amount: Rs {{5}}
-Balance due: Rs {{6}}
+Namaste *{{1}}* 🙏
+
+*Bill No:* {{2}}  |  *Date:* {{3}}
+
+*Delivered*
+{{4}}
+
+*Empties Collected Today*
+{{5}}
+
+━━━━━━━━━━━━━━
+*Total Bill Amount:* ₹{{6}}
+*Payment Status:* {{7}}
+
+*Empty Cylinders Pending:* {{8}}
+*Total Account Balance Due:* ₹{{9}}
+
+Contact us for any correction.
 ```
 
-- Sample values when prompted: `Ramesh Traders`, `S-1042`, `13-09-2026`, `2 × 19kg Commercial`, `4300`, `12500`
+- Sample values, in order: `Ramesh Traders`, `S-1042`, `13-09-2026`, `2 × 19kg Commercial @ ₹2150 = ₹4300 • 1 × 5kg @ ₹450 = ₹450`, `2 × 19kg Commercial`, `4750`, `Paid by Cash`, `7`, `12500`
+
+The delivered sample and the amount sample must agree — `4300 + 450 = 4750`. A sample where the line items do not sum to the total reads as careless to a reviewer.
 
 - [ ] **Step 3: Create `bill_payment`**
 
-- Category: **Utility**, Name: `bill_payment`, Language: English
+- Category: **Utility**, Name: `bill_payment`, Language: English (`en`)
+- Header: **Text**, `Payment received`
+- Footer: none
 - Body:
 
 ```
-Namaste {{1}}, payment of Rs {{2}} received on {{3}} via {{4}}.
-Balance due: Rs {{5}}
+Namaste *{{1}}* 🙏
+
+*Amount Received:* ₹{{2}}
+*Date of Payment:* {{3}}
+*Payment Mode:* {{4}}
+
+━━━━━━━━━━━━━━
+*Total Account Balance Due:* ₹{{5}}
+
+Contact us for any correction.
 ```
 
-- Samples: `Ramesh Traders`, `4300`, `13-09-2026`, `Cash`, `12500`
+- Samples, in order: `Ramesh Traders`, `4300`, `13-09-2026`, `Cash`, `12500`
 
 - [ ] **Step 4: Create `bill_return`**
 
-- Category: **Utility**, Name: `bill_return`, Language: English
+- Category: **Utility**, Name: `bill_return`, Language: English (`en`)
+- Header: **Text**, `Empties returned`
+- Footer: none
 - Body:
 
 ```
-Namaste {{1}}, return recorded on {{2}}.
-Returned: {{3}}
-Empties outstanding: {{4}}
+Namaste *{{1}}* 🙏
+
+*Date of Return:* {{2}}
+
+*Cylinders Returned*
+{{3}}
+
+━━━━━━━━━━━━━━
+*Empty Cylinders Pending:* {{4}}
+*Total Account Balance Due:* ₹{{5}}
+
+Contact us for any correction.
 ```
 
-- Samples: `Ramesh Traders`, `13-09-2026`, `3 × 19kg Commercial`, `7`
+- Samples, in order: `Ramesh Traders`, `13-09-2026`, `3 × 19kg Commercial`, `7`, `12500`
 
-- [ ] **Step 5: Confirm all three show Approved**
+- [ ] **Step 5: Set the message validity period on each template**
 
-Check the Message Templates list. Approval is typically minutes to hours.
+Enable **Set custom validity period** and set it to the maximum the field allows. The 10-minute default is tuned for OTPs: a customer whose phone is off longer than the window never receives the bill, and because the function records a send as `sent` when Meta accepts it rather than when it is delivered, the app shows a successful send with nothing on the customer's phone.
 
-If any is rejected, the reason is almost always promotional wording or a mismatched sample. Fix the flagged element and resubmit — do not change the placeholder count or order, because Task 5 sends parameters positionally.
+- [ ] **Step 6: Confirm all three show Approved**
+
+Check the Message Templates list. Approval is typically minutes; Meta's stated ceiling is 24 hours.
+
+If any is rejected, the reason is almost always promotional wording, a mismatched sample, or one of the two body rules above. Fix the flagged element and resubmit — do not change the placeholder count or order, because Task 5 sends parameters positionally.
+
+Sample values are checked against the body, so a sample list shorter or longer than the placeholder count is rejected on submission rather than at send time. The `•`, `@`, `₹` and `━` characters are accepted; a newline or tab inside a *parameter* is not, which is why every multi-item list stays on one line joined with ` • `.
 
 ---
 
