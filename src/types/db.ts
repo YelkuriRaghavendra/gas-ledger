@@ -198,10 +198,13 @@ export interface BillProfit {
   qty: number
   revenue_incl: number
   revenue_ex: number
-  cost_ex: number
-  profit: number
+  // sum() over the bill's lines, so SQL NULL when no line could be costed.
+  // `cost_known` (bool_and over the lines) is false in that case, but the null
+  // is real and the types say so rather than leaving consumers to coerce it.
+  cost_ex: number | null
+  profit: number | null
+  gst_in: number | null
   gst_out: number
-  gst_in: number
   cost_known: boolean
 }
 

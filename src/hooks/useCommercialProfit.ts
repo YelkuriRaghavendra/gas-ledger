@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { settleOldestFirst, type SettledBill } from '../utils/profit'
+import { billsInWindow, settleOldestFirst, type SettledBill } from '../utils/profit'
 import type { BillLineProfit, BillProfit, PaymentBill } from '../types/db'
 
 // Half-open [start, end) bounds on the view's IST `day` column, matching
@@ -40,8 +40,21 @@ export function useCommercialProfit(year: number, month: number) {
     setForbidden(false)
     const { start, end } = monthBounds(year, month)
 
+    // Bills are fetched from the beginning of time, not from `start`, because
+    // settlement is a running process over a customer's whole history: it pools
+    // their payments and applies them oldest-bill-first, ignoring payment dates
+    // entirely. Feeding a one-month bill queue a lifetime payment pool lets the
+    // same rupee realise a bill in August and again in September.
+    //
+    // The upper bound is still `end`: bills AFTER the window cannot affect how
+    // much of the pool reaches bills inside it (they queue behind them), while
+    // bills BEFORE it consume the pool first and must be present. Settle over
+    // everything, then slice.
+    //
+    // commercial_line_profit_range stays scoped to the window — the by-product
+    // breakdown has no settlement in it and needs no history.
     const [billRes, lineRes] = await Promise.all([
-      supabase.rpc('commercial_bill_profit', { p_from: start, p_to: end }),
+      supabase.rpc('commercial_bill_profit', { p_from: '1900-01-01', p_to: end }),
       supabase.rpc('commercial_line_profit_range', { p_from: start, p_to: end }),
     ])
 
@@ -57,7 +70,8 @@ export function useCommercialProfit(year: number, month: number) {
 
     try {
       const payments = await loadPayments()
-      setBills(settleOldestFirst((billRes.data ?? []) as BillProfit[], payments))
+      const settled = settleOldestFirst((billRes.data ?? []) as BillProfit[], payments)
+      setBills(billsInWindow(settled, start, end))
       setLines((lineRes.data ?? []) as BillLineProfit[])
       setError(null)
     } catch (e: any) {

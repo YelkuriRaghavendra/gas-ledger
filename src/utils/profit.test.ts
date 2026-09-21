@@ -86,6 +86,68 @@ describe('settleOldestFirst', () => {
     const result = settleOldestFirst([bill(1, '2026-09-03', 0, 0)], [])
     expect(result[0].realisedFraction).toBe(1)
   })
+
+  it('breaks a created_at tie by bill_id, not by input order', () => {
+    // Same timestamp, higher id listed first. Without the secondary key the
+    // payment would settle whichever row the API happened to return first.
+    const bills = [bill(2, '2026-09-03', 29000, 1200), bill(1, '2026-09-03', 29000, 3000)]
+    const result = settleOldestFirst(bills, [payment('2026-09-05', 29000)])
+    const byId = new Map(result.map((r) => [r.bill_id, r]))
+    expect(byId.get(1)!.realisedFraction).toBe(1)
+    expect(byId.get(2)!.realisedFraction).toBe(0)
+
+    // Reversed input, same answer.
+    const flipped = settleOldestFirst([...bills].reverse(), [payment('2026-09-05', 29000)])
+    const byIdFlipped = new Map(flipped.map((r) => [r.bill_id, r]))
+    expect(byIdFlipped.get(1)!.realisedFraction).toBe(1)
+    expect(byIdFlipped.get(2)!.realisedFraction).toBe(0)
+  })
+
+  it('realises nothing rather than NaN when every line of a bill is uncosted', () => {
+    const uncosted = { ...bill(1, '2026-09-03', 29000, 0), profit: null, cost_ex: null, gst_in: null, cost_known: false }
+    const [settled] = settleOldestFirst([uncosted], [payment('2026-09-05', 29000)])
+    expect(settled.realisedFraction).toBe(1)
+    expect(settled.realisedProfit).toBe(0)
+    expect(settled.pendingProfit).toBe(0)
+  })
+})
+
+import { billsInWindow } from './profit'
+
+describe('settle over history, then slice to the window', () => {
+  it('does not let one payment realise a bill in two different months', () => {
+    // Customer C: unpaid 29,000 on 5 Aug and on 10 Sep, one 29,000 payment.
+    // Only the August bill is covered; the September screen must show its bill
+    // pending, and the two months together must realise 29,000 once.
+    const history = [bill(1, '2026-08-05', 29000, 1271), bill(2, '2026-09-10', 29000, 1271)]
+    const settled = settleOldestFirst(history, [payment('2026-09-20', 29000)])
+
+    const august = billsInWindow(settled, '2026-08-01', '2026-09-01')
+    const september = billsInWindow(settled, '2026-09-01', '2026-10-01')
+
+    expect(august.map((b) => b.bill_id)).toEqual([1])
+    expect(september.map((b) => b.bill_id)).toEqual([2])
+    expect(august[0].realisedFraction).toBe(1)
+    expect(september[0].realisedFraction).toBe(0)
+    expect(september[0].pendingProfit).toBe(1271)
+  })
+
+  it('agrees with the customer-screen view of the same bill', () => {
+    // useCustomerProfit settles over the customer's full history with no slice.
+    // The windowed path must reach the same realisedFraction for a given bill,
+    // or Reports and CustomerDetail disagree about whether it is realised.
+    const history = [bill(1, '2026-08-05', 29000, 1271), bill(2, '2026-09-10', 29000, 1271)]
+    const payments = [payment('2026-09-20', 29000)]
+    const customerView = new Map(settleOldestFirst(history, payments).map((b) => [b.bill_id, b]))
+    const reportsView = billsInWindow(settleOldestFirst(history, payments), '2026-09-01', '2026-10-01')
+
+    expect(reportsView[0].realisedFraction).toBe(customerView.get(2)!.realisedFraction)
+  })
+
+  it('excludes a bill on the last day of the window', () => {
+    const settled = settleOldestFirst([bill(1, '2026-09-01', 1000, 100), bill(2, '2026-10-01', 1000, 100)], [])
+    expect(billsInWindow(settled, '2026-09-01', '2026-10-01').map((b) => b.bill_id)).toEqual([1])
+  })
 })
 
 import { summariseProfit, profitByCustomer, profitByProduct } from './profit'
@@ -119,6 +181,7 @@ describe('summariseProfit', () => {
   it('totals revenue, cost, profit and margin ex-GST', () => {
     const s = summariseProfit([settled({}), settled({ bill_id: 2 })])
     expect(s.revenue).toBeCloseTo(49152.54, 2)
+    expect(s.costedRevenue).toBeCloseTo(49152.54, 2)
     expect(s.profit).toBeCloseTo(2542.38, 2)
     expect(s.marginPct).toBeCloseTo(5.17, 2)
     expect(s.qty).toBe(20)
@@ -144,9 +207,37 @@ describe('summariseProfit', () => {
     expect(s.profit).toBeCloseTo(1271.19, 2)
   })
 
+  it('measures margin against costed revenue, not total revenue', () => {
+    // 100,000 billed, of which 29,000 has no cost behind it, on 22,000 profit.
+    // Margin describes the 71,000 the profit was computed from — 31.0%, not the
+    // 22.0% that dividing by the full revenue would report.
+    const s = summariseProfit([
+      settled({
+        bill_id: 1, qty: 10, revenue_ex: 71000, cost_ex: 49000, profit: 22000,
+        gst_out: 0, gst_in: 0, realisedProfit: 22000, pendingProfit: 0,
+      }),
+      settled({
+        bill_id: 2, qty: 5, revenue_ex: 29000, cost_known: false,
+        cost_ex: null, profit: null, gst_in: null, gst_out: 0,
+        realisedProfit: 0, pendingProfit: 0,
+      }),
+    ])
+    expect(s.revenue).toBe(100000)
+    expect(s.costedRevenue).toBe(71000)
+    expect(s.cost).toBe(49000)
+    expect(s.profit).toBe(22000)
+    expect(s.marginPct).toBeCloseTo(30.99, 2)
+    // Revenue − cost = profit holds over the costed slice.
+    expect(s.costedRevenue - s.cost).toBeCloseTo(s.profit, 2)
+    // Total revenue and qty still report everything billed.
+    expect(s.qty).toBe(15)
+    expect(s.unknownCostBills).toBe(1)
+  })
+
   it('returns a zero margin rather than NaN on empty input', () => {
     const s = summariseProfit([])
     expect(s.profit).toBe(0)
+    expect(s.costedRevenue).toBe(0)
     expect(s.marginPct).toBe(0)
   })
 })
@@ -186,9 +277,24 @@ describe('profitByProduct', () => {
 
   it('skips unknown-cost lines', () => {
     const rows = profitByProduct([
-      line({ bill_line_id: 1, product_id: 1, profit: 1000 }),
-      line({ bill_line_id: 2, product_id: 1, cost_known: false, profit: null, cost_ex: null }),
+      line({ bill_line_id: 1, bill_id: 1, product_id: 1, profit: 1000 }),
+      line({ bill_line_id: 2, bill_id: 2, product_id: 1, cost_known: false, profit: null, cost_ex: null }),
     ])
     expect(rows[0].profit).toBe(1000)
+  })
+
+  it('drops the whole bill when one of its lines is uncosted, matching summariseProfit', () => {
+    // Bill 1 mixes a costed line with an uncosted one; summariseProfit excludes
+    // bill 1 entirely, so the by-product column must too or the breakdown sums
+    // to more than the headline sitting next to it on screen.
+    const rows = profitByProduct([
+      line({ bill_line_id: 1, bill_id: 1, product_id: 1, profit: 1000, qty: 10 }),
+      line({ bill_line_id: 2, bill_id: 1, product_id: 2, cost_known: false, profit: null, cost_ex: null, qty: 2 }),
+      line({ bill_line_id: 3, bill_id: 2, product_id: 1, profit: 500, qty: 5 }),
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].productId).toBe(1)
+    expect(rows[0].profit).toBe(500)
+    expect(rows[0].qty).toBe(5)
   })
 })

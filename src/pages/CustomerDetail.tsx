@@ -528,8 +528,8 @@ export function CustomerDetail() {
                         <p className={`mt-[2px] text-[11px] font-semibold ${
                           profitByBill.get(t.id)!.realisedFraction >= 1 ? 'text-[#1D9E75]' : 'text-[#EF9F27]'
                         }`}>
-                          {profitByBill.get(t.id)!.cost_known
-                            ? `+${formatCurrency(profitByBill.get(t.id)!.profit)} ${
+                          {profitByBill.get(t.id)!.cost_known && profitByBill.get(t.id)!.profit != null
+                            ? `+${formatCurrency(profitByBill.get(t.id)!.profit!)} ${
                                 profitByBill.get(t.id)!.realisedFraction >= 1 ? 'realised' : 'pending'
                               }`
                             : 'cost unknown'}
