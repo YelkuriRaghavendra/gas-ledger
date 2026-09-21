@@ -176,6 +176,7 @@ export function CustomerDetail() {
       return
     }
     let cancelled = false
+    setBillLines([])
     setBillLinesError(null)
     supabase
       .rpc('commercial_bill_line_profit', { p_bill_id: viewingTx.id })
