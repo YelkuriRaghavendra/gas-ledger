@@ -152,20 +152,37 @@ $$;
 -- A bundle line (New Connection) has no purchase of its own; it costs as the sum
 -- of its components. If any component's cost is unknown the sum is null, and the
 -- line is flagged rather than silently costed at zero.
+-- Scalar subqueries, not UNION ALL + LIMIT 1: a union's row order is not
+-- guaranteed without ORDER BY, and the bundle branch is a bare aggregate that
+-- returns a NULL row even for products that are not bundles. This form always
+-- returns exactly one row and always prefers the direct cost.
+--
+-- bool_and forces the bundle cost to NULL when ANY component cost is unknown.
+-- Without it, sum() would quietly skip the unknown component and report a
+-- partial cost as if it were the whole thing.
 create or replace function public.resolve_line_cost(p_product_id bigint, p_date date)
 returns table (unit_cost_ex numeric, cost_source text)
 language sql stable as $$
-  select direct.unit_cost_ex, direct.cost_source
-  from public.resolve_unit_cost(p_product_id, p_date) direct
-  union all
   select
-    sum(bc.qty * comp.unit_cost_ex),
-    'bundle'
-  from public.bundle_components bc
-  cross join lateral public.resolve_unit_cost(bc.component_product_id, p_date) comp
-  where bc.bundle_product_id = p_product_id
-    and not exists (select 1 from public.resolve_unit_cost(p_product_id, p_date))
-  limit 1
+    coalesce(
+      (select d.unit_cost_ex from public.resolve_unit_cost(p_product_id, p_date) d),
+      bundle.cost
+    ),
+    case
+      when exists (select 1 from public.resolve_unit_cost(p_product_id, p_date))
+        then (select d.cost_source from public.resolve_unit_cost(p_product_id, p_date) d)
+      when bundle.cost is not null then 'bundle'
+      else null
+    end
+  from (
+    select case
+             when bool_and(comp.unit_cost_ex is not null)
+               then sum(bc.qty * comp.unit_cost_ex)
+           end as cost
+    from public.bundle_components bc
+    left join lateral public.resolve_unit_cost(bc.component_product_id, p_date) comp on true
+    where bc.bundle_product_id = p_product_id
+  ) bundle
 $$;
 ```
 
@@ -1485,14 +1502,16 @@ git commit -m "feat(reports): per-bill profit on the customer screen"
 
 - [ ] **Step 1: Add the strip**
 
-In `Home.tsx`, alongside the existing `currentMonthInIST()` usage, add:
+`Home.tsx` already holds the displayed month in `viewYear` / `viewMonth` (declared near line 39 and fed to `useMonthSummary`). Reuse those, so the strip follows the hero card's month stepper rather than the calendar month — otherwise the two cards disagree whenever the user steps back a month.
+
+Add after the existing `useMonthSummary` call:
 
 ```tsx
-const { bills: profitBills, forbidden: profitForbidden } = useCommercialProfit(monthYear, monthNumber)
+const { bills: profitBills, forbidden: profitForbidden } = useCommercialProfit(viewYear, viewMonth)
 const profitSummary = useMemo(() => summariseProfit(profitBills), [profitBills])
 ```
 
-using whatever variables that file already holds for the displayed month — the strip must follow the hero card's month stepper, not the calendar month, or the two cards will disagree.
+`Home.tsx` does not currently import `useMemo` — add it to the existing `react` import alongside `Fragment`, `useCallback`, `useRef`, `useState`.
 
 Render directly below the hero card:
 
