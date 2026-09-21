@@ -251,9 +251,11 @@ limit 5;
 ```
 
 Expected for a 12 × 19 kg line sold at ₹2,900 each against a ₹2,750 purchase:
-`revenue_incl 34800`, `revenue_ex 29491.53`, `gst_out 5308.47`, `unit_cost_ex 2330.51`, `cost_ex 27966.12`, `profit 1525.41`, `cost_known true`.
+`revenue_incl 34800`, `revenue_ex 29491.53`, `gst_out 5308.47`, `unit_cost_ex 2330.51`, `cost_ex 27966.10`, `profit 1525.42`, `cost_known true`.
 
-Sanity check the per-cylinder figure: `1525.41 / 12 = 127.12`. If you see `150.00` the division was skipped somewhere.
+`unit_cost_ex * 12` does not equal `cost_ex`: the view rounds each output column independently from the unrounded unit cost, so `cost_ex` is `round(12 * 2330.508474…, 2)`, not `12 * 2330.51`. The two differ by 2 paise. That is expected, not a bug.
+
+Sanity check the per-cylinder figure: `1525.42 / 12 = 127.12`. If you see `150.00` the division was skipped somewhere.
 
 - [ ] **Step 4: Verify the exclusions**
 
