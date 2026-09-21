@@ -437,18 +437,26 @@ select
   pl.product_id,
   (po.created_at at time zone 'Asia/Kolkata')::date        as cost_date,
   (pl.amount / pl.qty) / (1 + p.gst_rate / 100.0)          as unit_cost_ex,
-  po.po_number
+  po.po_number,
+  po.created_at
 from public.purchase_lines pl
 join public.purchase_orders po on po.id = pl.purchase_order_id
 join public.products p on p.id = pl.product_id
 where po.type = 'purchase'
   and pl.qty > 0;
 
-revoke all on public.product_unit_cost from anon, authenticated;
+revoke all on public.product_unit_cost from public, anon, authenticated;
 
 -- Prefers the nearest purchase on or before the sale date. Falls forward to the
 -- earliest purchase after it when the product was first bought later than the
 -- sale — otherwise a backdated bill would report infinite margin.
+--
+-- The created_at / po_number keys make the order TOTAL. Without them two
+-- purchase lines for one product sharing a cost_date rank equally and Postgres
+-- returns either — the 1st-of-month revision case exactly, where an old-rate PO
+-- and a new-rate PO land on the same day, and the same bill can then report two
+-- different margins on two queries. On a tie the most recently recorded
+-- purchase wins, which is the one that reflects replacement cost.
 create or replace function public.resolve_unit_cost(p_product_id bigint, p_date date)
 returns table (unit_cost_ex numeric, cost_source text)
 language sql stable as $$
@@ -457,11 +465,17 @@ language sql stable as $$
   where uc.product_id = p_product_id
   order by
     (uc.cost_date <= p_date) desc,
-    abs(uc.cost_date - p_date) asc
+    abs(uc.cost_date - p_date) asc,
+    uc.created_at desc,
+    uc.po_number desc
   limit 1
 $$;
 
-revoke all on function public.resolve_unit_cost(bigint, date) from anon, authenticated;
+-- `from public`, not just `from anon, authenticated`: Postgres grants EXECUTE on
+-- every new function to PUBLIC by default, and revoking from two named roles
+-- leaves that grant standing — the function stays callable by anyone through
+-- POST /rest/v1/rpc/.
+revoke all on function public.resolve_unit_cost(bigint, date) from public, anon, authenticated;
 
 -- A bundle line (New Connection) has no purchase of its own; it costs as the sum
 -- of its components. If any component's cost is unknown the sum is null, and the
@@ -499,7 +513,7 @@ language sql stable as $$
   ) bundle
 $$;
 
-revoke all on function public.resolve_line_cost(bigint, date) from anon, authenticated;
+revoke all on function public.resolve_line_cost(bigint, date) from public, anon, authenticated;
 
 -- ── bill_line_profit ─────────────────────────────────────────
 create or replace view public.bill_line_profit as
@@ -622,6 +636,14 @@ begin
     select * from public.bill_line_profit
     where day >= p_from and day < p_to;
 end $$;
+
+-- These four are `security definer` and call require_owner() first, so the owner
+-- gate holds regardless — but the default PUBLIC EXECUTE grant is revoked so the
+-- privilege matches the intent rather than resting on the guard alone.
+revoke all on function public.commercial_bill_profit(date, date)          from public;
+revoke all on function public.commercial_bill_profit_for_customer(bigint) from public;
+revoke all on function public.commercial_bill_line_profit(bigint)         from public;
+revoke all on function public.commercial_line_profit_range(date, date)    from public;
 
 grant execute on function public.commercial_bill_profit(date, date)          to authenticated;
 grant execute on function public.commercial_bill_profit_for_customer(bigint) to authenticated;
