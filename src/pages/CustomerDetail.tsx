@@ -103,7 +103,11 @@ function digestLine(group: HistoryGroup) {
   return parts.join(' · ')
 }
 
-function detailRows(t: HistoryEntry, profitLines: BillLineProfit[] = []): { k: string; v: string }[] {
+function detailRows(
+  t: HistoryEntry,
+  profitLines: BillLineProfit[] = [],
+  billLinesError: string | null = null,
+): { k: string; v: string }[] {
   const rows: { k: string; v: string }[] = []
   if (t.productName) rows.push({ k: 'Product', v: t.productName })
   if (t.type === 'sale') {
@@ -121,12 +125,16 @@ function detailRows(t: HistoryEntry, profitLines: BillLineProfit[] = []): { k: s
   rows.push({ k: 'Balance after', v: formatCurrency(t.balanceAfter) })
   if (t.type === 'sale' && profitLines.length > 0) {
     for (const l of profitLines) {
+      // bill_line_id keeps the row key unique per line — nothing in the schema
+      // stops two lines on the same bill sharing a product_id.
       rows.push({
-        k: `Cost · ${l.product_name}`,
+        k: `Cost · ${l.product_name} · #${l.bill_line_id}`,
         v: l.cost_known ? `${formatCurrency(l.unit_cost_ex ?? 0)} × ${l.qty}${l.cost_source ? ` (${l.cost_source})` : ''}` : 'unknown',
       })
-      rows.push({ k: `Profit · ${l.product_name}`, v: l.cost_known ? formatCurrency(l.profit ?? 0) : '—' })
+      rows.push({ k: `Profit · ${l.product_name} · #${l.bill_line_id}`, v: l.cost_known ? formatCurrency(l.profit ?? 0) : '—' })
     }
+  } else if (t.type === 'sale' && billLinesError) {
+    rows.push({ k: 'Margin', v: 'Could not load' })
   }
   return rows
 }
@@ -158,16 +166,37 @@ export function CustomerDetail() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
   const [billLines, setBillLines] = useState<BillLineProfit[]>([])
+  const [billLinesError, setBillLinesError] = useState<string | null>(null)
   const profileNames = useProfiles()
 
   useEffect(() => {
     if (!isOwner || !viewingTx || viewingTx.type !== 'sale') {
       setBillLines([])
+      setBillLinesError(null)
       return
     }
+    let cancelled = false
+    setBillLinesError(null)
     supabase
       .rpc('commercial_bill_line_profit', { p_bill_id: viewingTx.id })
-      .then(({ data }) => setBillLines((data ?? []) as BillLineProfit[]))
+      .then(({ data, error }) => {
+        // Guards both escape routes: the user opened a different bill before
+        // this response landed, or closed the sheet entirely — either way the
+        // response for `viewingTx.id` at request time is stale by the time it
+        // arrives, and must not be applied to whatever is on screen now.
+        if (cancelled) return
+        if (error) {
+          setBillLines([])
+          // 42501 is the RPC's non-owner refusal; isOwner already keeps staff
+          // from reaching this call, so surface anything else as a real failure.
+          if (error.code !== '42501') setBillLinesError(error.message)
+          return
+        }
+        setBillLines((data ?? []) as BillLineProfit[])
+      })
+    return () => {
+      cancelled = true
+    }
   }, [isOwner, viewingTx])
 
   const productNameById = new Map(products.map((p) => [p.id, p.name]))
@@ -537,7 +566,7 @@ export function CustomerDetail() {
           iconColor={getActivityTint(viewingTx.type).color}
           title={historyTitle(viewingTx, viewingTx.productName)}
           amount={historyAmount(viewingTx)}
-          rows={detailRows(viewingTx, billLines)}
+          rows={detailRows(viewingTx, billLines, billLinesError)}
           created={formatDate(viewingTx.created_at)}
           createdBy={viewingTx.created_by ? profileNames.get(viewingTx.created_by) : undefined}
           updated={formatUpdated(viewingTx.updated_at, viewingTx.created_at)}
