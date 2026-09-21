@@ -76,6 +76,9 @@ export function DomesticCombos() {
         name,
         price: Number(newPrice || 0),
         segment: 'domestic',
+        // The column defaults to 18 (commercial); domestic sits at 5 and must
+        // say so on every insert. See DomesticStock.tsx.
+        gst_rate: 5,
         kind: 'service',
         unit: 'pc',
         sort_order: maxSort + 1,

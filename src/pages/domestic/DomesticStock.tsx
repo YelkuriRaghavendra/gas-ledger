@@ -59,6 +59,11 @@ export function DomesticStock() {
       name: trimmed,
       price: Number(price || 0),
       segment: 'domestic',
+      // Explicit: the column defaults to 18 (commercial). Migration 011
+      // backfilled the domestic catalogue to 5 once, but a default cannot know
+      // the segment, so every product created here must state its own slab or
+      // it is taxed as commercial.
+      gst_rate: 5,
       kind,
       unit: unit.trim() || 'pc',
       sort_order: maxSort + 1,
