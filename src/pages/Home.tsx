@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useRef, useState } from 'react'
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -10,6 +10,8 @@ import { useActivityFeed, type FeedItem } from '../hooks/useActivityFeed'
 import { useProfiles } from '../hooks/useProfiles'
 import { useDailySummary } from '../hooks/useDailySummary'
 import { currentMonthInIST, useMonthSummary } from '../hooks/useMonthSummary'
+import { useCommercialProfit } from '../hooks/useCommercialProfit'
+import { summariseProfit } from '../utils/profit'
 import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
@@ -39,6 +41,8 @@ export function Home() {
   const [viewYear, setViewYear] = useState(() => currentMonthInIST().year)
   const [viewMonth, setViewMonth] = useState(() => currentMonthInIST().month)
   const monthly = useMonthSummary('commercial', viewYear, viewMonth)
+  const { bills: profitBills, forbidden: profitForbidden } = useCommercialProfit(viewYear, viewMonth)
+  const profitSummary = useMemo(() => summariseProfit(profitBills), [profitBills])
   const nowIST = currentMonthInIST()
   const atCurrentMonth = viewYear === nowIST.year && viewMonth === nowIST.month
   // Only spell out the year once it stops being the obvious one.
@@ -223,6 +227,19 @@ export function Home() {
                 />
               </div>
             </div>
+
+            {isOwner && !profitForbidden && (
+              <Link to="/commercial/reports" className="mt-3 flex items-center justify-between rounded-[16px] bg-surface px-[13px] py-3 shadow-card">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-muted">Profit this month</p>
+                  <p className="mt-[2px] font-display text-[21px] font-bold text-ink">{formatCurrency(profitSummary.profit)}</p>
+                  <p className="mt-[2px] text-[11px] font-semibold text-subtle">
+                    {formatCurrency(profitSummary.realised)} realised · {profitSummary.marginPct.toFixed(1)}%
+                  </p>
+                </div>
+                <span className="text-[12px] font-bold text-accent">Reports ›</span>
+              </Link>
+            )}
 
             <CylindersCard items={cylinderItems} accent="orange" linkLabel="Godown" linkTo="/commercial/godown" />
 
