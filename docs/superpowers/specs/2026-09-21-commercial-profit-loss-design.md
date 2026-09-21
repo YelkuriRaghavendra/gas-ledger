@@ -89,17 +89,54 @@ Profit output is therefore gated server-side. Staff keep the Purchases screen an
 current purchase visibility is unchanged — the gate applies to the derived profit
 figures, not to the raw purchase records.
 
+### 5. Profit is computed ex-GST
+
+Confirmed with the owner: stored amounts on both `bill_lines` and
+`purchase_lines` are GST-inclusive — what the customer hands over and what we pay
+the plant. The agency is registered and claims input credit.
+
+Profit must therefore be computed on base amounts, not on the stored figures. One
+cylinder, commercial:
+
+| | Stored (incl.) | Base | GST |
+| --- | --- | --- | --- |
+| Sold | 2900.00 | 2457.63 | 442.37 collected |
+| Cost | 2750.00 | 2330.51 | 419.49 input credit |
+| Difference | 150.00 | **127.12** | 22.88 payable |
+
+The operation is a division, not a subtraction. `base = amount / (1 + rate)`, and
+the tax slice of an inclusive amount is `amount * rate / (1 + rate)` — 15.25% of
+the total at an 18% rate, not 18%. Writing `amount * 0.18` would take 18% of a
+figure that already contains the tax and overstate GST by ~18%.
+
+Because both legs carry the same rate, inclusive-basis profit is exactly
+`ex-GST profit * 1.18`. Reporting on stored amounts would therefore read 18% high
+on every commercial figure, and 5% high on domestic. Customer and product
+rankings would be unaffected — the inflation is uniform — but absolute rupee
+totals would be wrong by a material margin.
+
+This adds the one schema change in this design: `products.gst_rate numeric not
+null default 18`, backfilled to 5 for `segment = 'domestic'`. Per-product rather
+than a single setting, because the two segments sit at different slabs and
+accessories may differ again.
+
+Reports gains a **GST payable** figure for the period: output GST collected minus
+input credit claimed. Both halves already exist in the data once rates are known,
+and the owner needs the number for filing regardless.
+
 ## Data model
 
-No table changes. No migration risk. Every object below is a view or a function,
-reversible with `drop`.
+One schema change: `products.gst_rate` (see decision 5). Everything else below is
+a view or a function, reversible with `drop`.
 
 ### Costing rules
 
 - Only `purchase_orders.type = 'purchase'` contributes cost. `type = 'opening'`
   rows are stock seeding with no real money behind them.
 - Unit cost is `purchase_lines.amount / purchase_lines.qty`, guarded against
-  `qty = 0` (TVS-style empties-only lines).
+  `qty = 0` (TVS-style empties-only lines), then divided by
+  `1 + products.gst_rate / 100` to reach the base rate. Revenue is stripped the
+  same way. Both sides must be ex-GST or the margin is meaningless.
 - If no purchase exists on or before the sale date, fall forward to the earliest
   purchase ever recorded for that product.
 - If the product was never purchased at all — accessories sourced outside the OMC
@@ -135,7 +172,9 @@ Public API, `security definer`, each beginning with an owner check that raises
 `insufficient_privilege` for anyone else:
 
 - `commercial_profit_summary(from_date, to_date)` — revenue, COGS, gross profit,
-  margin %, realised, pending, cylinders sold, unknown-cost line count.
+  margin %, realised, pending, cylinders sold, unknown-cost line count, GST
+  collected, input credit, GST payable. All money figures ex-GST except the three
+  GST figures themselves.
 - `commercial_profit_by_product(from_date, to_date)`
 - `commercial_profit_by_customer(from_date, to_date)` — adds `amount_due` and
   `empties_outstanding` per customer.
@@ -202,14 +241,20 @@ need nothing further from the database.
 - Inclusion: surrender sale counts, surrender return excluded, opening bills
   excluded, domestic products excluded.
 - Bundles: bundle line costs as the sum of its components.
+- GST: a 2900/2750 commercial pair yields profit 127.12 and GST payable 22.88,
+  not 150 and 522. A product at a different `gst_rate` strips at its own rate.
+  Guard against a future `gst_rate = 0` product dividing correctly by 1.
 - Access: a `staff` profile calling each function receives
   `insufficient_privilege`, not an empty result set. An empty set would read as
   "no profit this month" and hide the failure.
 
 ## Out of scope
 
-- Operating expenses (wages, transport, godown rent). This delivers gross margin.
-  A full P&L needs an expenses table and is a separate change.
+- Operating expenses (wages, transport, godown rent). This delivers gross margin,
+  ex-GST. A full P&L needs an expenses table and is a separate change.
+- GST returns. Reports shows GST payable for a period as a working figure; it is
+  not a filing-grade computation and does not handle reverse charge, credit
+  notes, or ineligible credit.
 - Domestic segment reporting.
 - Accrual-basis view.
 - Payment-to-invoice allocation stored in the schema. Settlement is derived;
