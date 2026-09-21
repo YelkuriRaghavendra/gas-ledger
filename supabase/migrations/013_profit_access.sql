@@ -67,13 +67,6 @@ begin
     where day >= p_from and day < p_to;
 end $$;
 
-revoke all on public.product_unit_cost from anon, authenticated;
-revoke all on public.bill_line_profit  from anon, authenticated;
-revoke all on public.bill_profit       from anon, authenticated;
-
-revoke all on function public.resolve_unit_cost(bigint, date) from anon, authenticated;
-revoke all on function public.resolve_line_cost(bigint, date) from anon, authenticated;
-
 grant execute on function public.commercial_bill_profit(date, date)          to authenticated;
 grant execute on function public.commercial_bill_profit_for_customer(bigint) to authenticated;
 grant execute on function public.commercial_bill_line_profit(bigint)         to authenticated;

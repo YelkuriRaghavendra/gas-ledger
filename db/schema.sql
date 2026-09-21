@@ -444,6 +444,8 @@ join public.products p on p.id = pl.product_id
 where po.type = 'purchase'
   and pl.qty > 0;
 
+revoke all on public.product_unit_cost from anon, authenticated;
+
 -- Prefers the nearest purchase on or before the sale date. Falls forward to the
 -- earliest purchase after it when the product was first bought later than the
 -- sale — otherwise a backdated bill would report infinite margin.
@@ -458,6 +460,8 @@ language sql stable as $$
     abs(uc.cost_date - p_date) asc
   limit 1
 $$;
+
+revoke all on function public.resolve_unit_cost(bigint, date) from anon, authenticated;
 
 -- A bundle line (New Connection) has no purchase of its own; it costs as the sum
 -- of its components. If any component's cost is unknown the sum is null, and the
@@ -495,6 +499,8 @@ language sql stable as $$
   ) bundle
 $$;
 
+revoke all on function public.resolve_line_cost(bigint, date) from anon, authenticated;
+
 -- ── bill_line_profit ─────────────────────────────────────────
 create or replace view public.bill_line_profit as
 select
@@ -528,6 +534,8 @@ left join lateral public.resolve_line_cost(
 where b.type = 'sale'
   and p.segment = 'commercial';
 
+revoke all on public.bill_line_profit from anon, authenticated;
+
 -- ── bill_profit ──────────────────────────────────────────────
 create or replace view public.bill_profit as
 select
@@ -542,6 +550,8 @@ select
   bool_and(cost_known) as cost_known
 from public.bill_line_profit
 group by bill_id, bill_number, customer_id, created_at, day, paid;
+
+revoke all on public.bill_profit from anon, authenticated;
 
 -- ── profit access: owner gate ────────────────────────────────
 -- The app's existing profile?.role === 'owner' checks only hide UI. Every table
@@ -612,13 +622,6 @@ begin
     select * from public.bill_line_profit
     where day >= p_from and day < p_to;
 end $$;
-
-revoke all on public.product_unit_cost from anon, authenticated;
-revoke all on public.bill_line_profit  from anon, authenticated;
-revoke all on public.bill_profit       from anon, authenticated;
-
-revoke all on function public.resolve_unit_cost(bigint, date) from anon, authenticated;
-revoke all on function public.resolve_line_cost(bigint, date) from anon, authenticated;
 
 grant execute on function public.commercial_bill_profit(date, date)          to authenticated;
 grant execute on function public.commercial_bill_profit_for_customer(bigint) to authenticated;
