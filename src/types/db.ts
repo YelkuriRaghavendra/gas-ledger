@@ -23,6 +23,7 @@ export interface Product {
   id: number
   name: string
   price: number
+  gst_rate: number
   price_options: PriceOption[]
   segment: Segment
   kind: ProductKind

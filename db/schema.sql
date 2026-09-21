@@ -33,6 +33,7 @@ create table if not exists public.products (
   id                 bigserial   primary key,
   name               text        not null,
   price              numeric     not null default 0,
+  gst_rate           numeric     not null default 18,
   segment            text        not null default 'commercial' check (segment in ('commercial', 'domestic')),
   kind               text        not null default 'cylinder'   check (kind in ('cylinder', 'accessory', 'service')),
   unit               text        not null default 'pc',
@@ -443,6 +444,8 @@ select * from (values
   ('Pass Book',                  0::numeric, 'domestic', 'accessory', 'pc', 11)
 ) as v(name, price, segment, kind, unit, sort_order)
 where not exists (select 1 from public.products where segment = 'domestic');
+
+update public.products set gst_rate = 5 where segment = 'domestic';
 
 insert into public.bundle_components (bundle_product_id, component_product_id, qty)
 select nc.id, comp.id, 1
