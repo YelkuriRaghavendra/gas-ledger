@@ -49,3 +49,103 @@ export function settleOldestFirst(bills: BillProfit[], payments: PaymentBill[]):
     }
   })
 }
+
+import type { BillLineProfit } from '../types/db'
+
+export interface ProfitSummary {
+  revenue: number
+  cost: number
+  profit: number
+  marginPct: number
+  realised: number
+  pending: number
+  qty: number
+  gstOut: number
+  gstIn: number
+  gstPayable: number
+  unknownCostBills: number
+}
+
+export interface CustomerProfit {
+  customerId: number
+  name: string
+  qty: number
+  profit: number
+  realised: number
+  pending: number
+}
+
+export interface ProductProfit {
+  productId: number
+  name: string
+  qty: number
+  revenue: number
+  cost: number
+  profit: number
+}
+
+// Bills whose cost could not be resolved contribute revenue context but never
+// profit — costing them at zero would report infinite margin. The count is
+// surfaced on screen so a missing purchase order is visible rather than silent.
+export function summariseProfit(bills: SettledBill[]): ProfitSummary {
+  let revenue = 0, cost = 0, profit = 0, realised = 0, pending = 0
+  let qty = 0, gstOut = 0, gstIn = 0, unknownCostBills = 0
+
+  for (const b of bills) {
+    revenue += b.revenue_ex
+    gstOut += b.gst_out
+    qty += b.qty
+    if (!b.cost_known) {
+      unknownCostBills += 1
+      continue
+    }
+    cost += b.cost_ex
+    gstIn += b.gst_in
+    profit += b.profit
+    realised += b.realisedProfit
+    pending += b.pendingProfit
+  }
+
+  return {
+    revenue, cost, profit,
+    marginPct: revenue > 0 ? (profit / revenue) * 100 : 0,
+    realised, pending, qty, gstOut, gstIn,
+    gstPayable: gstOut - gstIn,
+    unknownCostBills,
+  }
+}
+
+export function profitByCustomer(bills: SettledBill[], names: Map<number, string>): CustomerProfit[] {
+  const acc = new Map<number, CustomerProfit>()
+  for (const b of bills) {
+    if (b.customer_id == null || !b.cost_known) continue
+    const row = acc.get(b.customer_id) ?? {
+      customerId: b.customer_id,
+      name: names.get(b.customer_id) ?? `Customer ${b.customer_id}`,
+      qty: 0, profit: 0, realised: 0, pending: 0,
+    }
+    row.qty += b.qty
+    row.profit += b.profit
+    row.realised += b.realisedProfit
+    row.pending += b.pendingProfit
+    acc.set(b.customer_id, row)
+  }
+  return [...acc.values()].sort((a, b) => b.profit - a.profit)
+}
+
+export function profitByProduct(lines: BillLineProfit[]): ProductProfit[] {
+  const acc = new Map<number, ProductProfit>()
+  for (const l of lines) {
+    if (!l.cost_known || l.profit == null || l.cost_ex == null) continue
+    const row = acc.get(l.product_id) ?? {
+      productId: l.product_id, name: l.product_name,
+      qty: 0, revenue: 0, cost: 0, profit: 0,
+    }
+    row.qty += l.qty
+    row.revenue += l.revenue_ex
+    row.cost += l.cost_ex
+    row.profit += l.profit
+    acc.set(l.product_id, row)
+  }
+  return [...acc.values()].sort((a, b) => b.profit - a.profit)
+}
