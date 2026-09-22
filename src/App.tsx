@@ -15,6 +15,7 @@ import { RecordPayment } from './pages/RecordPayment'
 import { ActivityFeed } from './pages/ActivityFeed'
 import { BusinessDetails } from './pages/BusinessDetails'
 import { Purchases } from './pages/Purchases'
+import { Reports } from './pages/Reports'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { AllStock } from './pages/AllStock'
 import { SetCurrentStock } from './pages/SetCurrentStock'
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="/commercial/purchases/:billId/edit" element={<RecordPurchase />} />
             <Route path="/commercial/godown" element={<AllStock />} />
             <Route path="/commercial/godown/set-stock" element={<SetCurrentStock />} />
+            <Route path="/commercial/reports" element={<Reports />} />
 
             {/* Domestic */}
             <Route path="/domestic" element={<DomesticHome />} />

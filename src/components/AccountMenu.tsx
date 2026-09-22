@@ -22,6 +22,11 @@ export function AccountMenu({ open, onClose }: { open: boolean; onClose: () => v
         </div>
       </div>
       {/* Products and prices are edited from the Godown / Stock screen. */}
+      {profile?.role === 'owner' && (
+        <Link to="/commercial/reports" onClick={onClose} className={rowCls}>
+          Reports <span className="text-[#C0B4A2]">›</span>
+        </Link>
+      )}
       <Link to="/account/business" onClick={onClose} className={`${rowCls} border-b-0`}>Business details <span className="text-[#C0B4A2]">›</span></Link>
       <button onClick={signOut} className="mt-3 h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface text-[15px] font-bold" style={{ color: '#C23B22' }}>
         Sign out

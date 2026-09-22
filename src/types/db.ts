@@ -23,6 +23,7 @@ export interface Product {
   id: number
   name: string
   price: number
+  gst_rate: number
   price_options: PriceOption[]
   segment: Segment
   kind: ProductKind
@@ -183,4 +184,57 @@ export interface DailyPurchaseSummary {
   cylinders_purchased: number
   empties_given_to_supplier: number
   purchase_amount: number
+}
+
+// One row per commercial sale bill, from commercial_bill_profit(). Every money
+// field is ex-GST except revenue_incl and the gst_* pair.
+export interface BillProfit {
+  bill_id: number
+  bill_number: string
+  customer_id: number | null
+  created_at: string
+  day: string
+  paid: boolean
+  qty: number
+  revenue_incl: number
+  revenue_ex: number
+  // sum() over the bill's lines, so SQL NULL when no line could be costed.
+  // `cost_known` (bool_and over the lines) is false in that case, but the null
+  // is real and the types say so rather than leaving consumers to coerce it.
+  cost_ex: number | null
+  profit: number | null
+  gst_in: number | null
+  gst_out: number
+  cost_known: boolean
+}
+
+export interface BillLineProfit {
+  bill_line_id: number
+  bill_id: number
+  bill_number: string
+  customer_id: number | null
+  created_at: string
+  day: string
+  paid: boolean
+  product_id: number
+  product_name: string
+  gst_rate: number
+  qty: number
+  revenue_incl: number
+  revenue_ex: number
+  gst_out: number
+  unit_cost_ex: number | null
+  cost_ex: number | null
+  gst_in: number | null
+  profit: number | null
+  cost_known: boolean
+  cost_source: string | null
+}
+
+// Payment bills carry no lines, so they are read from `bills` directly rather
+// than through the gated profit functions.
+export interface PaymentBill {
+  customer_id: number
+  created_at: string
+  total_amount: number
 }
