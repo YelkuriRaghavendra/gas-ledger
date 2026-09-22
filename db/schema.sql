@@ -33,6 +33,7 @@ create table if not exists public.products (
   id                 bigserial   primary key,
   name               text        not null,
   price              numeric     not null default 0,
+  gst_rate           numeric     not null default 18,
   segment            text        not null default 'commercial' check (segment in ('commercial', 'domestic')),
   kind               text        not null default 'cylinder'   check (kind in ('cylinder', 'accessory', 'service')),
   unit               text        not null default 'pc',
@@ -497,6 +498,230 @@ select
 from bills
 group by 1;
 
+-- ── product_unit_cost ────────────────────────────────────────
+-- Cost basis: the latest purchase rate on or before the sale date — replacement
+-- cost, not a blended average. The OMC revises the commercial rate on the 1st of
+-- every month, so two bills for the same product at the same sale price will
+-- legitimately show different profit if a revision fell between them.
+
+create or replace view public.product_unit_cost as
+select
+  pl.product_id,
+  (po.created_at at time zone 'Asia/Kolkata')::date        as cost_date,
+  (pl.amount / pl.qty) / (1 + p.gst_rate / 100.0)          as unit_cost_ex,
+  po.po_number,
+  po.created_at
+from public.purchase_lines pl
+join public.purchase_orders po on po.id = pl.purchase_order_id
+join public.products p on p.id = pl.product_id
+where po.type = 'purchase'
+  and pl.qty > 0;
+
+revoke all on public.product_unit_cost from public, anon, authenticated;
+
+-- Prefers the nearest purchase on or before the sale date. Falls forward to the
+-- earliest purchase after it when the product was first bought later than the
+-- sale — otherwise a backdated bill would report infinite margin.
+--
+-- The created_at / po_number keys make the order TOTAL. Without them two
+-- purchase lines for one product sharing a cost_date rank equally and Postgres
+-- returns either — the 1st-of-month revision case exactly, where an old-rate PO
+-- and a new-rate PO land on the same day, and the same bill can then report two
+-- different margins on two queries. On a tie the most recently recorded
+-- purchase wins, which is the one that reflects replacement cost.
+create or replace function public.resolve_unit_cost(p_product_id bigint, p_date date)
+returns table (unit_cost_ex numeric, cost_source text)
+language sql stable as $$
+  select uc.unit_cost_ex, uc.po_number
+  from public.product_unit_cost uc
+  where uc.product_id = p_product_id
+  order by
+    (uc.cost_date <= p_date) desc,
+    abs(uc.cost_date - p_date) asc,
+    uc.created_at desc,
+    uc.po_number desc
+  limit 1
+$$;
+
+-- `from public`, not just `from anon, authenticated`: Postgres grants EXECUTE on
+-- every new function to PUBLIC by default, and revoking from two named roles
+-- leaves that grant standing — the function stays callable by anyone through
+-- POST /rest/v1/rpc/.
+revoke all on function public.resolve_unit_cost(bigint, date) from public, anon, authenticated;
+
+-- A bundle line (New Connection) has no purchase of its own; it costs as the sum
+-- of its components. If any component's cost is unknown the sum is null, and the
+-- line is flagged rather than silently costed at zero.
+-- Scalar subqueries, not UNION ALL + LIMIT 1: a union's row order is not
+-- guaranteed without ORDER BY, and the bundle branch is a bare aggregate that
+-- returns a NULL row even for products that are not bundles. This form always
+-- returns exactly one row and always prefers the direct cost.
+--
+-- bool_and forces the bundle cost to NULL when ANY component cost is unknown.
+-- Without it, sum() would quietly skip the unknown component and report a
+-- partial cost as if it were the whole thing.
+create or replace function public.resolve_line_cost(p_product_id bigint, p_date date)
+returns table (unit_cost_ex numeric, cost_source text)
+language sql stable as $$
+  select
+    coalesce(
+      (select d.unit_cost_ex from public.resolve_unit_cost(p_product_id, p_date) d),
+      bundle.cost
+    ),
+    case
+      when exists (select 1 from public.resolve_unit_cost(p_product_id, p_date))
+        then (select d.cost_source from public.resolve_unit_cost(p_product_id, p_date) d)
+      when bundle.cost is not null then 'bundle'
+      else null
+    end
+  from (
+    select case
+             when bool_and(comp.unit_cost_ex is not null)
+               then sum(bc.qty * comp.unit_cost_ex)
+           end as cost
+    from public.bundle_components bc
+    left join lateral public.resolve_unit_cost(bc.component_product_id, p_date) comp on true
+    where bc.bundle_product_id = p_product_id
+  ) bundle
+$$;
+
+revoke all on function public.resolve_line_cost(bigint, date) from public, anon, authenticated;
+
+-- ── bill_line_profit ─────────────────────────────────────────
+create or replace view public.bill_line_profit as
+select
+  bl.id                                                      as bill_line_id,
+  b.id                                                       as bill_id,
+  b.bill_number,
+  b.customer_id,
+  b.created_at,
+  (b.created_at at time zone 'Asia/Kolkata')::date           as day,
+  b.paid,
+  bl.product_id,
+  p.name                                                     as product_name,
+  p.gst_rate,
+  bl.qty,
+  bl.amount                                                  as revenue_incl,
+  round(bl.amount / (1 + p.gst_rate / 100.0), 2)             as revenue_ex,
+  round(bl.amount - bl.amount / (1 + p.gst_rate / 100.0), 2) as gst_out,
+  round(c.unit_cost_ex, 2)                                   as unit_cost_ex,
+  round(bl.qty * c.unit_cost_ex, 2)                          as cost_ex,
+  round(bl.qty * c.unit_cost_ex * p.gst_rate / 100.0, 2)     as gst_in,
+  round(bl.amount / (1 + p.gst_rate / 100.0)
+        - bl.qty * c.unit_cost_ex, 2)                        as profit,
+  (c.unit_cost_ex is not null)                               as cost_known,
+  c.cost_source
+from public.bill_lines bl
+join public.bills b on b.id = bl.bill_id
+join public.products p on p.id = bl.product_id
+left join lateral public.resolve_line_cost(
+  bl.product_id, (b.created_at at time zone 'Asia/Kolkata')::date
+) c on true
+where b.type = 'sale'
+  and p.segment = 'commercial';
+
+revoke all on public.bill_line_profit from anon, authenticated;
+
+-- ── bill_profit ──────────────────────────────────────────────
+create or replace view public.bill_profit as
+select
+  bill_id, bill_number, customer_id, created_at, day, paid,
+  sum(qty)           as qty,
+  sum(revenue_incl)  as revenue_incl,
+  sum(revenue_ex)    as revenue_ex,
+  sum(cost_ex)       as cost_ex,
+  sum(profit)        as profit,
+  sum(gst_out)       as gst_out,
+  sum(gst_in)        as gst_in,
+  bool_and(cost_known) as cost_known
+from public.bill_line_profit
+group by bill_id, bill_number, customer_id, created_at, day, paid;
+
+revoke all on public.bill_profit from anon, authenticated;
+
+-- ── profit access: owner gate ────────────────────────────────
+-- The app's existing profile?.role === 'owner' checks only hide UI. Every table
+-- carries `for select to authenticated using (true)`, so a staff member with a
+-- browser console can read cost data directly. Profit output is therefore gated
+-- here, where the API itself refuses.
+--
+-- Staff keep the Purchases screen: raw purchase visibility is deliberately
+-- unchanged. Only the derived profit figures are owner-only.
+
+create or replace function public.is_owner()
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles where id = auth.uid() and role = 'owner'
+  )
+$$;
+
+create or replace function public.require_owner()
+returns void
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then
+    -- 42501 = insufficient_privilege. Deliberately an error, not an empty set:
+    -- an empty set renders as "no profit this month" and hides the refusal.
+    raise exception 'owner role required' using errcode = '42501';
+  end if;
+end $$;
+
+create or replace function public.commercial_bill_profit(p_from date, p_to date)
+returns setof public.bill_profit
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.require_owner();
+  return query
+    select * from public.bill_profit
+    where day >= p_from and day < p_to
+    order by created_at desc;
+end $$;
+
+create or replace function public.commercial_bill_profit_for_customer(p_customer_id bigint)
+returns setof public.bill_profit
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.require_owner();
+  return query
+    select * from public.bill_profit
+    where customer_id = p_customer_id
+    order by created_at desc;
+end $$;
+
+create or replace function public.commercial_bill_line_profit(p_bill_id bigint)
+returns setof public.bill_line_profit
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.require_owner();
+  return query
+    select * from public.bill_line_profit where bill_id = p_bill_id;
+end $$;
+
+-- Line-level rows for a period, so Reports can break profit down by product.
+create or replace function public.commercial_line_profit_range(p_from date, p_to date)
+returns setof public.bill_line_profit
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.require_owner();
+  return query
+    select * from public.bill_line_profit
+    where day >= p_from and day < p_to;
+end $$;
+
+-- These four are `security definer` and call require_owner() first, so the owner
+-- gate holds regardless — but the default PUBLIC EXECUTE grant is revoked so the
+-- privilege matches the intent rather than resting on the guard alone.
+revoke all on function public.commercial_bill_profit(date, date)          from public;
+revoke all on function public.commercial_bill_profit_for_customer(bigint) from public;
+revoke all on function public.commercial_bill_line_profit(bigint)         from public;
+revoke all on function public.commercial_line_profit_range(date, date)    from public;
+
+grant execute on function public.commercial_bill_profit(date, date)          to authenticated;
+grant execute on function public.commercial_bill_profit_for_customer(bigint) to authenticated;
+grant execute on function public.commercial_bill_line_profit(bigint)         to authenticated;
+grant execute on function public.commercial_line_profit_range(date, date)    to authenticated;
+
 -- ============================================================
 -- SEED — domestic catalogue + combos (idempotent)
 -- ============================================================
@@ -515,6 +740,8 @@ select * from (values
   ('Pass Book',                  0::numeric, 'domestic', 'accessory', 'pc', 11)
 ) as v(name, price, segment, kind, unit, sort_order)
 where not exists (select 1 from public.products where segment = 'domestic');
+
+update public.products set gst_rate = 5 where segment = 'domestic';
 
 insert into public.bundle_components (bundle_product_id, component_product_id, qty)
 select nc.id, comp.id, 1

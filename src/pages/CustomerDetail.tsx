@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -9,6 +9,8 @@ import { useBills } from '../hooks/useBills'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { useProfiles } from '../hooks/useProfiles'
 import { useWhatsAppSends } from '../hooks/useWhatsAppSends'
+import { useCustomerProfit } from '../hooks/useCommercialProfit'
+import { summariseProfit } from '../utils/profit'
 import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
@@ -18,7 +20,7 @@ import { DetailModal } from '../components/DetailModal'
 import { WhatsAppStatus } from '../components/WhatsAppStatus'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon } from '../components/icons'
 import { sendBillWhatsApp } from '../lib/whatsapp'
-import type { Bill, BillLine } from '../types/db'
+import type { Bill, BillLine, BillLineProfit } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
 
 function historyAmount(t: HistoryEntry) {
@@ -104,7 +106,11 @@ function digestLine(group: HistoryGroup) {
   return parts.join(' · ')
 }
 
-function detailRows(t: HistoryEntry): { k: string; v: string }[] {
+function detailRows(
+  t: HistoryEntry,
+  profitLines: BillLineProfit[] = [],
+  billLinesError: string | null = null,
+): { k: string; v: string }[] {
   const rows: { k: string; v: string }[] = []
   if (t.productName) rows.push({ k: 'Product', v: t.productName })
   if (t.type === 'sale') {
@@ -120,6 +126,19 @@ function detailRows(t: HistoryEntry): { k: string; v: string }[] {
   }
   if (t.note) rows.push({ k: 'Note', v: t.note })
   rows.push({ k: 'Balance after', v: formatCurrency(t.balanceAfter) })
+  if (t.type === 'sale' && profitLines.length > 0) {
+    for (const l of profitLines) {
+      // bill_line_id keeps the row key unique per line — nothing in the schema
+      // stops two lines on the same bill sharing a product_id.
+      rows.push({
+        k: `Cost · ${l.product_name} · #${l.bill_line_id}`,
+        v: l.cost_known ? `${formatCurrency(l.unit_cost_ex ?? 0)} × ${l.qty}${l.cost_source ? ` (${l.cost_source})` : ''}` : 'unknown',
+      })
+      rows.push({ k: `Profit · ${l.product_name} · #${l.bill_line_id}`, v: l.cost_known ? formatCurrency(l.profit ?? 0) : '—' })
+    }
+  } else if (t.type === 'sale' && billLinesError) {
+    rows.push({ k: 'Margin', v: 'Could not load' })
+  }
   return rows
 }
 
@@ -129,6 +148,12 @@ export function CustomerDetail() {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
+  const { bills: profitBills } = useCustomerProfit(Number(id))
+  const profitByBill = useMemo(
+    () => new Map(profitBills.map((b) => [b.bill_id, b])),
+    [profitBills],
+  )
+  const profitSummary = useMemo(() => summariseProfit(profitBills), [profitBills])
   const { data: balance, loading, error, refresh: refreshBalance } = useCustomerBalance(customerId)
   const { data: productBalances, refresh: refreshProductBalances } = useCustomerProductBalances(customerId)
   const { data: products } = useProducts()
@@ -145,7 +170,40 @@ export function CustomerDetail() {
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
+  const [billLines, setBillLines] = useState<BillLineProfit[]>([])
+  const [billLinesError, setBillLinesError] = useState<string | null>(null)
   const profileNames = useProfiles()
+
+  useEffect(() => {
+    if (!isOwner || !viewingTx || viewingTx.type !== 'sale') {
+      setBillLines([])
+      setBillLinesError(null)
+      return
+    }
+    let cancelled = false
+    setBillLines([])
+    setBillLinesError(null)
+    supabase
+      .rpc('commercial_bill_line_profit', { p_bill_id: viewingTx.id })
+      .then(({ data, error }) => {
+        // Guards both escape routes: the user opened a different bill before
+        // this response landed, or closed the sheet entirely — either way the
+        // response for `viewingTx.id` at request time is stale by the time it
+        // arrives, and must not be applied to whatever is on screen now.
+        if (cancelled) return
+        if (error) {
+          setBillLines([])
+          // 42501 is the RPC's non-owner refusal; isOwner already keeps staff
+          // from reaching this call, so surface anything else as a real failure.
+          if (error.code !== '42501') setBillLinesError(error.message)
+          return
+        }
+        setBillLines((data ?? []) as BillLineProfit[])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOwner, viewingTx])
 
   const productNameById = new Map(products.map((p) => [p.id, p.name]))
 
@@ -377,15 +435,33 @@ export function CustomerDetail() {
         </button>
       </div>
 
-      <div className="mb-[18px] flex items-center justify-between rounded-[20px] bg-surface px-[18px] py-4 shadow-card">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-subtle">Amount due</p>
-          <p className="mt-[3px] font-display text-[25px] font-bold leading-none text-accent">{formatCurrency(balance.amount_due)}</p>
+      <div className="mb-[18px] rounded-[20px] bg-surface px-[18px] py-4 shadow-card">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-subtle">Amount due</p>
+            <p className="mt-[3px] font-display text-[25px] font-bold leading-none text-accent">{formatCurrency(balance.amount_due)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-subtle">{emptiesOwed(totalEmptiesOut).owedBy === 'agency' ? 'Advance' : 'Pending'}</p>
+            <p className="mt-[2px] font-display text-[19px] font-bold text-[#2E8B57]">{emptiesOwed(totalEmptiesOut).count}</p>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-subtle">{emptiesOwed(totalEmptiesOut).owedBy === 'agency' ? 'Advance' : 'Pending'}</p>
-          <p className="mt-[2px] font-display text-[19px] font-bold text-[#2E8B57]">{emptiesOwed(totalEmptiesOut).count}</p>
-        </div>
+        {isOwner && profitBills.length > 0 && (
+          <div className="mt-3 grid grid-cols-3 gap-2 border-t border-borderMuted pt-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-muted">Profit</p>
+              <p className="mt-[2px] font-display text-[15px] font-bold text-ink">{formatCurrency(profitSummary.profit)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-muted">Realised</p>
+              <p className="mt-[2px] font-display text-[15px] font-bold text-[#1D9E75]">{formatCurrency(profitSummary.realised)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-muted">Margin</p>
+              <p className="mt-[2px] font-display text-[15px] font-bold text-ink">{profitSummary.marginPct.toFixed(1)}%</p>
+            </div>
+          </div>
+        )}
       </div>
 
       <h2 className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.6px] text-subtle">By product</h2>
@@ -463,6 +539,17 @@ export function CustomerDetail() {
                         {historyAmount(t)}
                       </p>
                       <p className="mt-[1px] text-xs font-semibold text-muted">Bal {formatCurrency(t.balanceAfter)}</p>
+                      {isOwner && t.type === 'sale' && profitByBill.has(t.id) && (
+                        <p className={`mt-[2px] text-[11px] font-semibold ${
+                          profitByBill.get(t.id)!.realisedFraction >= 1 ? 'text-[#1D9E75]' : 'text-[#EF9F27]'
+                        }`}>
+                          {profitByBill.get(t.id)!.cost_known && profitByBill.get(t.id)!.profit != null
+                            ? `+${formatCurrency(profitByBill.get(t.id)!.profit!)} ${
+                                profitByBill.get(t.id)!.realisedFraction >= 1 ? 'realised' : 'pending'
+                              }`
+                            : 'cost unknown'}
+                        </p>
+                      )}
                     </div>
                     <span className="shrink-0 rotate-180">
                       <ChevronLeftIcon size={16} color="#B7AC9B" />
@@ -505,7 +592,7 @@ export function CustomerDetail() {
           iconColor={getActivityTint(viewingTx.type).color}
           title={historyTitle(viewingTx, viewingTx.productName)}
           amount={historyAmount(viewingTx)}
-          rows={detailRows(viewingTx)}
+          rows={detailRows(viewingTx, billLines, billLinesError)}
           created={formatDate(viewingTx.created_at)}
           createdBy={viewingTx.created_by ? profileNames.get(viewingTx.created_by) : undefined}
           updated={formatUpdated(viewingTx.updated_at, viewingTx.created_at)}

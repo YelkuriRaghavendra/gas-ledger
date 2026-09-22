@@ -240,6 +240,10 @@ export function AllStock() {
       name: trimmed,
       price: Number(addPrice || 0),
       segment: addSegment,
+      // This screen creates products in both segments, so the rate follows the
+      // chosen one rather than the column default. Commercial LPG is 18%,
+      // domestic 5%.
+      gst_rate: addSegment === 'commercial' ? 18 : 5,
       kind: addKind,
       unit: addUnit.trim() || 'pc',
       sort_order: maxSort + 1,
