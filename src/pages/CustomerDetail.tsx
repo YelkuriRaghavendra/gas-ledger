@@ -167,6 +167,7 @@ export function CustomerDetail() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewingTx, setViewingTx] = useState<HistoryEntry | null>(null)
@@ -212,6 +213,15 @@ export function CustomerDetail() {
     setName(balance.name)
     setPhone(balance.phone ?? '')
     setAddress(balance.address ?? '')
+    // customer_balances is a rollup view and does not carry whatsapp_enabled,
+    // so read it off the row itself. One query, and only when the owner opens
+    // the form — every viewer of this screen should not pay for it.
+    const { data: row } = await supabase
+      .from('customers')
+      .select('whatsapp_enabled')
+      .eq('id', customerId)
+      .maybeSingle()
+    setWhatsappEnabled(row?.whatsapp_enabled ?? false)
     setEditing(true)
   }
 
@@ -229,6 +239,7 @@ export function CustomerDetail() {
         name: name.trim(),
         phone: phone.trim() || null,
         address: address.trim() || null,
+        whatsapp_enabled: whatsappEnabled,
       })
       .eq('id', customerId)
       .select()
@@ -375,6 +386,14 @@ export function CustomerDetail() {
             onChange={(e) => setAddress(e.target.value)}
             className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
+          <label className="flex items-center gap-[10px] pt-1 text-[13px] font-bold text-ink">
+            <input
+              type="checkbox"
+              checked={whatsappEnabled}
+              onChange={(e) => setWhatsappEnabled(e.target.checked)}
+            />
+            Send bills on WhatsApp
+          </label>
           <div className="flex gap-2 pt-1">
             <button
               type="submit"
