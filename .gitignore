@@ -8,3 +8,6 @@ dist
 .agents/
 backup-*.sql
 skills-lock.json
+
+# Supabase CLI scratch (link state, version cache)
+supabase/.temp/
