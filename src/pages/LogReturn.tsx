@@ -11,7 +11,6 @@ import { Stepper } from '../components/Stepper'
 import { ChevronLeftIcon } from '../components/icons'
 import { combineDateWithNow, dateInputValue, emptiesOwed, todayInputValue } from '../utils/format'
 import { insertBillWithRetry } from '../utils/billNumber'
-import { sendBillWhatsApp } from '../lib/whatsapp'
 
 export function LogReturn() {
   const { id, billId } = useParams()
@@ -145,7 +144,6 @@ export function LogReturn() {
       setError(error.message)
       return
     }
-    sendBillWhatsApp(bill.id)
     navigate(`/commercial/customers/${customerId}`)
   }
 

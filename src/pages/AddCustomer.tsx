@@ -9,7 +9,6 @@ export function AddCustomer() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
-  const [whatsappEnabled, setWhatsappEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,7 +30,6 @@ export function AddCustomer() {
         name: name.trim(),
         phone: phone.trim() || null,
         address: address.trim() || null,
-        whatsapp_enabled: whatsappEnabled,
       })
       .select('id')
       .single()
@@ -84,14 +82,6 @@ export function AddCustomer() {
               className={fieldInput}
             />
           </div>
-          <label className="flex items-center gap-[10px] text-[13px] font-bold text-ink">
-            <input
-              type="checkbox"
-              checked={whatsappEnabled}
-              onChange={(e) => setWhatsappEnabled(e.target.checked)}
-            />
-            Send bills on WhatsApp
-          </label>
         </div>
 
         {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
