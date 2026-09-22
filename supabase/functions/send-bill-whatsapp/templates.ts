@@ -157,3 +157,20 @@ export function buildTemplateParams(template: TemplateName, ctx: BillContext): s
       ]
   }
 }
+
+// Meta counts header variables separately from body variables. The approved
+// bill_sale and bill_payment templates each carry one — "{{1}} New bill" and
+// "{{1}}  Payment Received" — where the variable holds the leading icon.
+// Sending only body parameters makes Meta reject the whole message with
+// #132000 "Number of parameters does not match the expected number of params".
+// bill_return's header is static text and takes none.
+export function buildHeaderParams(template: TemplateName): string[] {
+  switch (template) {
+    case 'bill_sale':
+      return ['\u{1F9FE}']
+    case 'bill_payment':
+      return ['\u2705']
+    case 'bill_return':
+      return []
+  }
+}

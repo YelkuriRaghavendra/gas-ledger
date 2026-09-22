@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   templateForBillType,
+  buildHeaderParams,
   buildTemplateParams,
   formatBillDate,
   formatPlainItems,
@@ -248,6 +249,31 @@ describe('buildTemplateParams', () => {
     for (const t of ['bill_sale', 'bill_payment', 'bill_return'] as const) {
       for (const p of buildTemplateParams(t, dirty)) {
         expect(p).not.toMatch(/[\n\t]/)
+      }
+    }
+  })
+})
+
+// The approved templates carry a header variable on bill_sale and bill_payment
+// and none on bill_return. Meta counts header and body variables separately and
+// rejects the entire message with #132000 when either count is short, so these
+// numbers are a contract with what is live in the Meta console, not an
+// implementation detail.
+describe('buildHeaderParams', () => {
+  it('sends one header parameter for the templates whose header has a variable', () => {
+    expect(buildHeaderParams('bill_sale')).toHaveLength(1)
+    expect(buildHeaderParams('bill_payment')).toHaveLength(1)
+  })
+
+  it('sends none for bill_return, whose header is static text', () => {
+    expect(buildHeaderParams('bill_return')).toEqual([])
+  })
+
+  it('never emits a newline or tab, which Meta rejects in a header', () => {
+    for (const t of ['bill_sale', 'bill_payment', 'bill_return'] as const) {
+      for (const p of buildHeaderParams(t)) {
+        expect(p).not.toMatch(/[\n\t]/)
+        expect(p.length).toBeGreaterThan(0)
       }
     }
   })

@@ -1,6 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { normalizeIndianPhone } from './phone.ts'
-import { buildTemplateParams, templateForBillType, type BillContext } from './templates.ts'
+import { buildHeaderParams, buildTemplateParams, templateForBillType, type BillContext } from './templates.ts'
 import { updateWithRetry } from './retryUpdate.ts'
 
 const GRAPH_VERSION = 'v25.0'
@@ -331,6 +331,7 @@ async function claimSend(db: any, billId: number, template: string): Promise<Cla
 }
 
 async function send(to: string, template: string, params: string[]): Promise<Outcome> {
+  const headerParams = buildHeaderParams(template)
   const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')
   const token = Deno.env.get('WHATSAPP_TOKEN')
   if (!phoneNumberId || !token) {
@@ -356,10 +357,21 @@ async function send(to: string, template: string, params: string[]): Promise<Out
           template: {
             name: template,
             language: { code: 'en' },
-            components: [{
-              type: 'body',
-              parameters: params.map((text) => ({ type: 'text', text })),
-            }],
+            components: [
+              // The header component is sent only for templates whose approved
+              // header actually carries a variable. Sending an empty header
+              // component, or omitting a required one, both fail with #132000.
+              ...(headerParams.length > 0
+                ? [{
+                    type: 'header',
+                    parameters: headerParams.map((text) => ({ type: 'text', text })),
+                  }]
+                : []),
+              {
+                type: 'body',
+                parameters: params.map((text) => ({ type: 'text', text })),
+              },
+            ],
           },
         }),
         signal: controller.signal,
