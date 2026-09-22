@@ -40,6 +40,7 @@ export interface Customer {
   name: string
   phone: string | null
   address: string | null
+  whatsapp_enabled: boolean
   created_at: string
 }
 
@@ -184,6 +185,18 @@ export interface DailyPurchaseSummary {
   cylinders_purchased: number
   empties_given_to_supplier: number
   purchase_amount: number
+}
+
+export type WhatsAppSendStatus = 'pending' | 'sent' | 'failed' | 'skipped'
+
+export interface WhatsAppSend {
+  id: number
+  bill_id: number
+  status: WhatsAppSendStatus
+  reason: string | null
+  message_id: string | null
+  template: string
+  created_at: string
 }
 
 // One row per commercial sale bill, from commercial_bill_profit(). Every money

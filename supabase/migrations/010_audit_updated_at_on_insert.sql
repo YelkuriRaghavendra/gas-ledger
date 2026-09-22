@@ -12,6 +12,17 @@
 --
 -- Mirroring created_at on insert makes "never edited" mean updated_at ==
 -- created_at, whatever date was chosen. The update branch is unchanged.
+--
+-- TRADEOFF: updated_at is now derived from a client-supplied created_at on
+-- insert, so the row no longer records an independent server timestamp for the
+-- moment it was actually written. On a backdated entry that insert time was the
+-- only server-truth clock value, and it is gone. Acceptable here because every
+-- table's RLS is `using (true) with check (true)` for authenticated users, so
+-- these columns are a "who did what" convenience for the owner rather than a
+-- security boundary. The cleaner fix, if audit trails ever need to be
+-- trustworthy, is a nullable edited_at column (NULL on insert, now() on
+-- update): "never edited" becomes edited_at IS NULL and updated_at can stay
+-- server-stamped. That needs a client change too, so it is not done here.
 
 create or replace function public.stamp_audit()
 returns trigger language plpgsql as $$
@@ -19,7 +30,10 @@ begin
   if tg_op = 'INSERT' then
     if new.created_by is null then new.created_by := auth.uid(); end if;
     new.updated_at := new.created_at;
-    if new.updated_by is null then new.updated_by := coalesce(new.created_by, auth.uid()); end if;
+    -- Prefer the real actor over anything the client sent, so a spoofed
+    -- created_by cannot propagate into updated_by. Falls back to the supplied
+    -- value only when there is no auth context (service-role data import).
+    new.updated_by := coalesce(auth.uid(), new.updated_by, new.created_by);
   else
     new.updated_at := now();
     new.updated_by := coalesce(auth.uid(), new.updated_by);

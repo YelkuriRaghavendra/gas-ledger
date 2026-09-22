@@ -8,6 +8,7 @@ import { useProducts } from '../hooks/useProducts'
 import { useBills } from '../hooks/useBills'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { useProfiles } from '../hooks/useProfiles'
+import { useWhatsAppSends } from '../hooks/useWhatsAppSends'
 import { useCustomerProfit } from '../hooks/useCommercialProfit'
 import { summariseProfit } from '../utils/profit'
 import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
@@ -16,7 +17,9 @@ import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
 import { StatementDialog } from '../components/StatementDialog'
 import { DetailModal } from '../components/DetailModal'
+import { WhatsAppStatus } from '../components/WhatsAppStatus'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon } from '../components/icons'
+import { sendBillWhatsApp } from '../lib/whatsapp'
 import type { Bill, BillLine, BillLineProfit } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
 
@@ -156,6 +159,8 @@ export function CustomerDetail() {
   const { data: products } = useProducts()
   const { data: bills, refresh: refreshBills } = useBills(customerId)
   const { data: agencySettings } = useAgencySettings()
+  const billIds = bills.map((b) => b.id)
+  const { data: sends, refetch: refetchSends } = useWhatsAppSends(billIds)
   const [editing, setEditing] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [statementOpen, setStatementOpen] = useState(false)
@@ -250,6 +255,16 @@ export function CustomerDetail() {
       return
     }
     navigate('/commercial/customers')
+  }
+
+  function retryWhatsApp(billId: number) {
+    sendBillWhatsApp(billId)
+    setTimeout(refetchSends, 2500)
+  }
+
+  async function enableWhatsAppAndSend(billId: number) {
+    await supabase.from('customers').update({ whatsapp_enabled: true }).eq('id', customerId)
+    retryWhatsApp(billId)
   }
 
   async function handleDeleteBill(billId: number) {
@@ -540,6 +555,16 @@ export function CustomerDetail() {
                       <ChevronLeftIcon size={16} color="#B7AC9B" />
                     </span>
                   </button>
+                  {sends[t.id] && (
+                    <div className="px-2 pb-[6px] pl-[57px]">
+                      <WhatsAppStatus
+                        send={sends[t.id]}
+                        onRetry={() => retryWhatsApp(t.id)}
+                        onEnable={isOwner ? () => enableWhatsAppAndSend(t.id) : undefined}
+                        onAddPhone={isOwner ? () => startEdit() : undefined}
+                      />
+                    </div>
+                  )}
                 </li>
               )
             })}

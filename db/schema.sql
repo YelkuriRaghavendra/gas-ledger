@@ -49,15 +49,18 @@ create table if not exists public.products (
 );
 
 -- ── customers (commercial only) ──────────────────────────────
+-- whatsapp_enabled defaults to false: nothing is sent until a customer is
+-- explicitly opted in.
 create table if not exists public.customers (
-  id          bigserial   primary key,
-  name        text        not null,
-  phone       text,
-  address     text,
-  created_at  timestamptz not null default now(),
-  created_by  uuid,
-  updated_at  timestamptz not null default now(),
-  updated_by  uuid
+  id                bigserial   primary key,
+  name              text        not null,
+  phone             text,
+  address           text,
+  whatsapp_enabled  boolean     not null default false,
+  created_at        timestamptz not null default now(),
+  created_by        uuid,
+  updated_at        timestamptz not null default now(),
+  updated_by        uuid
 );
 
 -- ── bills: header for sale / return / payment / opening ──────
@@ -97,6 +100,27 @@ create table if not exists public.bill_lines (
   updated_by  uuid
 );
 create index if not exists idx_bill_lines_bill on public.bill_lines (bill_id);
+
+-- ── whatsapp_sends: WhatsApp bill notification send log ──────
+-- One row per send ATTEMPT, not per bill. A retry appends a row so the
+-- history of what failed and why is preserved. A row is claimed as
+-- 'pending' before the Meta call and updated in place once it resolves, so
+-- the unique index below can guarantee at most one live send per bill.
+create table if not exists public.whatsapp_sends (
+  id          bigserial   primary key,
+  bill_id     bigint      not null references public.bills(id) on delete cascade,
+  status      text        not null check (status in ('pending', 'sent', 'failed', 'skipped')),
+  reason      text,
+  message_id  text,
+  template    text        not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_whatsapp_sends_bill on public.whatsapp_sends (bill_id);
+-- At most one row that is in-flight or already succeeded per bill. Any
+-- number of 'failed'/'skipped' rows is fine — retries append, as designed.
+create unique index if not exists whatsapp_sends_one_live_per_bill
+  on public.whatsapp_sends (bill_id)
+  where status in ('pending', 'sent');
 
 -- ── purchase_orders: header for purchase / opening ───────────
 -- type=opening: godown opening stock adjustment.
@@ -172,7 +196,10 @@ begin
     -- though it had been edited (created 3 Sep, "updated" 4 Sep). Callers read
     -- updated_at = created_at as "never edited".
     new.updated_at := new.created_at;
-    if new.updated_by is null then new.updated_by := coalesce(new.created_by, auth.uid()); end if;
+    -- Prefer the real actor over anything the client sent, so a spoofed
+    -- created_by cannot propagate into updated_by. Falls back to the supplied
+    -- value only when there is no auth context (service-role data import).
+    new.updated_by := coalesce(auth.uid(), new.updated_by, new.created_by);
   else
     new.updated_at := now();
     new.updated_by := coalesce(auth.uid(), new.updated_by);
@@ -201,6 +228,41 @@ create trigger trg_stamp_bundle_components before insert or update on public.bun
 create trigger trg_stamp_agency_settings   before insert or update on public.agency_settings   for each row execute function public.stamp_audit();
 
 -- ============================================================
+-- OWNER-ONLY GUARD: customers.whatsapp_enabled
+-- ============================================================
+-- Enforced here rather than via RLS: a restrictive `with check
+-- (whatsapp_enabled = false or <is owner>)` on customers_write would also
+-- block a staff member from editing the phone number of an already-enabled
+-- customer, since the post-update row still has the flag set. A trigger can
+-- compare old vs new and restrict only a change to the flag itself, leaving
+-- every other column staff-editable as before.
+create or replace function public.enforce_whatsapp_enabled_owner_only()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.whatsapp_enabled and not exists (
+      select 1 from public.profiles where id = auth.uid() and role = 'owner'
+    ) then
+      raise exception 'only an owner can enable WhatsApp for a customer';
+    end if;
+  elsif new.whatsapp_enabled is distinct from old.whatsapp_enabled and not exists (
+    select 1 from public.profiles where id = auth.uid() and role = 'owner'
+  ) then
+    raise exception 'only an owner can change whatsapp_enabled';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_whatsapp_enabled_owner_only on public.customers;
+create trigger trg_whatsapp_enabled_owner_only
+  before insert or update on public.customers
+  for each row execute function public.enforce_whatsapp_enabled_owner_only();
+
+-- ============================================================
 -- ROW-LEVEL SECURITY
 -- ============================================================
 alter table public.profiles          enable row level security;
@@ -209,6 +271,7 @@ alter table public.customers         enable row level security;
 alter table public.bundle_components enable row level security;
 alter table public.bills             enable row level security;
 alter table public.bill_lines        enable row level security;
+alter table public.whatsapp_sends    enable row level security;
 alter table public.purchase_orders   enable row level security;
 alter table public.purchase_lines    enable row level security;
 alter table public.agency_settings   enable row level security;
@@ -245,6 +308,12 @@ create policy "bills_write" on public.bills for all to authenticated using (true
 create policy "bill_lines_read"  on public.bill_lines for select to authenticated using (true);
 create policy "bill_lines_write" on public.bill_lines for all to authenticated using (true) with check (true);
 
+-- whatsapp_sends: read-only for the app. There is deliberately NO insert
+-- policy for authenticated — rows are written solely by the Edge Function
+-- using the service role key, which bypasses RLS. A client able to insert
+-- here could fake a 'sent' status for a bill that was never delivered.
+create policy "whatsapp_sends_read" on public.whatsapp_sends for select to authenticated using (true);
+
 -- purchase_orders
 create policy "purchase_orders_read"  on public.purchase_orders for select to authenticated using (true);
 create policy "purchase_orders_write" on public.purchase_orders for all to authenticated using (true) with check (true);
@@ -254,6 +323,9 @@ create policy "purchase_lines_read"  on public.purchase_lines for select to auth
 create policy "purchase_lines_write" on public.purchase_lines for all to authenticated using (true) with check (true);
 
 -- customers
+-- Any authenticated user can write any column here — EXCEPT
+-- whatsapp_enabled, which trg_whatsapp_enabled_owner_only (see the OWNER-ONLY
+-- GUARD section above) restricts to owners regardless of this policy.
 drop policy if exists "customers_read" on public.customers;
 create policy "customers_read" on public.customers for select to authenticated using (true);
 drop policy if exists "customers_write" on public.customers;
