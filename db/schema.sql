@@ -113,9 +113,20 @@ create table if not exists public.whatsapp_sends (
   reason      text,
   message_id  text,
   template    text        not null,
+  -- What the delivery webhook reported afterwards. `status` above records what
+  -- happened when we called Meta; these record whether it actually arrived.
+  delivery_status     text check (delivery_status in ('sent', 'delivered', 'read', 'failed')),
+  delivery_updated_at timestamptz,
+  error_code          int,
+  error_detail        text,
   created_at  timestamptz not null default now()
 );
 create index if not exists idx_whatsapp_sends_bill on public.whatsapp_sends (bill_id);
+-- The delivery webhook arrives with only a wamid, so this is its lookup path.
+-- Partial, because rows that never reached Meta have no message_id.
+create unique index if not exists idx_whatsapp_sends_message_id
+  on public.whatsapp_sends (message_id)
+  where message_id is not null;
 -- At most one row that is in-flight or already succeeded per bill. Any
 -- number of 'failed'/'skipped' rows is fine — retries append, as designed.
 create unique index if not exists whatsapp_sends_one_live_per_bill

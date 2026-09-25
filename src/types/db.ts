@@ -189,6 +189,8 @@ export interface DailyPurchaseSummary {
 
 export type WhatsAppSendStatus = 'pending' | 'sent' | 'failed' | 'skipped'
 
+export type WhatsAppDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'
+
 export interface WhatsAppSend {
   id: number
   bill_id: number
@@ -196,6 +198,12 @@ export interface WhatsAppSend {
   reason: string | null
   message_id: string | null
   template: string
+  // Set by the delivery webhook, null until Meta reports back. `status` above
+  // says whether Meta accepted the message; these say whether it arrived.
+  delivery_status: WhatsAppDeliveryStatus | null
+  delivery_updated_at: string | null
+  error_code: number | null
+  error_detail: string | null
   created_at: string
 }
 
