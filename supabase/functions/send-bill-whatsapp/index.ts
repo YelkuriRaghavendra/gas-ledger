@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { normalizeIndianPhone } from './phone.ts'
+import { resolveRecipient } from './recipient.ts'
 import { buildHeaderParams, buildTemplateParams, templateForBillType, type BillContext } from './templates.ts'
 import { updateWithRetry } from './retryUpdate.ts'
 
@@ -163,10 +163,22 @@ async function resolve(db: any, bill: any): Promise<ResolveResult> {
   if (customerError) return { outcome: failedDataError(template), alreadyRecorded: false, recorded: false }
   if (!customer) return { outcome: skip('no_customer', template), alreadyRecorded: false, recorded: false }
   if (!customer.whatsapp_enabled) return { outcome: skip('disabled', template), alreadyRecorded: false, recorded: false }
-  if (!customer.phone) return { outcome: skip('no_phone', template), alreadyRecorded: false, recorded: false }
+  // The no_phone check runs before the override so the reason stays accurate
+  // for a customer who genuinely has no number on file.
+  if (!customer.phone && !Deno.env.get('WHATSAPP_TEST_RECIPIENT')) {
+    return { outcome: skip('no_phone', template), alreadyRecorded: false, recorded: false }
+  }
 
-  const to = normalizeIndianPhone(customer.phone)
-  if (!to) return { outcome: skip('invalid_phone', template), alreadyRecorded: false, recorded: false }
+  const recipient = resolveRecipient(customer.phone, Deno.env.get('WHATSAPP_TEST_RECIPIENT'))
+  if (recipient.kind === 'invalid_phone') {
+    return { outcome: skip('invalid_phone', template), alreadyRecorded: false, recorded: false }
+  }
+  if (recipient.kind === 'invalid_test_override') {
+    // Fails the send rather than falling back to the customer: a typo in the
+    // override must never result in a real customer being messaged.
+    return { outcome: skip('invalid_test_override', template), alreadyRecorded: false, recorded: false }
+  }
+  const { to, redirected } = recipient
 
   const { data: lines, error: linesError } = await db
     .from('bill_lines')
@@ -221,6 +233,13 @@ async function resolve(db: any, bill: any): Promise<ResolveResult> {
   }
 
   const sendOutcome = await send(to, template, buildTemplateParams(template, ctx))
+
+  // Record the redirect on the row itself. Without this the log would read
+  // exactly like a real send, and an owner reviewing bill history would
+  // believe customers received messages that went to a test phone instead.
+  if (redirected && sendOutcome.status === 'sent') {
+    sendOutcome.reason = 'test_redirect'
+  }
 
   // Update the row we already claimed rather than inserting a new one — the
   // claim and the final result must be the same row, or the unique index

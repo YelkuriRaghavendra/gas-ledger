@@ -10,6 +10,7 @@ export const STALE_PENDING_MS = 5 * 60 * 1000
 export type WhatsAppDisplayState =
   | { kind: 'none' }
   | { kind: 'sending' }
+  | { kind: 'test_redirect' }
   | { kind: 'accepted' }
   | { kind: 'delivered' }
   | { kind: 'read' }
@@ -35,6 +36,12 @@ export function getWhatsAppDisplayState(
   if (send.status === 'pending') {
     const ageMs = now - new Date(send.created_at).getTime()
     return ageMs < STALE_PENDING_MS ? { kind: 'sending' } : { kind: 'stale' }
+  }
+
+  // A bill sent while WHATSAPP_TEST_RECIPIENT is configured went to a test
+  // phone, not to this customer. Saying "Delivered" here would be false.
+  if (send.status === 'sent' && send.reason === 'test_redirect') {
+    return { kind: 'test_redirect' }
   }
 
   if (send.status === 'sent') {
@@ -95,6 +102,13 @@ export function WhatsAppStatus({ send, onRetry, onEnable, onAddPhone, now }: Pro
 
     case 'sent':
       return <span className="text-[11px] font-bold text-[#2E8B57]">✓ Sent on WhatsApp</span>
+
+    case 'test_redirect':
+      return (
+        <span className="text-[11px] font-bold text-[#854F0B]">
+          ⚠ Sent to the test number, not this customer
+        </span>
+      )
 
     case 'accepted':
       return <span className="text-[11px] font-bold text-muted">✓ Sent — awaiting delivery</span>
