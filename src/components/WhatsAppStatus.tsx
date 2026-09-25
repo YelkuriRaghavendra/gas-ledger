@@ -10,6 +10,10 @@ export const STALE_PENDING_MS = 5 * 60 * 1000
 export type WhatsAppDisplayState =
   | { kind: 'none' }
   | { kind: 'sending' }
+  | { kind: 'accepted' }
+  | { kind: 'delivered' }
+  | { kind: 'read' }
+  | { kind: 'undelivered'; reason: string | null; code: number | null }
   | { kind: 'sent' }
   | { kind: 'stale' }
   | { kind: 'failed'; reason: string | null }
@@ -33,7 +37,21 @@ export function getWhatsAppDisplayState(
     return ageMs < STALE_PENDING_MS ? { kind: 'sending' } : { kind: 'stale' }
   }
 
-  if (send.status === 'sent') return { kind: 'sent' }
+  if (send.status === 'sent') {
+    // `status: 'sent'` only ever meant Meta accepted the message. Whether it
+    // reached the phone is a separate fact the delivery webhook reports later,
+    // and until it does the honest answer is "accepted", not "sent".
+    switch (send.delivery_status) {
+      case 'delivered':
+        return { kind: 'delivered' }
+      case 'read':
+        return { kind: 'read' }
+      case 'failed':
+        return { kind: 'undelivered', reason: send.error_detail, code: send.error_code }
+      default:
+        return { kind: 'accepted' }
+    }
+  }
 
   if (send.status === 'failed') return { kind: 'failed', reason: send.reason }
 
@@ -75,6 +93,25 @@ export function WhatsAppStatus({ send, onRetry, onEnable, onAddPhone, now }: Pro
 
     case 'sent':
       return <span className="text-[11px] font-bold text-[#2E8B57]">✓ Sent on WhatsApp</span>
+
+    case 'accepted':
+      return <span className="text-[11px] font-bold text-muted">✓ Sent — awaiting delivery</span>
+
+    case 'delivered':
+      return <span className="text-[11px] font-bold text-[#2E8B57]">✓✓ Delivered</span>
+
+    case 'read':
+      return <span className="text-[11px] font-bold text-[#3B6EA5]">✓✓ Read</span>
+
+    case 'undelivered':
+      return (
+        <span className="text-[11px] font-bold text-muted">
+          ⚠ Not delivered — {state.reason ?? (state.code ? `Meta error ${state.code}` : 'no reason given')}{' '}
+          <button type="button" onClick={onRetry} className="underline text-accent">
+            Retry
+          </button>
+        </span>
+      )
 
     case 'stale':
       return (

@@ -12,6 +12,10 @@ function send(overrides: Partial<WhatsAppSend>): WhatsAppSend {
     reason: null,
     message_id: null,
     template: 'bill_created',
+    delivery_status: null,
+    delivery_updated_at: null,
+    error_code: null,
+    error_detail: null,
     created_at: new Date(NOW).toISOString(),
     ...overrides,
   }
@@ -37,9 +41,12 @@ describe('getWhatsAppDisplayState', () => {
     expect(getWhatsAppDisplayState(s, NOW)).toEqual({ kind: 'stale' })
   })
 
-  it('shows sent for a sent row', () => {
+  // Before delivery reporting existed this returned { kind: 'sent' }, which
+  // overstated what was known: Meta accepting a message is not the same as the
+  // customer receiving it. A row with no webhook result yet is 'accepted'.
+  it('shows accepted for a sent row the webhook has not reported on', () => {
     const s = send({ status: 'sent' })
-    expect(getWhatsAppDisplayState(s, NOW)).toEqual({ kind: 'sent' })
+    expect(getWhatsAppDisplayState(s, NOW)).toEqual({ kind: 'accepted' })
   })
 
   it('shows failed with its reason for a failed row', () => {
@@ -80,5 +87,49 @@ describe('getWhatsAppDisplayState', () => {
   it('shows nothing for skipped/no_customer', () => {
     const s = send({ status: 'skipped', reason: 'no_customer' })
     expect(getWhatsAppDisplayState(s, NOW)).toEqual({ kind: 'none' })
+  })
+})
+
+// Meta accepting a message and the message arriving are different events. The
+// webhook reports the second one; `status: 'sent'` only ever meant the first.
+describe('getWhatsAppDisplayState — delivery reporting', () => {
+  it('reads as accepted, not delivered, while the webhook has said nothing', () => {
+    expect(getWhatsAppDisplayState(send({ status: 'sent', delivery_status: null }), NOW))
+      .toEqual({ kind: 'accepted' })
+  })
+
+  it('stays accepted when Meta has only confirmed it left', () => {
+    expect(getWhatsAppDisplayState(send({ status: 'sent', delivery_status: 'sent' }), NOW))
+      .toEqual({ kind: 'accepted' })
+  })
+
+  it('reports delivery once the phone has it', () => {
+    expect(getWhatsAppDisplayState(send({ status: 'sent', delivery_status: 'delivered' }), NOW))
+      .toEqual({ kind: 'delivered' })
+  })
+
+  it('reports a read message', () => {
+    expect(getWhatsAppDisplayState(send({ status: 'sent', delivery_status: 'read' }), NOW))
+      .toEqual({ kind: 'read' })
+  })
+
+  it('surfaces a delivery failure with Meta\'s own reason', () => {
+    expect(
+      getWhatsAppDisplayState(
+        send({ status: 'sent', delivery_status: 'failed', error_code: 131049, error_detail: 'Not delivered: per-user cap' }),
+        NOW,
+      ),
+    ).toEqual({ kind: 'undelivered', reason: 'Not delivered: per-user cap', code: 131049 })
+  })
+
+  it('still names the failure when Meta sent no detail', () => {
+    expect(
+      getWhatsAppDisplayState(send({ status: 'sent', delivery_status: 'failed', error_code: 470, error_detail: null }), NOW),
+    ).toEqual({ kind: 'undelivered', reason: null, code: 470 })
+  })
+
+  it('lets a failed send outrank any delivery state, since it never reached Meta', () => {
+    expect(getWhatsAppDisplayState(send({ status: 'failed', reason: 'timeout', delivery_status: null }), NOW))
+      .toEqual({ kind: 'failed', reason: 'timeout' })
   })
 })
