@@ -26,6 +26,23 @@ export function outranks(incoming: DeliveryStatus, current: DeliveryStatus | nul
   return RANK[incoming] > RANK[current]
 }
 
+// Number.isFinite alone is not enough: 1e20 is finite but overflows Date and
+// makes toISOString throw, which would discard every status in the batch.
+const MIN_EPOCH_S = 946684800 // 2000-01-01
+const MAX_EPOCH_S = 4102444800 // 2100-01-01
+
+function toIso(timestamp: unknown): string {
+  const seconds = Number(timestamp)
+  if (!Number.isFinite(seconds) || seconds < MIN_EPOCH_S || seconds > MAX_EPOCH_S) {
+    return new Date().toISOString()
+  }
+  return new Date(seconds * 1000).toISOString()
+}
+
+function isInt32(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && Math.abs(value) <= 2147483647
+}
+
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : []
 }
@@ -53,15 +70,16 @@ export function parseStatusPayload(body: unknown): StatusUpdate[] {
         const s = status as Record<string, any>
         if (typeof s.id !== 'string' || !KNOWN.includes(s.status)) continue
 
-        const seconds = Number(s.timestamp)
         const error = asArray(s.errors)[0] as Record<string, any> | undefined
 
         updates.push({
           messageId: s.id,
           status: s.status as DeliveryStatus,
-          at: Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : new Date().toISOString(),
-          errorCode: typeof error?.code === 'number' ? error.code : null,
-          errorDetail: errorDetail(error),
+          at: toIso(s.timestamp),
+          // Constrained to a 32-bit int: the column is `int`, and an oversized
+          // JSON number would make the UPDATE fail and lose the whole status.
+          errorCode: isInt32(error?.code) ? error!.code : null,
+          errorDetail: errorDetail(error)?.slice(0, 500) ?? null,
         })
       }
     }

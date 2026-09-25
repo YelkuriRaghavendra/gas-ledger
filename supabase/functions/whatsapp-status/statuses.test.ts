@@ -96,3 +96,46 @@ describe('outranks', () => {
     expect(outranks('delivered', 'failed')).toBe(false)
   })
 })
+
+// Meta is the only legitimate caller, but a signed payload is still parsed
+// blind, and a throw here discards every status in the batch — including the
+// valid ones — because index.ts catches and acknowledges.
+describe('parseStatusPayload — hostile input', () => {
+  const wamid2 = 'wamid.HOSTILE'
+
+  it('does not throw on a timestamp that overflows Date', () => {
+    const out = parseStatusPayload(payload([{ id: wamid2, status: 'delivered', timestamp: '1e20' }]))
+    expect(out).toHaveLength(1)
+    expect(() => new Date(out[0].at).toISOString()).not.toThrow()
+  })
+
+  it('falls back to now for a nonsense timestamp rather than losing the status', () => {
+    const before = Date.now()
+    const out = parseStatusPayload(payload([{ id: wamid2, status: 'delivered', timestamp: 'yesterday' }]))
+    expect(new Date(out[0].at).getTime()).toBeGreaterThanOrEqual(before)
+  })
+
+  it('drops an error code too large for the int column', () => {
+    const out = parseStatusPayload(
+      payload([{ id: wamid2, status: 'failed', timestamp: '1758800000', errors: [{ code: 1e30, message: 'x' }] }]),
+    )
+    expect(out[0].errorCode).toBeNull()
+  })
+
+  it('truncates an oversized error detail', () => {
+    const out = parseStatusPayload(
+      payload([{ id: wamid2, status: 'failed', timestamp: '1758800000', errors: [{ message: 'x'.repeat(5000) }] }]),
+    )
+    expect(out[0].errorDetail!.length).toBe(500)
+  })
+
+  it('keeps the valid statuses in a batch containing a broken one', () => {
+    const out = parseStatusPayload(
+      payload([
+        { id: 'wamid.GOOD', status: 'delivered', timestamp: '1758800000' },
+        { id: 'wamid.BAD', status: 'delivered', timestamp: '1e20' },
+      ]),
+    )
+    expect(out.map((u) => u.messageId)).toEqual(['wamid.GOOD', 'wamid.BAD'])
+  })
+})

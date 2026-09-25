@@ -74,9 +74,12 @@ describe('getWhatsAppDisplayState', () => {
     expect(getWhatsAppDisplayState(s, NOW)).toEqual({ kind: 'invalid_phone' })
   })
 
-  it('maps skipped/already_sent to sent, not an error', () => {
+  // Changed with delivery reporting: this row records that a send was skipped
+  // because another was live. It carries no delivery result of its own, so it
+  // cannot claim the message arrived.
+  it('maps skipped/already_sent to accepted, not to a delivery claim', () => {
     const s = send({ status: 'skipped', reason: 'already_sent' })
-    expect(getWhatsAppDisplayState(s, NOW)).toEqual({ kind: 'sent' })
+    expect(getWhatsAppDisplayState(s, NOW)).toEqual({ kind: 'accepted' })
   })
 
   it('shows nothing for skipped/not_applicable', () => {

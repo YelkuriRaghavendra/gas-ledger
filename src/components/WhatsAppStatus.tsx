@@ -64,9 +64,11 @@ export function getWhatsAppDisplayState(
     case 'invalid_phone':
       return { kind: 'invalid_phone' }
     case 'already_sent':
-      // A live/successful send already exists for this bill — this attempt
-      // was correctly skipped, so it reads the same as a normal send.
-      return { kind: 'sent' }
+      // A live send already exists for this bill and this attempt was
+      // correctly skipped. 'accepted', not 'sent': this row carries no
+      // delivery result of its own, so claiming the message arrived would
+      // overstate what is known.
+      return { kind: 'accepted' }
     default:
       // not_applicable / no_customer — nothing worth showing.
       return { kind: 'none' }

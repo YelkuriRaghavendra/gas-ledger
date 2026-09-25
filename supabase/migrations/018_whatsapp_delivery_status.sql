@@ -18,6 +18,8 @@ alter table public.whatsapp_sends
 
 -- The webhook arrives with only a wamid, so this is the lookup path for every
 -- callback. Partial, because rows that never reached Meta have no message_id.
-create index if not exists idx_whatsapp_sends_message_id
+-- UNIQUE because a wamid identifies exactly one send: with duplicates the
+-- lookup returns nothing and the delivery status is silently discarded.
+create unique index if not exists idx_whatsapp_sends_message_id
   on public.whatsapp_sends (message_id)
   where message_id is not null;

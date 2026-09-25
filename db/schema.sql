@@ -124,7 +124,7 @@ create table if not exists public.whatsapp_sends (
 create index if not exists idx_whatsapp_sends_bill on public.whatsapp_sends (bill_id);
 -- The delivery webhook arrives with only a wamid, so this is its lookup path.
 -- Partial, because rows that never reached Meta have no message_id.
-create index if not exists idx_whatsapp_sends_message_id
+create unique index if not exists idx_whatsapp_sends_message_id
   on public.whatsapp_sends (message_id)
   where message_id is not null;
 -- At most one row that is in-flight or already succeeded per bill. Any

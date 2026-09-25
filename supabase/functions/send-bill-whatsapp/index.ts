@@ -277,7 +277,7 @@ async function claimSend(db: any, billId: number, template: string): Promise<Cla
   // crashed between claiming and recording its result.
   const { data: rows, error: readError } = await db
     .from('whatsapp_sends')
-    .select('id, status, created_at')
+    .select('id, status, created_at, delivery_status')
     .eq('bill_id', billId)
     .in('status', ['pending', 'sent'])
     .limit(1)
@@ -289,6 +289,41 @@ async function claimSend(db: any, billId: number, template: string): Promise<Cla
   }
 
   const existing = rows[0]
+
+  // A 'sent' row whose delivery webhook came back 'failed' is NOT a successful
+  // send: Meta accepted the message and then could not deliver it, so the
+  // customer has nothing. Treating it as live would make Retry a no-op that
+  // records a 'skipped/already_sent' row — which reads as success in the UI and
+  // hides the delivery failure entirely.
+  //
+  // Retire it to 'failed' so it leaves the one-live-per-bill slot, then fall
+  // through and claim a fresh attempt. The history is preserved: the attempt
+  // genuinely did fail, just at delivery rather than at the API call.
+  if (existing.status === 'sent' && existing.delivery_status === 'failed') {
+    const { error: retireError } = await db
+      .from('whatsapp_sends')
+      .update({ status: 'failed', reason: 'not_delivered' })
+      .eq('id', existing.id)
+      .eq('status', 'sent')
+      .eq('delivery_status', 'failed')
+
+    if (retireError) {
+      return { claimId: null, outcome: failedDataError(template) }
+    }
+
+    const { data: reclaimed, error: reclaimError } = await db
+      .from('whatsapp_sends')
+      .insert({ bill_id: billId, status: 'pending', reason: null, message_id: null, template })
+      .select('id')
+      .single()
+
+    if (reclaimError || !reclaimed) {
+      // Another request retired the row and claimed it first. Theirs is live.
+      return { claimId: null, outcome: skip('already_sent', template) }
+    }
+    return { claimId: reclaimed.id, outcome: null }
+  }
+
   const staleThresholdIso = new Date(Date.now() - STALE_CLAIM_MS).toISOString()
   const looksStale = existing.status === 'pending' &&
     new Date(existing.created_at).getTime() < Date.now() - STALE_CLAIM_MS
