@@ -136,3 +136,19 @@ describe('getWhatsAppDisplayState — delivery reporting', () => {
       .toEqual({ kind: 'failed', reason: 'timeout' })
   })
 })
+
+// WHATSAPP_TEST_RECIPIENT redirects every bill to one test phone. The log
+// records it as 'test_redirect' so the history cannot imply the customer was
+// messaged when they were not.
+describe('getWhatsAppDisplayState — test redirect', () => {
+  it('never claims the customer was messaged', () => {
+    expect(getWhatsAppDisplayState(send({ status: 'sent', reason: 'test_redirect' }), NOW))
+      .toEqual({ kind: 'test_redirect' })
+  })
+
+  it('says so even once a delivery result arrives, because it was delivered elsewhere', () => {
+    expect(
+      getWhatsAppDisplayState(send({ status: 'sent', reason: 'test_redirect', delivery_status: 'delivered' }), NOW),
+    ).toEqual({ kind: 'test_redirect' })
+  })
+})
