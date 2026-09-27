@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
+import { HeroCard, HeroCardStats } from '../components/HeroCard'
 import { ChevronLeftIcon } from '../components/icons'
 import { useAuth } from '../auth/AuthContext'
 import { useCommercialProfit } from '../hooks/useCommercialProfit'
@@ -28,6 +29,7 @@ export function Reports() {
 
   const atCurrentMonth = year === now.year && month === now.month
   const denied = forbidden || (profile != null && profile.role !== 'owner')
+  const monthLabel = year === now.year ? MONTHS[month - 1] : `${MONTHS[month - 1]} ${year}`
 
   function shiftMonth(delta: number) {
     const next = month + delta
@@ -47,7 +49,7 @@ export function Reports() {
 
         {!loading && !denied && !error && (
           <>
-            <div className="rounded-[26px] bg-gradient-to-br from-inkSoft to-ink p-6 text-white shadow-float">
+            <HeroCard className="p-6">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#C9BBA8]">Gross profit</p>
                 <div className="-mr-[5px] flex items-center gap-[2px]">
@@ -59,8 +61,8 @@ export function Reports() {
                   >
                     <ChevronLeftIcon size={15} />
                   </button>
-                  <span className="min-w-[62px] text-center font-display text-[12.5px] font-bold">
-                    {MONTHS[month - 1]} {year}
+                  <span className="min-w-[52px] text-center font-display text-[12.5px] font-bold">
+                    {monthLabel}
                   </span>
                   <button
                     type="button"
@@ -81,22 +83,21 @@ export function Reports() {
                 {summary.marginPct.toFixed(1)}% margin · {summary.qty} cylinders · excludes GST
               </p>
 
-              <div className="mt-[15px] flex items-center gap-5 border-t border-white/[.14] pt-[12px]">
+              <HeroCardStats className="border-t border-white/[.14] pt-[12px]">
                 <div>
                   <p className="text-[10px] font-semibold text-mutedOnDark">Realised</p>
                   <p className="mt-[1px] font-display text-[16px] font-semibold text-[#5FCF97]">
                     {formatCurrency(summary.realised)}
                   </p>
                 </div>
-                <div className="h-[26px] w-px bg-white/[.14]" />
                 <div>
                   <p className="text-[10px] font-semibold text-mutedOnDark">Pending</p>
                   <p className="mt-[1px] font-display text-[16px] font-semibold text-[#EF9F27]">
                     {formatCurrency(summary.pending)}
                   </p>
                 </div>
-              </div>
-            </div>
+              </HeroCardStats>
+            </HeroCard>
 
             <div className="mt-3 grid grid-cols-3 gap-2">
               <Tile label="Revenue" value={formatCurrency(summary.revenue)} />
