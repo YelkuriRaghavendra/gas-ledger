@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { AlertDialog } from '../components/AlertDialog'
 import { Avatar } from '../components/Avatar'
 import { Toggle } from '../components/Toggle'
-import { ChevronLeftIcon, SearchIcon, WhatsAppIcon } from '../components/icons'
+import { ChevronLeftIcon, SearchIcon } from '../components/icons'
 
 const WHATSAPP_GREEN = '#25D366'
 
@@ -20,10 +20,6 @@ export function WhatsAppSettings() {
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [alert, setAlert] = useState<string | null>(null)
-  // Which direction the bulk switch was moved, or null when no dialog is open.
-  // Nothing moves until the write lands, so cancelling leaves the list alone.
-  const [pending, setPending] = useState<boolean | null>(null)
-  const [working, setWorking] = useState(false)
   // Ids mid-write, so a row cannot be tapped twice into a race with itself.
   const [busy, setBusy] = useState<number[]>([])
 
@@ -47,9 +43,6 @@ export function WhatsAppSettings() {
   const withPhone = useMemo(() => (rows ?? []).filter((r) => r.phone), [rows])
   const withoutPhone = useMemo(() => (rows ?? []).filter((r) => !r.phone), [rows])
   const on = withPhone.filter((r) => r.whatsapp_enabled).length
-  // On only when everyone who could receive a bill does. A partly-on list reads
-  // as off, because that is the state the switch would change.
-  const allOn = withPhone.length > 0 && on === withPhone.length
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -79,27 +72,6 @@ export function WhatsAppSettings() {
     }
   }
 
-  async function applyToEveryone(next: boolean) {
-    setWorking(true)
-    const { error: writeError, count } = await supabase
-      .from('customers')
-      .update({ whatsapp_enabled: next }, { count: 'exact' })
-      .not('phone', 'is', null)
-      .eq('whatsapp_enabled', !next)
-    setWorking(false)
-    setPending(null)
-    if (writeError) {
-      setAlert(writeError.message)
-    } else {
-      setAlert(
-        `WhatsApp turned ${next ? 'on' : 'off'} for ${count ?? 0} customer${count === 1 ? '' : 's'}`,
-      )
-    }
-    void load()
-  }
-
-  const affected = pending ? withPhone.length - on : on
-
   return (
     <div className="p-4">
       <Link
@@ -117,20 +89,8 @@ export function WhatsAppSettings() {
 
       {rows !== null && (
         <>
-          <div className="mb-[18px] flex items-center justify-between rounded-[16px] bg-surface px-[18px] py-[17px] shadow-card">
-            <span className="flex items-center gap-[10px] text-[14.5px] font-bold text-ink">
-              <WhatsAppIcon size={18} />
-              Everyone with a phone
-            </span>
-            <Toggle
-              checked={allOn}
-              onChange={(next) => setPending(next)}
-              disabled={withPhone.length === 0}
-              label="Push Notifications to WhatsApp for everyone with a phone number"
-              onColor={WHATSAPP_GREEN}
-            />
-          </div>
-
+          {/* No all-at-once switch here: that one lives on the row that opens
+              this screen, so it is not offered twice. */}
           {withPhone.length > 0 && (
             <div className="relative mb-[14px]">
               <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2">
@@ -215,22 +175,6 @@ export function WhatsAppSettings() {
         </>
       )}
 
-      <AlertDialog
-        open={pending !== null}
-        onClose={() => setPending(null)}
-        onConfirm={() => void applyToEveryone(pending === true)}
-        title={
-          pending
-            ? `Send bills on WhatsApp to ${affected} customer${affected === 1 ? '' : 's'}?`
-            : `Stop sending bills on WhatsApp to ${affected} customer${affected === 1 ? '' : 's'}?`
-        }
-        message={
-          pending
-            ? 'Everyone with a phone number starts receiving their bills on WhatsApp, from their next bill onward.'
-            : 'Nobody receives bills on WhatsApp after this. You can switch individual customers back on here.'
-        }
-        actionLabel={working ? 'Saving…' : pending ? 'Turn on' : 'Turn off'}
-      />
       <AlertDialog open={alert !== null} onClose={() => setAlert(null)} title={alert ?? ''} />
     </div>
   )
