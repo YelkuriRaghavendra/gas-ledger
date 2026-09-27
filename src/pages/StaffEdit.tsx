@@ -132,7 +132,13 @@ export function StaffEdit() {
     if (active !== person?.active) {
       const result = await setStaffActive(id!, active)
       if (!result.ok) {
+        // The RLS write above already landed, so the roster and this
+        // screen's "Last changed" footer must catch up before the error
+        // shows -- otherwise they sit one save behind until the owner
+        // navigates away and back. The retry stays idempotent: the fields
+        // above are unchanged, so resubmitting just re-issues this toggle.
         setSaving(false)
+        await refresh()
         setError(staffErrorMessage(result.error))
         return
       }

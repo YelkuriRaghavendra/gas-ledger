@@ -17,9 +17,12 @@ export function Account() {
   return (
     <div className="p-4">
       {/* navigate(-1), not a link to "/": this page is reached from both the
-          commercial and the domestic side. */}
+          commercial and the domestic side. But a deep link or a cold PWA
+          launch can land here as the first history entry, where -1 leaves
+          the app (or no-ops) -- fall back to "/" so the router can send the
+          owner to the right segment instead. */}
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => (window.history.state?.idx ? navigate(-1) : navigate('/'))}
         className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted"
       >
         <ChevronLeftIcon size={18} /> Back

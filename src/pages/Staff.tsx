@@ -48,10 +48,19 @@ export function Staff() {
       <h1 className="mb-4 font-display text-[24px] font-bold tracking-[-0.5px] text-ink">Staff</h1>
 
       {loading && <p className="text-muted">Loading…</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {/* An error and a genuinely empty roster look identical below, so a
+          failed load must not also render the (empty) roster body and the
+          add button -- an owner could mistake that for "nobody's on it yet". */}
+      {!loading && error && <p className="text-sm text-red-600">{error}</p>}
 
-      {!loading && (
+      {!loading && !error && (
         <>
+          {active.length === 0 && inactive.length === 0 && (
+            <p className="rounded-[20px] bg-surface px-4 py-10 text-center text-sm font-medium text-subtle shadow-card">
+              No staff yet
+            </p>
+          )}
+
           <div className="space-y-[10px]">
             {active.map((p) => (
               <StaffRow key={p.id} person={p} isYou={p.id === profile?.id} />
