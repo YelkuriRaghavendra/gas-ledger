@@ -1,8 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { validateCreate, validateSetActive } from './validation.ts'
-
-// 100 years. GoTrue takes a duration string, not a flag -- 'none' lifts it.
-const BAN_FOREVER = '876000h'
+import { planSetActive } from './setActivePlan.ts'
 
 // supabase.functions.invoke() sends Authorization + Content-Type, which makes
 // this a non-simple cross-origin request -- the browser preflights it with
@@ -85,8 +83,18 @@ Deno.serve(async (req: Request) => {
 
     if (createError || !created?.user) {
       const message = createError?.message ?? ''
-      if (createError?.status === 422 || /already (been )?registered|already exists/i.test(message)) {
+      // GoTrue's own `code` is the reliable signal that the address itself is
+      // the problem; the message regex is only a fallback for older/other
+      // error shapes that don't carry a code. `status === 422` is NOT enough
+      // on its own -- GoTrue also returns 422 for a weak password, a
+      // signup_disabled project, or a malformed address, none of which is
+      // "email taken", and telling the owner that would send them changing
+      // the email forever against what is really a different problem.
+      if (createError?.code === 'email_exists' || /already (been )?registered|already exists/i.test(message)) {
         return json({ error: 'email_taken' }, 409)
+      }
+      if (createError?.status === 422) {
+        return json({ error: 'invalid_request', detail: message || 'The auth provider rejected this request' }, 400)
       }
       console.error('createUser failed:', message)
       return json({ error: 'server_error' }, 500)
@@ -119,10 +127,23 @@ Deno.serve(async (req: Request) => {
     if (profileError) {
       // Without this rollback a failed insert strands an auth user who can
       // sign in with no profile row, which ModeGate renders as a permanent
-      // loading screen.
-      await admin.auth.admin.deleteUser(newId)
+      // loading screen. The delete's own result is checked -- it can fail
+      // too, and silently assuming it worked would log a "rolled back"
+      // message for an account that is still there.
+      const { error: deleteError } = await admin.auth.admin.deleteUser(newId)
+      if (deleteError) {
+        console.error(
+          'profile upsert failed AND rollback delete failed -- an orphaned auth user was left behind:',
+          profileError.message,
+          deleteError.message,
+        )
+        return json({
+          error: 'server_error',
+          detail: 'The account could not be finished and the cleanup also failed. An account was left behind -- remove it in the Supabase dashboard.',
+        }, 500)
+      }
       console.error('profile upsert failed, rolled back auth user:', profileError.message)
-      return json({ error: 'server_error' }, 500)
+      return json({ error: 'server_error', detail: 'The account could not be finished and was rolled back. Nothing was created.' }, 500)
     }
 
     return json({ ok: true, user_id: newId })
@@ -149,9 +170,6 @@ Deno.serve(async (req: Request) => {
     }
     if (!target) return json({ error: 'not_found' }, 404)
 
-    // Idempotent: a double tap or a stale roster must not fire a redundant ban.
-    if (target.active === active) return json({ ok: true })
-
     if (!active && target.role === 'owner') {
       const { count, error: countError } = await admin
         .from('profiles')
@@ -168,24 +186,82 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // The ban goes first on purpose. If the profiles update then fails, the
-    // user is banned but still listed as active -- visibly wrong and safe. The
-    // reverse order would show them deactivated while their session kept
-    // working.
-    const { error: banError } = await admin.auth.admin.updateUserById(user_id, {
-      ban_duration: active ? 'none' : BAN_FOREVER,
-    })
-    if (banError) {
-      console.error('ban update failed:', banError.message)
-      return json({ error: 'server_error' }, 500)
+    const plan = planSetActive(target, active)
+
+    // The ban/unban call and the profiles.active write are two separate,
+    // non-transactional calls to two different systems -- either can fail on
+    // its own. See setActivePlan.ts for why the order is direction-dependent
+    // and why the ban/unban call is never skipped, even when the flag
+    // already reads the desired value (plan.write_flag === false): a prior
+    // call may have written one side and not the other, and re-issuing the
+    // same action is the only way to repair that. updateUserById is
+    // idempotent on a repeated ban_duration, so re-applying it costs nothing
+    // when nothing had actually drifted.
+
+    if (plan.order === 'ban_then_flag') {
+      const { error: banError } = await admin.auth.admin.updateUserById(user_id, {
+        ban_duration: plan.ban_duration,
+      })
+      if (banError) {
+        console.error('ban update failed:', banError.message)
+        return json({ error: 'server_error' }, 500)
+      }
+
+      if (!plan.write_flag) return json({ ok: true })
+
+      const { error: flagError } = await admin
+        .from('profiles')
+        .update({ active, updated_by: callerId })
+        .eq('id', user_id)
+      if (flagError) {
+        // The account is now banned but the profiles row still reads active
+        // -- e.g. a concurrent demotion tripped the database's last-active-
+        // owner backstop even though the count check above passed. Lift the
+        // ban we just applied rather than leave the account banned with no
+        // way to undo it from inside the app.
+        console.error('active flag update failed after ban, rolling back:', flagError.message)
+        const { error: rollbackError } = await admin.auth.admin.updateUserById(user_id, { ban_duration: 'none' })
+        if (rollbackError) {
+          console.error(
+            'rollback unban ALSO failed -- account is banned with no flag change, needs manual repair:',
+            rollbackError.message,
+          )
+          return json({
+            error: 'server_error',
+            detail: 'The change failed and the rollback also failed. The account is now banned and needs to be unbanned manually in the Supabase dashboard.',
+          }, 500)
+        }
+        return json({
+          error: 'server_error',
+          detail: 'The change could not be completed and was rolled back. Nothing changed.',
+        }, 500)
+      }
+
+      return json({ ok: true })
     }
 
-    const { error: flagError } = await admin
-      .from('profiles')
-      .update({ active, updated_by: callerId })
-      .eq('id', user_id)
-    if (flagError) {
-      console.error('active flag update failed:', flagError.message)
+    // plan.order === 'flag_then_unban'
+    if (plan.write_flag) {
+      const { error: flagError } = await admin
+        .from('profiles')
+        .update({ active, updated_by: callerId })
+        .eq('id', user_id)
+      if (flagError) {
+        // Nothing has reached GoTrue yet in this order -- the account is
+        // untouched, so there is nothing to roll back.
+        console.error('active flag update failed:', flagError.message)
+        return json({ error: 'server_error' }, 500)
+      }
+    }
+
+    const { error: unbanError } = await admin.auth.admin.updateUserById(user_id, {
+      ban_duration: plan.ban_duration,
+    })
+    if (unbanError) {
+      // The profile now reads active but the account is still banned --
+      // visibly wrong but safe (nobody gains access who shouldn't), so this
+      // is left for a retry rather than rolled back.
+      console.error('unban failed after flag update:', unbanError.message)
       return json({ error: 'server_error' }, 500)
     }
 
