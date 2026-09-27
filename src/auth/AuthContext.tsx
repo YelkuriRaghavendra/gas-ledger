@@ -47,15 +47,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .single()
       .then(({ data, error }) => {
         if (cancelled) return
-        if (error) console.error('Failed to load profile:', error.message)
         const loaded = data as Profile | null
 
-        // A signed-in user with no profile row hangs ModeGate on its loading
-        // branch forever. A deactivated one is already banned in GoTrue, but
-        // their current access token stays valid until it expires -- signing
-        // out here clears the screen now rather than at the next refresh.
+        // PGRST116 ("no rows") from .single() means the profile genuinely
+        // doesn't exist -- sign out so the user isn't stuck on a loading
+        // screen forever. Any other error (network blip, RLS hiccup, a 5xx)
+        // is a fetch failure, not evidence the profile is missing: signing
+        // out here would drop a perfectly valid session over a transient
+        // problem and blame the owner for it. Leave the session alone and
+        // let the existing loading/retry behaviour handle it instead.
+        if (error) {
+          if (error.code === 'PGRST116') {
+            setSignOutReason('no-profile')
+            setProfile(null)
+            setLoading(false)
+            void supabase.auth.signOut()
+            return
+          }
+          console.error('Failed to load profile:', error.message)
+          return
+        }
+
+        // A deactivated profile is already banned in GoTrue, but their
+        // current access token stays valid until it expires -- signing out
+        // here clears the screen now rather than at the next refresh.
         if (!loaded || !loaded.active) {
-          setSignOutReason(loaded ? 'inactive' : 'no-profile')
+          setSignOutReason('inactive')
           setProfile(null)
           setLoading(false)
           void supabase.auth.signOut()

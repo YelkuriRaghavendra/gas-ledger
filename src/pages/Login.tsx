@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useAgencySettings } from '../hooks/useAgencySettings'
@@ -14,11 +14,17 @@ export function Login() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  // Read once on mount, before the early `if (session)` return can skip it.
-  const [notice] = useState(() => {
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // Read-and-clear as an effect, not a lazy initializer: StrictMode
+  // double-invokes initializers in development, so the first, discarded
+  // pass would clear sessionStorage and the committed pass would read null.
+  // Runs before the early `if (session)` return below so hooks still fire
+  // on every render.
+  useEffect(() => {
     const reason = takeSignOutReason()
-    return reason ? signOutMessage(reason) : null
-  })
+    if (reason) setNotice(signOutMessage(reason))
+  }, [])
 
   if (session) return <Navigate to="/" replace />
 
