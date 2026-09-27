@@ -1,37 +1,17 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
-import { supabase } from '../lib/supabase'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { useAllCustomerProductBalances } from '../hooks/useAllCustomerProductBalances'
 import { emptiesOwed, formatCurrency } from '../utils/format'
 import { Avatar } from '../components/Avatar'
 import { StatusPill } from '../components/StatusPill'
-import { AlertDialog } from '../components/AlertDialog'
 import { SearchIcon, MapPinIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
 
 export function Customers() {
-  const { profile } = useAuth()
-  const isOwner = profile?.role === 'owner'
   const { data, loading, error } = useCustomerBalances()
   const { data: productBalances } = useAllCustomerProductBalances()
   const [search, setSearch] = useState('')
-  const [confirmBulkEnable, setConfirmBulkEnable] = useState(false)
-  const [enabling, setEnabling] = useState(false)
-  const [alert, setAlert] = useState<string | null>(null)
-
-  async function enableAllWithPhone() {
-    setEnabling(true)
-    const { error: updateError, count } = await supabase
-      .from('customers')
-      .update({ whatsapp_enabled: true }, { count: 'exact' })
-      .not('phone', 'is', null)
-      .eq('whatsapp_enabled', false)
-    setEnabling(false)
-    setConfirmBulkEnable(false)
-    setAlert(updateError ? updateError.message : `WhatsApp enabled for ${count ?? 0} customer${count === 1 ? '' : 's'}`)
-  }
 
   const emptiesByCustomer = useMemo(() => {
     const map = new Map<number, number>()
@@ -82,16 +62,6 @@ export function Customers() {
           />
         </div>
 
-        {isOwner && (
-          <button
-            type="button"
-            onClick={() => setConfirmBulkEnable(true)}
-            className="mb-[18px] w-full rounded-[16px] bg-surface py-[13px] text-[12.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
-          >
-            Enable WhatsApp for all customers with a phone
-          </button>
-        )}
-
         {loading && <p className="text-muted">Loading…</p>}
         {error && <p className="text-red-600">{error}</p>}
 
@@ -127,15 +97,6 @@ export function Customers() {
         </ul>
       </div>
 
-      <AlertDialog
-        open={confirmBulkEnable}
-        onClose={() => setConfirmBulkEnable(false)}
-        onConfirm={enableAllWithPhone}
-        title="Enable WhatsApp for all customers?"
-        message="Every customer with a phone number will start receiving bills on WhatsApp from their next bill onward."
-        actionLabel={enabling ? 'Enabling…' : 'Enable'}
-      />
-      <AlertDialog open={alert !== null} onClose={() => setAlert(null)} title={alert ?? ''} />
     </div>
   )
 }

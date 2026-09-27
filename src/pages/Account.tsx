@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useAgencySettings } from '../hooks/useAgencySettings'
+import { supabase } from '../lib/supabase'
 import { InitialsBadge } from '../components/InitialsBadge'
+import { AlertDialog } from '../components/AlertDialog'
 import { ChevronLeftIcon } from '../components/icons'
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -13,6 +16,29 @@ export function Account() {
   const { data } = useAgencySettings()
   const navigate = useNavigate()
   const isOwner = profile?.role === 'owner'
+  const [confirmBulkEnable, setConfirmBulkEnable] = useState(false)
+  const [enabling, setEnabling] = useState(false)
+  const [alert, setAlert] = useState<string | null>(null)
+
+  // Lives here rather than on the customer list because it is a one-off
+  // settings action, not something done while working through customers. The
+  // owner-only guard is cosmetic -- a trigger on customers rejects a
+  // whatsapp_enabled change from anyone else.
+  async function enableAllWithPhone() {
+    setEnabling(true)
+    const { error: updateError, count } = await supabase
+      .from('customers')
+      .update({ whatsapp_enabled: true }, { count: 'exact' })
+      .not('phone', 'is', null)
+      .eq('whatsapp_enabled', false)
+    setEnabling(false)
+    setConfirmBulkEnable(false)
+    setAlert(
+      updateError
+        ? updateError.message
+        : `WhatsApp enabled for ${count ?? 0} customer${count === 1 ? '' : 's'}`,
+    )
+  }
 
   return (
     <div className="p-4">
@@ -56,6 +82,15 @@ export function Account() {
         <Link to="/account/business" className={rowCls}>
           Business details <span className="text-[#C0B4A2]">›</span>
         </Link>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => setConfirmBulkEnable(true)}
+            className={`${rowCls} w-full text-left transition active:scale-[0.99]`}
+          >
+            Enable WhatsApp for everyone with a phone
+          </button>
+        )}
       </div>
 
       <button
@@ -65,6 +100,16 @@ export function Account() {
       >
         Sign out
       </button>
+
+      <AlertDialog
+        open={confirmBulkEnable}
+        onClose={() => setConfirmBulkEnable(false)}
+        onConfirm={enableAllWithPhone}
+        title="Enable WhatsApp for all customers?"
+        message="Every customer with a phone number will start receiving bills on WhatsApp from their next bill onward."
+        actionLabel={enabling ? 'Enabling…' : 'Enable'}
+      />
+      <AlertDialog open={alert !== null} onClose={() => setAlert(null)} title={alert ?? ''} />
     </div>
   )
 }
