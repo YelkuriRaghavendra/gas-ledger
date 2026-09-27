@@ -24,9 +24,13 @@ export function BottomSheet({ open, onClose, children, slideUp }: BottomSheetPro
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface text-[20px] font-bold leading-none text-muted shadow-card active:scale-95"
+          className="absolute right-3.5 top-3.5 flex h-8 w-8 items-center justify-center rounded-full bg-surface text-subtle hover:text-ink shadow-card transition active:scale-95 z-10"
         >
-          ×
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="12" />
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
         </button>
         {children}
       </div>
