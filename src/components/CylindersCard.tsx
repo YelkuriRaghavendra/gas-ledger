@@ -28,9 +28,10 @@ export function CylindersCard({ items, accent, linkLabel, linkTo }: {
                 </>
               )
             })()}
-            <div className={`flex gap-4 ${it.emptiesWithCustomers === undefined ? 'mt-[14px]' : ''}`}>
-              <div><p className="font-display text-[21px] font-bold text-ink">{it.full}</p><p className="text-[10px] font-semibold text-subtle">full</p></div>
-              <div><p className="font-display text-[21px] font-bold text-[#2E8B57]">{it.empty}</p><p className="text-[10px] font-semibold text-subtle">empty</p></div>
+            <div className={`flex items-center ${it.emptiesWithCustomers === undefined ? 'mt-[14px]' : ''}`}>
+              <div className="flex-1"><p className="font-display text-[21px] font-bold text-ink">{it.full}</p><p className="text-[10px] font-semibold text-subtle">full</p></div>
+              <div className="h-9 w-px bg-borderMuted" />
+              <div className="flex-1 pl-[14px]"><p className="font-display text-[21px] font-bold text-[#2E8B57]">{it.empty}</p><p className="text-[10px] font-semibold text-subtle">empty</p></div>
             </div>
           </div>
         ))}

@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -17,6 +17,7 @@ import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
 import { ChevronLeftIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
+import { HeroCard, HeroCardStats } from '../components/HeroCard'
 import { CylindersCard, type CardItem } from '../components/CylindersCard'
 import { DetailModal } from '../components/DetailModal'
 
@@ -115,21 +116,10 @@ export function Home() {
 
         {!loading && !error && (
           <>
-            <div
-              className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-inkSoft to-ink shadow-float"
+            <HeroCard
               onTouchStart={onTouchStart}
               onTouchEnd={onTouchEnd}
             >
-              <svg
-                width="170"
-                height="170"
-                viewBox="0 0 24 24"
-                fill="rgba(228,87,27,.16)"
-                className="pointer-events-none absolute -bottom-12 -right-8"
-              >
-                <rect x="6" y="6" width="12" height="16.5" rx="5" />
-                <rect x="8.6" y="3.6" width="6.8" height="2.6" rx="1.3" />
-              </svg>
               <div
                 className="flex transition-transform duration-300 ease-out"
                 style={{ transform: `translateX(-${slide * 100}%)` }}
@@ -144,17 +134,16 @@ export function Home() {
                   <Link to="/commercial/customers" className="relative mt-[9px] inline-flex items-center gap-1 text-[12.5px] font-semibold text-mutedOnDark">
                     from {customersWithDue} customer{customersWithDue === 1 ? '' : 's'} ›
                   </Link>
-                  <div className="relative mt-[15px] flex items-center gap-5">
+                  <HeroCardStats className="relative">
                     <div>
                       <p className="text-[10px] font-semibold text-mutedOnDark">{emptiesOwed(emptiesOutTotal).owedBy === 'agency' ? 'Advance' : 'Pending'}</p>
                       <p className="mt-[1px] font-display text-[16px] font-semibold text-[#5FCF97]">{emptiesOwed(emptiesOutTotal).count}</p>
                     </div>
-                    <div className="h-[26px] w-px bg-white/[.14]" />
                     <div>
                       <p className="text-[10px] font-semibold text-mutedOnDark">Sold today</p>
                       <p className="mt-[1px] font-display text-[16px] font-semibold text-white">{soldToday}</p>
                     </div>
-                  </div>
+                  </HeroCardStats>
                 </div>
 
                 <div className="w-full shrink-0 p-6 text-white">
@@ -194,19 +183,18 @@ export function Home() {
                   <p className="relative mt-[9px] text-[12.5px] font-semibold text-mutedOnDark">
                     payments and sales paid on the spot
                   </p>
-                  <div className="relative mt-[15px] flex items-center gap-5">
-                    {cylinderProducts.map((p, i) => (
-                      <Fragment key={p.id}>
-                        {i > 0 && <div className="h-[26px] w-px bg-white/[.14]" />}
+                  <HeroCardStats className="relative">
+                    {cylinderProducts.map((p) => (
+                      <div key={p.id}>
                         <div>
                           <p className="text-[10px] font-semibold text-mutedOnDark">{p.name} sold</p>
                           <p className="mt-[1px] font-display text-[16px] font-semibold text-white">
                             {monthly.soldByProduct.get(p.id) ?? 0}
                           </p>
                         </div>
-                      </Fragment>
+                      </div>
                     ))}
-                  </div>
+                  </HeroCardStats>
                 </div>
               </div>
               <div className="flex justify-center gap-[6px] pb-3">
@@ -223,18 +211,21 @@ export function Home() {
                   className={`h-[6px] rounded-full transition-all ${slide === 1 ? 'w-[18px] bg-white/80' : 'w-[6px] bg-white/30'}`}
                 />
               </div>
-            </div>
+            </HeroCard>
 
             {isOwner && !profitForbidden && (
-              <Link to="/commercial/reports" className="mt-3 flex items-center justify-between rounded-[16px] bg-surface px-[13px] py-3 shadow-card">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-muted">Profit this month</p>
-                  <p className="mt-[2px] font-display text-[21px] font-bold text-ink">{formatCurrency(profitSummary.profit)}</p>
-                  <p className="mt-[2px] text-[11px] font-semibold text-subtle">
-                    {formatCurrency(profitSummary.realised)} realised · {profitSummary.marginPct.toFixed(1)}%
-                  </p>
+              <Link to="/commercial/reports" className="mt-4 flex items-center justify-between overflow-hidden rounded-[20px] border border-[#F4DDCF] bg-[#FFF4EE] p-[14px] transition active:scale-[0.99]">
+                <div className="flex min-w-0 items-center gap-[11px]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-accent text-[20px] font-bold text-white">↗</div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.5px] text-[#9B5B37]">Profit this month</p>
+                    <p className="mt-[1px] truncate font-display text-[21px] font-bold tracking-[-0.4px] text-ink">{formatCurrency(profitSummary.profit)}</p>
+                    <p className="mt-[2px] truncate text-[10.5px] font-semibold text-muted">
+                      {formatCurrency(profitSummary.realised)} realised · {profitSummary.marginPct.toFixed(1)}% margin
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[12px] font-bold text-accent">Reports ›</span>
+                <span className="ml-3 shrink-0 rounded-[10px] bg-white px-[9px] py-[6px] text-[11px] font-bold text-accent shadow-card">Reports ›</span>
               </Link>
             )}
 

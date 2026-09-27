@@ -40,9 +40,10 @@ export default function App() {
   const hideNav = location.pathname === '/login'
 
   return (
-    <div className="min-h-screen bg-cream pb-16">
-      <ConnectionBanner />
-      <Routes>
+    <div className="min-h-screen bg-[#E7E0D6] md:px-6">
+      <div className="min-h-screen bg-cream pb-16 md:mx-auto md:max-w-[430px] md:shadow-[0_0_48px_rgba(31,24,19,0.18)]">
+        <ConnectionBanner />
+        <Routes>
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<ModeGate />}>
@@ -93,7 +94,8 @@ export default function App() {
             <Route path="/domestic/combos" element={<DomesticCombos />} />
           </Route>
         </Route>
-      </Routes>
+        </Routes>
+      </div>
       {!hideNav && (isDomestic ? <DomesticNav /> : <BottomNav />)}
     </div>
   )

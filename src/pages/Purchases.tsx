@@ -16,12 +16,13 @@ import {
 } from '../utils/purchases'
 import { ChevronLeftIcon, PlusIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
+import { HeroCard, HeroCardStats } from '../components/HeroCard'
 import { PurchaseDetail } from '../components/PurchaseDetail'
 import truckMark from '../assets/truck.png'
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
 export function Purchases() {
@@ -84,7 +85,7 @@ export function Purchases() {
           </Link>
         </div>
 
-        <div className="mb-[14px] rounded-[20px] bg-ink px-[18px] py-4 text-white">
+        <HeroCard className="mb-[14px] p-6">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#C9BBA8]">Spent in</p>
             {/* Pulled tight to the card edge; the negative margin cancels the
@@ -116,17 +117,17 @@ export function Purchases() {
             </div>
           </div>
 
-          <p className="mt-1 font-display text-[30px] font-bold leading-none tracking-[-0.7px]">
+          <p className="mt-1 font-display text-[38px] font-bold leading-none tracking-[-1px]">
             {formatCurrency(summary.spend)}
           </p>
-          <p className="mt-[5px] text-[11px] font-semibold text-mutedOnDark">
+          <p className="mt-[9px] text-[12.5px] font-semibold text-mutedOnDark">
             across {summary.orderCount} {summary.orderCount === 1 ? 'order' : 'orders'}
           </p>
-          <div className="mt-[14px] flex gap-[10px] border-t border-[#3A2F26] pt-[13px]">
+          <HeroCardStats className="border-t border-white/[.14] pt-[13px]">
             <Stat value={String(summary.cylindersIn)} label="Cylinders in" />
             <Stat value={String(summary.emptiesOut)} label="Empties out" />
-          </div>
-        </div>
+          </HeroCardStats>
+        </HeroCard>
 
         {groups.map((group) => (
           <div key={group.key} className="mb-[9px]">

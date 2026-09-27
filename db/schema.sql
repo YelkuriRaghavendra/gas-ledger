@@ -460,7 +460,9 @@ create policy "customers_write" on public.customers for all to authenticated usi
 
 -- agency_settings
 drop policy if exists "agency_settings_read" on public.agency_settings;
-create policy "agency_settings_read" on public.agency_settings for select to authenticated using (true);
+-- The login screen displays the agency name before sign-in, so this one
+-- non-sensitive settings row must be readable by anonymous visitors too.
+create policy "agency_settings_read" on public.agency_settings for select to anon, authenticated using (true);
 drop policy if exists "agency_settings_write" on public.agency_settings;
 create policy "agency_settings_write" on public.agency_settings for all to authenticated using (true) with check (true);
 
