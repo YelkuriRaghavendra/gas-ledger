@@ -18,6 +18,7 @@ import { ActivityFeed } from './pages/ActivityFeed'
 import { BusinessDetails } from './pages/BusinessDetails'
 import { Purchases } from './pages/Purchases'
 import { Reports } from './pages/Reports'
+import { Staff } from './pages/Staff'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { AllStock } from './pages/AllStock'
 import { SetCurrentStock } from './pages/SetCurrentStock'
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="/account" element={<Account />} />
             <Route element={<OwnerRoute />}>
               <Route path="/commercial/reports" element={<Reports />} />
+              <Route path="/account/staff" element={<Staff />} />
             </Route>
 
             {/* Domestic */}
