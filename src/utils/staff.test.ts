@@ -6,6 +6,7 @@ import {
   canEditOwnAccess,
   wouldOrphanOwners,
   staffErrorMessage,
+  profileWriteErrorMessage,
 } from './staff'
 
 describe('roleLabel', () => {
@@ -133,5 +134,39 @@ describe('staffErrorMessage', () => {
   it('falls back for an unknown code or a missing body', () => {
     expect(staffErrorMessage({ error: 'teapot' })).toBe('Something went wrong. Try again.')
     expect(staffErrorMessage(null)).toBe('Something went wrong. Try again.')
+  })
+})
+
+describe('profileWriteErrorMessage', () => {
+  const knownMessages = [
+    'only an owner can change role, segment access or active status',
+    'you cannot change your own role',
+    'you cannot deactivate yourself',
+    'at least one active owner is required',
+    'only an owner can create an owner account',
+  ]
+
+  it.each(knownMessages)('passes the guard trigger sentence through as-is: %s', (message) => {
+    expect(profileWriteErrorMessage(message)).toBe(message)
+  })
+
+  it('matches a known sentence wrapped in PostgREST\'s own message', () => {
+    expect(
+      profileWriteErrorMessage(
+        'new row violates row-level security policy: "you cannot deactivate yourself"',
+      ),
+    ).toBe('you cannot deactivate yourself')
+  })
+
+  it('falls back for an unrelated Postgres error', () => {
+    expect(profileWriteErrorMessage('connection to server was lost')).toBe(
+      'Something went wrong. Try again.',
+    )
+  })
+
+  it('falls back for an empty or undefined message', () => {
+    expect(profileWriteErrorMessage('')).toBe('Something went wrong. Try again.')
+    expect(profileWriteErrorMessage(undefined)).toBe('Something went wrong. Try again.')
+    expect(profileWriteErrorMessage(null)).toBe('Something went wrong. Try again.')
   })
 })

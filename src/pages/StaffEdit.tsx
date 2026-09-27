@@ -9,6 +9,7 @@ import {
   ROLES,
   SEGMENTS,
   canEditOwnAccess,
+  profileWriteErrorMessage,
   roleLabel,
   segmentLabel,
   staffErrorMessage,
@@ -118,13 +119,30 @@ export function StaffEdit() {
     const fieldsChanged =
       name !== person?.name || role !== person?.role || segment !== person?.segment_access
     if (fieldsChanged) {
-      const { error: updateError } = await supabase
+      // Without .select(), postgrest-js sends Prefer: return=minimal, and an
+      // UPDATE that matches zero rows under RLS still comes back with
+      // error === null. That is reachable here: profiles_update_owner checks
+      // the caller's live is_active_owner() state, so a second owner
+      // demoting or deactivating this caller from another device mid-edit
+      // makes the next save match nothing. Asking for the row back and
+      // treating "none came back" as a failure is the only way to catch it.
+      const { data: updatedRow, error: updateError } = await supabase
         .from('profiles')
         .update({ name: name.trim(), role, segment_access: segment })
         .eq('id', id!)
+        .select()
+        .maybeSingle()
       if (updateError) {
         setSaving(false)
-        setError(updateError.message)
+        console.error(updateError.message)
+        setError(profileWriteErrorMessage(updateError.message))
+        return
+      }
+      if (!updatedRow) {
+        setSaving(false)
+        setError(
+          'That did not save. Your own access may have changed -- sign out and back in, then try again.',
+        )
         return
       }
     }

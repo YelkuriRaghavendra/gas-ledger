@@ -162,6 +162,15 @@ npm run dev
 13. Try signing in as them again. Same message, sign-in refused.
 14. Owner re-ticks "Can sign in". They can sign in again.
 
+Deactivating takes effect immediately for anything that needs a fresh sign-in
+or a token refresh, and `AuthContext` signs a live session out of the UI as
+soon as its profile comes back inactive -- that part is instant. What is not
+instant: an access token issued before the ban stays valid until it expires,
+up to about an hour, and can still be used to write bills or purchases
+straight against PostgREST during that window, bypassing the app entirely. If
+you are deactivating someone you no longer trust with that hour, revoke their
+sessions from Authentication → Users in the Supabase dashboard too.
+
 ## What is deliberately not here
 
 - **Changing or reissuing a password**, by the owner or the user. This is the
