@@ -174,11 +174,11 @@ export function StaffEdit() {
   const changedBy = person?.updated_by ? profileNames.get(person.updated_by) : undefined
 
   return (
-    <div className="p-4">
+    <div className="p-5 pb-10 pt-3">
       <Link to="/account/staff" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Staff
       </Link>
-      <h1 className="mb-4 font-display text-[24px] font-bold tracking-[-0.5px] text-ink">
+      <h1 className="mb-4 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">
         {isNew ? 'Add staff member' : person!.name}
       </h1>
 

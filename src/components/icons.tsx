@@ -176,3 +176,14 @@ export function WhatsAppIcon({ size = 16, color = '#25D366' }: { size?: number; 
     </svg>
   )
 }
+
+export function StoreIcon({ size = 24, color = 'currentColor', strokeWidth = 2 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5 4.5 4h15L21 9.5" />
+      <path d="M3 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 4 0 2.5 2.5 0 0 0 4 0 2.5 2.5 0 0 0 5 0" />
+      <path d="M4.5 12v7a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-7" />
+      <path d="M9.5 20v-5h5v5" />
+    </svg>
+  )
+}

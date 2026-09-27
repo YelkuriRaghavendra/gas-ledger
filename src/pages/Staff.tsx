@@ -41,11 +41,11 @@ export function Staff() {
   const inactive = sortStaff(staff.filter((p) => !p.active))
 
   return (
-    <div className="p-4">
+    <div className="p-5 pb-10 pt-3">
       <Link to="/account" className="mb-3 inline-flex items-center gap-[6px] py-[6px] text-sm font-bold text-muted">
         <ChevronLeftIcon size={18} /> Account
       </Link>
-      <h1 className="mb-4 font-display text-[24px] font-bold tracking-[-0.5px] text-ink">Staff</h1>
+      <h1 className="mb-4 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Staff</h1>
 
       {loading && <p className="text-muted">Loading…</p>}
       {/* An error and a genuinely empty roster look identical below, so a
