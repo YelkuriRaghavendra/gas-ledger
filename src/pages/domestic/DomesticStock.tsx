@@ -5,14 +5,12 @@ import { useGodownStock } from '../../hooks/useGodownStock'
 import { useProducts } from '../../hooks/useProducts'
 import { PlusIcon } from '../../components/icons'
 import { AppHeader } from '../../components/AppHeader'
-import { AccountMenu } from '../../components/AccountMenu'
 import { BottomSheet } from '../../components/BottomSheet'
 import { PriceOptionsEditor } from '../../components/PriceOptionsEditor'
 import type { Product, ProductKind, PriceOption } from '../../types/db'
 
 export function DomesticStock() {
   const navigate = useNavigate()
-  const [accountOpen, setAccountOpen] = useState(false)
   const { data: stock, loading, error, refresh: refreshStock } = useGodownStock('all')
   const { data: products, refresh: refreshProducts } = useProducts('domestic')
 
@@ -157,8 +155,7 @@ export function DomesticStock() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="domestic" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="domestic" />
 
       <div className="p-5 pt-1">
       <div className="mb-[22px] flex items-center justify-between">

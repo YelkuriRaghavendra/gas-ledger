@@ -1,10 +1,12 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { OwnerRoute } from './components/OwnerRoute'
 import { ModeGate } from './mode/ModeGate'
 import { BottomNav } from './components/BottomNav'
 import { DomesticNav } from './components/DomesticNav'
 import { ConnectionBanner } from './components/ConnectionBanner'
 import { Login } from './pages/Login'
+import { Account } from './pages/Account'
 import { Home } from './pages/Home'
 import { Customers } from './pages/Customers'
 import { AddCustomer } from './pages/AddCustomer'
@@ -63,7 +65,11 @@ export default function App() {
             <Route path="/commercial/purchases/:billId/edit" element={<RecordPurchase />} />
             <Route path="/commercial/godown" element={<AllStock />} />
             <Route path="/commercial/godown/set-stock" element={<SetCurrentStock />} />
-            <Route path="/commercial/reports" element={<Reports />} />
+
+            <Route path="/account" element={<Account />} />
+            <Route element={<OwnerRoute />}>
+              <Route path="/commercial/reports" element={<Reports />} />
+            </Route>
 
             {/* Domestic */}
             <Route path="/domestic" element={<DomesticHome />} />

@@ -10,7 +10,6 @@ import { StatusPill } from '../components/StatusPill'
 import { AlertDialog } from '../components/AlertDialog'
 import { SearchIcon, MapPinIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
-import { AccountMenu } from '../components/AccountMenu'
 
 export function Customers() {
   const { profile } = useAuth()
@@ -18,7 +17,6 @@ export function Customers() {
   const { data, loading, error } = useCustomerBalances()
   const { data: productBalances } = useAllCustomerProductBalances()
   const [search, setSearch] = useState('')
-  const [accountOpen, setAccountOpen] = useState(false)
   const [confirmBulkEnable, setConfirmBulkEnable] = useState(false)
   const [enabling, setEnabling] = useState(false)
   const [alert, setAlert] = useState<string | null>(null)
@@ -58,8 +56,7 @@ export function Customers() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="commercial" />
 
       <div className="p-5 pt-1">
         <h1 className="font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Customers</h1>

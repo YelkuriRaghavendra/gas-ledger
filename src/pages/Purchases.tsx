@@ -16,7 +16,6 @@ import {
 } from '../utils/purchases'
 import { ChevronLeftIcon, PlusIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
-import { AccountMenu } from '../components/AccountMenu'
 import { PurchaseDetail } from '../components/PurchaseDetail'
 import truckMark from '../assets/truck.png'
 
@@ -31,7 +30,6 @@ export function Purchases() {
   const isOwner = profile?.role === 'owner'
   const { data: products } = useProducts()
   const { data: purchaseOrders, refresh } = usePurchaseOrders()
-  const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<PurchaseOrderWithLines | null>(null)
   const profileNames = useProfiles()
 
@@ -72,8 +70,7 @@ export function Purchases() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="commercial" />
 
       <div className="p-5 pt-1">
         <div className="mb-[14px] flex items-center justify-between">
