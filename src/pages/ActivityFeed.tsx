@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { AppHeader } from '../components/AppHeader'
-import { AccountMenu } from '../components/AccountMenu'
 import { DetailModal } from '../components/DetailModal'
 import { useActivityFeed, type FeedItem } from '../hooks/useActivityFeed'
 import { useProfiles } from '../hooks/useProfiles'
@@ -39,7 +38,6 @@ const firstOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1).get
 
 export function ActivityFeed() {
   const { profile } = useAuth()
-  const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<FeedItem | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   // The month being browsed, held as the timestamp of its 1st so the value
@@ -103,8 +101,7 @@ export function ActivityFeed() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="commercial" />
 
       <div className="px-5 pt-1">
         {/* Title and month browser share one line. The label is fixed-width so

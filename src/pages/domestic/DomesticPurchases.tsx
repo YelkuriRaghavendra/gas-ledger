@@ -9,7 +9,6 @@ import { useProfiles } from '../../hooks/useProfiles'
 import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../../utils/format'
 import { PlusIcon } from '../../components/icons'
 import { AppHeader } from '../../components/AppHeader'
-import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
 import { getActivityIcon } from '../../utils/activityIcon'
 
@@ -24,7 +23,6 @@ function billRows(order: PurchaseOrderWithLines, productNameById: Map<number, st
 }
 
 export function DomesticPurchases() {
-  const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<PurchaseOrderWithLines | null>(null)
   const profileNames = useProfiles()
   const { profile } = useAuth()
@@ -44,8 +42,7 @@ export function DomesticPurchases() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="domestic" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="domestic" />
 
       <div className="p-5 pt-1">
         <div className="mb-[22px] flex items-center justify-between">

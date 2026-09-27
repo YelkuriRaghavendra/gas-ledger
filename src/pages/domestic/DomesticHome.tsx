@@ -9,7 +9,6 @@ import { useProfiles } from '../../hooks/useProfiles'
 import { formatCurrency, formatDate, formatUpdated } from '../../utils/format'
 import { getActivityIcon, getActivityTint } from '../../utils/activityIcon'
 import { AppHeader } from '../../components/AppHeader'
-import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
 import { CylindersCard, type CardItem } from '../../components/CylindersCard'
 
@@ -29,7 +28,6 @@ function monthStartIso() {
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function DomesticHome() {
-  const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<DomesticBill | null>(null)
   const [slide, setSlide] = useState(0)
   const touchRef = useRef<number | null>(null)
@@ -75,8 +73,7 @@ export function DomesticHome() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="domestic" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="domestic" />
 
       <div className="px-4">
         {loading && <p className="text-muted">Loading…</p>}

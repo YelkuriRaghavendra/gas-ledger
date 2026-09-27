@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useGodownStock } from '../hooks/useGodownStock'
 import { useProducts } from '../hooks/useProducts'
 import { AppHeader } from '../components/AppHeader'
-import { AccountMenu } from '../components/AccountMenu'
 import { BottomSheet } from '../components/BottomSheet'
 import { PriceOptionsEditor } from '../components/PriceOptionsEditor'
 import { PlusIcon } from '../components/icons'
@@ -134,7 +133,6 @@ export function AllStock() {
   const { data: stock, loading, refresh: refreshStock } = useGodownStock('all')
   const { data: commercialProducts, refresh: refreshCommercial } = useProducts('commercial')
   const { data: domesticProducts, refresh: refreshDomestic } = useProducts('domestic')
-  const [accountOpen, setAccountOpen] = useState(false)
 
   const allProducts = [...commercialProducts, ...domesticProducts]
   const productById = new Map<number, Product>(allProducts.map((p) => [p.id, p]))
@@ -278,8 +276,7 @@ export function AllStock() {
 
   return (
     <div className="pb-10">
-      <AppHeader view="commercial" title="Godown Inventory" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="commercial" title="Godown Inventory" />
 
       <div className="p-5 pt-1">
         {loading ? (

@@ -1,22 +1,18 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useGodownStock } from '../hooks/useGodownStock'
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { AppHeader } from '../components/AppHeader'
-import { AccountMenu } from '../components/AccountMenu'
 
 export function Godown() {
   const { data: stock, loading } = useGodownStock('all')
   const { data: purchaseOrders } = usePurchaseOrders()
-  const [accountOpen, setAccountOpen] = useState(false)
   const hasAdjustment = purchaseOrders.some((p) => p.type === 'opening')
 
   if (loading) return <p className="p-4 text-muted">Loading…</p>
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="commercial" />
 
       <div className="p-5 pt-1">
         <h1 className="mb-[22px] font-display text-[26px] font-bold tracking-[-0.5px] text-ink">Godown inventory</h1>

@@ -17,14 +17,12 @@ import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
 import { ChevronLeftIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
-import { AccountMenu } from '../components/AccountMenu'
 import { CylindersCard, type CardItem } from '../components/CylindersCard'
 import { DetailModal } from '../components/DetailModal'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function Home() {
-  const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<FeedItem | null>(null)
   const [slide, setSlide] = useState(0)
   const touchRef = useRef<number | null>(null)
@@ -109,8 +107,7 @@ export function Home() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="commercial" />
 
       <div className="px-4">
         {loading && <p className="text-muted">Loading…</p>}

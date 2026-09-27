@@ -7,6 +7,9 @@ export interface Profile {
   name: string
   role: Role
   segment_access: SegmentAccess
+  active: boolean
+  updated_at: string
+  updated_by: string | null
 }
 
 export type BillType = 'sale' | 'return' | 'payment' | 'opening'

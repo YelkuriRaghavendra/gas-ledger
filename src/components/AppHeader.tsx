@@ -9,7 +9,7 @@ export type HeaderView = 'commercial' | 'domestic'
 
 const initials = (s: string) => s.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
-export function AppHeader({ view, onOpenAccount, title }: { view: HeaderView; onOpenAccount: () => void; title?: string }) {
+export function AppHeader({ view, title }: { view: HeaderView; title?: string }) {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const { data } = useAgencySettings()
@@ -55,7 +55,7 @@ export function AppHeader({ view, onOpenAccount, title }: { view: HeaderView; on
             <SwapIcon size={18} color="#E4571B" strokeWidth={2.2} />
           </button>
         )}
-        <button onClick={onOpenAccount} aria-label="Account">
+        <button onClick={() => navigate('/account')} aria-label="Account">
           <InitialsBadge name={profile?.name ?? '?'} size={34} radius={11} />
         </button>
       </div>

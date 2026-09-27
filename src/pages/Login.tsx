@@ -1,9 +1,10 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { REMEMBER_ME_STORAGE_KEY } from '../lib/supabase'
 import { CylinderIcon } from '../components/CylinderIcon'
+import { takeSignOutReason, signOutMessage } from '../auth/signOutReason'
 
 export function Login() {
   const { session, signIn } = useAuth()
@@ -13,6 +14,17 @@ export function Login() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // Read-and-clear as an effect, not a lazy initializer: StrictMode
+  // double-invokes initializers in development, so the first, discarded
+  // pass would clear sessionStorage and the committed pass would read null.
+  // Runs before the early `if (session)` return below so hooks still fire
+  // on every render.
+  useEffect(() => {
+    const reason = takeSignOutReason()
+    if (reason) setNotice(signOutMessage(reason))
+  }, [])
 
   if (session) return <Navigate to="/" replace />
 
@@ -23,7 +35,9 @@ export function Login() {
     localStorage.setItem(REMEMBER_ME_STORAGE_KEY, String(remember))
     const { error } = await signIn(email, password)
     setSubmitting(false)
-    if (error) setError(error)
+    if (error) {
+      setError(/banned|blocked/i.test(error) ? signOutMessage('inactive') : error)
+    }
   }
 
   const businessName = settings?.business_name || 'Cylinder Tracker'
@@ -82,8 +96,10 @@ export function Login() {
             />
             Remember me
           </label>
-          {error && (
-            <p className="rounded-xl bg-[#FBE9E4] px-4 py-3 text-sm font-semibold text-[#C23B22]">{error}</p>
+          {(error || notice) && (
+            <p className="rounded-xl bg-[#FBE9E4] px-4 py-3 text-sm font-semibold text-[#C23B22]">
+              {error ?? notice}
+            </p>
           )}
           <button
             type="submit"

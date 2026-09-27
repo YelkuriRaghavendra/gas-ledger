@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { ChevronLeftIcon } from '../components/icons'
+import { ChevronLeftIcon, WhatsAppIcon } from '../components/icons'
+import { Toggle } from '../components/Toggle'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 
 export function AddCustomer() {
@@ -84,14 +85,18 @@ export function AddCustomer() {
               className={fieldInput}
             />
           </div>
-          <label className="flex items-center gap-[10px] text-[13px] font-bold text-ink">
-            <input
-              type="checkbox"
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-[9px] text-[13px] font-bold text-ink">
+              <WhatsAppIcon size={17} />
+              Send bills on WhatsApp
+            </span>
+            <Toggle
               checked={whatsappEnabled}
-              onChange={(e) => setWhatsappEnabled(e.target.checked)}
+              onChange={setWhatsappEnabled}
+              label="Send bills on WhatsApp"
+              onColor="#25D366"
             />
-            Send bills on WhatsApp
-          </label>
+          </div>
         </div>
 
         {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}

@@ -8,7 +8,6 @@ import { useDomesticSales, type DomesticBill } from '../../hooks/useDomesticSale
 import { formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../../utils/format'
 import { getActivityIcon, getActivityTint } from '../../utils/activityIcon'
 import { AppHeader } from '../../components/AppHeader'
-import { AccountMenu } from '../../components/AccountMenu'
 import { DetailModal } from '../../components/DetailModal'
 import { countNewConnections } from '../../utils/newConnection'
 
@@ -61,7 +60,6 @@ function billRows(bill: DomesticBill, productNameById: Map<number, string>) {
 }
 
 export function DomesticHistory() {
-  const [accountOpen, setAccountOpen] = useState(false)
   const [selected, setSelected] = useState<DomesticBill | null>(null)
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
@@ -85,8 +83,7 @@ export function DomesticHistory() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="domestic" onOpenAccount={() => setAccountOpen(true)} />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="domestic" />
 
       <div className="p-5 pt-1">
         <h1 className="mb-1 font-display text-[26px] font-bold tracking-[-0.5px] text-ink">History</h1>

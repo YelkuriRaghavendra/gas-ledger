@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
-import { AccountMenu } from '../components/AccountMenu'
 import { ChevronLeftIcon } from '../components/icons'
 import { useAuth } from '../auth/AuthContext'
 import { useCommercialProfit } from '../hooks/useCommercialProfit'
@@ -17,7 +16,6 @@ export function Reports() {
   const now = currentMonthInIST()
   const [year, setYear] = useState(now.year)
   const [month, setMonth] = useState(now.month)
-  const [accountOpen, setAccountOpen] = useState(false)
 
   const { bills, lines, loading, error, forbidden } = useCommercialProfit(year, month)
   const { data: balances } = useCustomerBalances()
@@ -40,8 +38,7 @@ export function Reports() {
 
   return (
     <div className="min-h-screen bg-cream pb-24">
-      <AppHeader view="commercial" onOpenAccount={() => setAccountOpen(true)} title="Reports" />
-      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AppHeader view="commercial" title="Reports" />
 
       <div className="px-4">
         {loading && !denied && <p className="text-muted">Loading…</p>}

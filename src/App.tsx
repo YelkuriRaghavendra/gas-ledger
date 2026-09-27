@@ -1,10 +1,12 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { OwnerRoute } from './components/OwnerRoute'
 import { ModeGate } from './mode/ModeGate'
 import { BottomNav } from './components/BottomNav'
 import { DomesticNav } from './components/DomesticNav'
 import { ConnectionBanner } from './components/ConnectionBanner'
 import { Login } from './pages/Login'
+import { Account } from './pages/Account'
 import { Home } from './pages/Home'
 import { Customers } from './pages/Customers'
 import { AddCustomer } from './pages/AddCustomer'
@@ -16,6 +18,9 @@ import { ActivityFeed } from './pages/ActivityFeed'
 import { BusinessDetails } from './pages/BusinessDetails'
 import { Purchases } from './pages/Purchases'
 import { Reports } from './pages/Reports'
+import { Staff } from './pages/Staff'
+import { WhatsAppSettings } from './pages/WhatsAppSettings'
+import { StaffEdit } from './pages/StaffEdit'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { AllStock } from './pages/AllStock'
 import { SetCurrentStock } from './pages/SetCurrentStock'
@@ -63,7 +68,15 @@ export default function App() {
             <Route path="/commercial/purchases/:billId/edit" element={<RecordPurchase />} />
             <Route path="/commercial/godown" element={<AllStock />} />
             <Route path="/commercial/godown/set-stock" element={<SetCurrentStock />} />
-            <Route path="/commercial/reports" element={<Reports />} />
+
+            <Route path="/account" element={<Account />} />
+            <Route element={<OwnerRoute />}>
+              <Route path="/commercial/reports" element={<Reports />} />
+              <Route path="/account/staff" element={<Staff />} />
+              <Route path="/account/whatsapp" element={<WhatsAppSettings />} />
+              <Route path="/account/staff/new" element={<StaffEdit />} />
+              <Route path="/account/staff/:id" element={<StaffEdit />} />
+            </Route>
 
             {/* Domestic */}
             <Route path="/domestic" element={<DomesticHome />} />
