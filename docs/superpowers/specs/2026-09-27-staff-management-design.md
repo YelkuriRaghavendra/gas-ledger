@@ -64,8 +64,17 @@ The `set_active` action does two things with the service-role key: sets
 The flag alone is an app-level convention: a deactivated user's existing JWT
 still satisfies every `to authenticated` policy in the schema until it expires,
 and they could keep writing bills from an app build that does not check the flag.
-A GoTrue ban rejects both sign-in and token refresh, so the session dies within
-one refresh cycle regardless of what the client does.
+A GoTrue ban rejects both sign-in and token refresh, so the session cannot renew
+itself regardless of what the client does.
+
+That is not the same as immediate. The ban stops the next sign-in and the next
+refresh, but an access token already in the person's hands stays valid until it
+expires — roughly an hour. `AuthContext` signs them out of the app as soon as it
+reads `active = false`, so the screen clears at once; the credential does not.
+For that window they could still reach PostgREST directly and write bills.
+Closing it properly means checking `active` inside RLS itself, which is a larger
+change than this one and is not attempted here. An offboarding that has to be
+airtight to the second needs the Supabase dashboard as well.
 
 The flag is still needed — it is what the staff list reads, and what RLS and the
 guard trigger can see. The two are written together in one function so they
