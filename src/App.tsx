@@ -19,6 +19,7 @@ import { BusinessDetails } from './pages/BusinessDetails'
 import { Purchases } from './pages/Purchases'
 import { Reports } from './pages/Reports'
 import { Staff } from './pages/Staff'
+import { WhatsAppSettings } from './pages/WhatsAppSettings'
 import { StaffEdit } from './pages/StaffEdit'
 import { RecordPurchase } from './pages/RecordPurchase'
 import { AllStock } from './pages/AllStock'
@@ -72,6 +73,7 @@ export default function App() {
             <Route element={<OwnerRoute />}>
               <Route path="/commercial/reports" element={<Reports />} />
               <Route path="/account/staff" element={<Staff />} />
+              <Route path="/account/whatsapp" element={<WhatsAppSettings />} />
               <Route path="/account/staff/new" element={<StaffEdit />} />
               <Route path="/account/staff/:id" element={<StaffEdit />} />
             </Route>

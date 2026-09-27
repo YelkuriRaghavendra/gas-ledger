@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { supabase } from '../lib/supabase'
 import { InitialsBadge } from '../components/InitialsBadge'
-import { AlertDialog } from '../components/AlertDialog'
-import { Toggle } from '../components/Toggle'
 import { ChevronLeftIcon, WhatsAppIcon } from '../components/icons'
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -17,18 +15,14 @@ export function Account() {
   const { data } = useAgencySettings()
   const navigate = useNavigate()
   const isOwner = profile?.role === 'owner'
-  // Which direction the owner asked for, or null when no dialog is open. The
-  // switch only moves once the write lands, so a cancelled confirm leaves it
-  // exactly where it was.
-  const [pending, setPending] = useState<boolean | null>(null)
-  const [working, setWorking] = useState(false)
-  const [alert, setAlert] = useState<string | null>(null)
-  // Counts of customers who have a phone number at all, and of those, how many
-  // already have WhatsApp on. The switch reads as on only when every one of
-  // them does -- null until both are known.
+  // Just the headline "N of M on", so the row can say where things stand
+  // without the owner having to open the screen to find out. The switches
+  // themselves live there.
   const [counts, setCounts] = useState<{ withPhone: number; on: number } | null>(null)
 
-  const loadCounts = useCallback(async () => {
+  useEffect(() => {
+    if (!isOwner) return
+    let cancelled = false
     const withPhone = supabase
       .from('customers')
       .select('id', { count: 'exact', head: true })
@@ -38,39 +32,14 @@ export function Account() {
       .select('id', { count: 'exact', head: true })
       .not('phone', 'is', null)
       .eq('whatsapp_enabled', true)
-    const [all, enabled] = await Promise.all([withPhone, on])
-    setCounts({ withPhone: all.count ?? 0, on: enabled.count ?? 0 })
-  }, [])
-
-  useEffect(() => {
-    if (isOwner) void loadCounts()
-  }, [isOwner, loadCounts])
-
-  // "On" means every customer who could receive a bill does. A partly-on list
-  // reads as off, because that is the state the switch would change.
-  const allOn = counts !== null && counts.withPhone > 0 && counts.on === counts.withPhone
-  const affected = counts === null ? 0 : pending ? counts.withPhone - counts.on : counts.on
-
-  // Lives here rather than on the customer list because it is a settings
-  // decision, not something done while working through customers. The
-  // owner-only guard is cosmetic -- a trigger on customers rejects a
-  // whatsapp_enabled change from anyone else.
-  async function applyToEveryone(next: boolean) {
-    setWorking(true)
-    const { error: updateError, count } = await supabase
-      .from('customers')
-      .update({ whatsapp_enabled: next }, { count: 'exact' })
-      .not('phone', 'is', null)
-      .eq('whatsapp_enabled', !next)
-    setWorking(false)
-    setPending(null)
-    setAlert(
-      updateError
-        ? updateError.message
-        : `WhatsApp turned ${next ? 'on' : 'off'} for ${count ?? 0} customer${count === 1 ? '' : 's'}`,
-    )
-    void loadCounts()
-  }
+    void Promise.all([withPhone, on]).then(([all, enabled]) => {
+      if (cancelled) return
+      setCounts({ withPhone: all.count ?? 0, on: enabled.count ?? 0 })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isOwner])
 
   return (
     <div className="p-4">
@@ -114,22 +83,24 @@ export function Account() {
         <Link to="/account/business" className={rowCls}>
           Business details <span className="text-[#C0B4A2]">›</span>
         </Link>
-        {/* A switch rather than a chevron: this row is the setting, not a way
-            through to one. The count it covers is named in the confirm. */}
+        {/* Navigates rather than toggling in place: the screen behind it holds
+            a switch per customer, and the count here says where things stand
+            without having to open it. */}
         {isOwner && (
-          <div className={rowCls}>
+          <Link to="/account/whatsapp" className={rowCls}>
             <span className="flex items-center gap-[10px]">
               <WhatsAppIcon size={18} />
               Push Notifications to WhatsApp
             </span>
-            <Toggle
-              checked={allOn}
-              onChange={(next) => setPending(next)}
-              disabled={counts === null || counts.withPhone === 0}
-              label="Push Notify to WhatsApp"
-              onColor="#25D366"
-            />
-          </div>
+            <span className="flex items-center gap-[8px]">
+              {counts !== null && counts.withPhone > 0 && (
+                <span className="text-[12.5px] font-semibold text-subtle">
+                  {counts.on} of {counts.withPhone}
+                </span>
+              )}
+              <span className="text-[#C0B4A2]">›</span>
+            </span>
+          </Link>
         )}
       </div>
 
@@ -141,25 +112,6 @@ export function Account() {
         Sign out
       </button>
 
-      <AlertDialog
-        open={pending !== null}
-        onClose={() => setPending(null)}
-        onConfirm={() => void applyToEveryone(pending === true)}
-        title={
-          pending
-            ? `Send bills on WhatsApp to ${affected} customer${affected === 1 ? '' : 's'}?`
-            : `Stop sending bills on WhatsApp to ${affected} customer${affected === 1 ? '' : 's'}?`
-        }
-        message={
-          pending
-            ? 'Everyone with a phone number starts receiving their bills on WhatsApp, from their next bill onward.'
-            : 'Nobody receives bills on WhatsApp after this. You can turn individual customers back on from their own screen.'
-        }
-        actionLabel={
-          working ? 'Saving…' : pending ? 'Turn on' : 'Turn off'
-        }
-      />
-      <AlertDialog open={alert !== null} onClose={() => setAlert(null)} title={alert ?? ''} />
     </div>
   )
 }
