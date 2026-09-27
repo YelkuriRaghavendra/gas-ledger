@@ -43,3 +43,45 @@ export function planSetActive(current: { active: boolean }, desired: boolean): S
     order: desired ? 'flag_then_unban' : 'ban_then_flag',
   }
 }
+
+// The exact message raised by enforce_profile_admin_rules in
+// supabase/migrations/019_staff_management.sql. PostgREST forwards the raised
+// exception as the error's message, so a substring match on the phrase is the
+// only signal available.
+const LAST_OWNER_BACKSTOP = 'at least one active owner is required'
+
+// Whether a failed profiles.active write is the database refusing to remove
+// the last active owner -- the one failure that leaves the account banned
+// with no in-app way back, and therefore the only one worth compensating.
+//
+// Deliberately narrow. If the trigger's wording ever changes this stops
+// matching, and the caller then leaves the ban in place: the account is
+// denied access it should have, which is visible and repairable, rather than
+// handed access the owner just tried to take away. Do not broaden this to
+// "any error mentioning owners" to make the happy path prettier -- every
+// error it newly matches becomes an unban.
+export function isLastOwnerBackstop(message: string | null | undefined): boolean {
+  return typeof message === 'string' && message.includes(LAST_OWNER_BACKSTOP)
+}
+
+// GoTrue reports a ban as an absolute timestamp (`banned_until`) but only
+// accepts a relative duration when writing one, so putting a ban back means
+// converting the timestamp into the time still left on it.
+//
+// Seconds, not hours: a short ban set by hand from the dashboard must not be
+// rounded up into a long one. Rounded up rather than down so the restored ban
+// never lapses earlier than the one it stands in for.
+//
+// bannedUntil: the target's banned_until as read before the ban was applied.
+// now: Date.now() at the moment of the restore.
+export function banDurationToRestore(bannedUntil: string | null | undefined, now: number): string {
+  if (!bannedUntil) return 'none'
+  const until = Date.parse(bannedUntil)
+  // An unreadable timestamp is not evidence of a ban, and this is only
+  // reached on the last-owner path where the account is meant to stay
+  // usable, so treat it as "was not banned".
+  if (Number.isNaN(until)) return 'none'
+  const secondsLeft = Math.ceil((until - now) / 1000)
+  if (secondsLeft <= 0) return 'none'
+  return `${secondsLeft}s`
+}

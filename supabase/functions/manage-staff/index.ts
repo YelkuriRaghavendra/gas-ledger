@@ -1,6 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { validateCreate, validateSetActive } from './validation.ts'
-import { planSetActive } from './setActivePlan.ts'
+import { banDurationToRestore, isLastOwnerBackstop, planSetActive } from './setActivePlan.ts'
 
 // supabase.functions.invoke() sends Authorization + Content-Type, which makes
 // this a non-simple cross-origin request -- the browser preflights it with
@@ -90,7 +90,13 @@ Deno.serve(async (req: Request) => {
       // signup_disabled project, or a malformed address, none of which is
       // "email taken", and telling the owner that would send them changing
       // the email forever against what is really a different problem.
-      if (createError?.code === 'email_exists' || /already (been )?registered|already exists/i.test(message)) {
+      // Both codes mean the same thing: current GoTrue returns `email_exists`,
+      // older admin-create responses returned `user_already_exists`.
+      if (
+        createError?.code === 'email_exists' ||
+        createError?.code === 'user_already_exists' ||
+        /already (been )?registered|already exists/i.test(message)
+      ) {
         return json({ error: 'email_taken' }, 409)
       }
       if (createError?.status === 422) {
@@ -139,7 +145,7 @@ Deno.serve(async (req: Request) => {
         )
         return json({
           error: 'server_error',
-          detail: 'The account could not be finished and the cleanup also failed. An account was left behind -- remove it in the Supabase dashboard.',
+          detail: 'The account could not be finished and a half-made login was left behind. Get help before trying this email again.',
         }, 500)
       }
       console.error('profile upsert failed, rolled back auth user:', profileError.message)
@@ -199,6 +205,21 @@ Deno.serve(async (req: Request) => {
     // when nothing had actually drifted.
 
     if (plan.order === 'ban_then_flag') {
+      // Read the ban state before changing it. The compensation below has to
+      // put back whatever was there, and this is the only record of it: an
+      // account that was already banned while the flag still read active --
+      // exactly the half-written state a re-issued deactivate exists to
+      // repair -- would otherwise be handed an unban it never had.
+      // If this read fails we do not know what to restore, so the ban is not
+      // applied at all: refusing the request changes nothing, which is the
+      // safe side.
+      const { data: before, error: readError } = await admin.auth.admin.getUserById(user_id)
+      if (readError || !before?.user) {
+        console.error('could not read the current ban state, not banning:', readError?.message ?? 'no user returned')
+        return json({ error: 'server_error' }, 500)
+      }
+      const priorBan = before.user.banned_until
+
       const { error: banError } = await admin.auth.admin.updateUserById(user_id, {
         ban_duration: plan.ban_duration,
       })
@@ -214,27 +235,44 @@ Deno.serve(async (req: Request) => {
         .update({ active, updated_by: callerId })
         .eq('id', user_id)
       if (flagError) {
-        // The account is now banned but the profiles row still reads active
-        // -- e.g. a concurrent demotion tripped the database's last-active-
-        // owner backstop even though the count check above passed. Lift the
-        // ban we just applied rather than leave the account banned with no
-        // way to undo it from inside the app.
-        console.error('active flag update failed after ban, rolling back:', flagError.message)
-        const { error: rollbackError } = await admin.auth.admin.updateUserById(user_id, { ban_duration: 'none' })
-        if (rollbackError) {
+        // Only one failure is worth undoing the ban for: the database's
+        // last-active-owner backstop (the handler's own count check above can
+        // be raced by a concurrent demotion). That one would leave the last
+        // owner banned with nobody able to let them back in. Every other
+        // failure -- a staff target, a transient PostgREST error -- is left
+        // banned on purpose: the owner asked for this account to be shut off,
+        // and restoring access on a database hiccup would undo exactly that.
+        if (!isLastOwnerBackstop(flagError.message)) {
+          console.error('active flag update failed after ban, leaving the ban in place:', flagError.message)
+          return json({
+            error: 'server_error',
+            // PostgREST can report an error for a write that committed, so
+            // the flag's state is genuinely unknown here -- do not claim it
+            // is unchanged.
+            detail: 'Their access was switched off, but the staff list may not have been updated. Refresh to check.',
+          }, 500)
+        }
+
+        console.error('last-active-owner backstop rejected the flag write, restoring the prior ban state:', flagError.message)
+        const { error: restoreError } = await admin.auth.admin.updateUserById(user_id, {
+          ban_duration: banDurationToRestore(priorBan, Date.now()),
+        })
+        if (restoreError) {
+          // Nothing in the app can reach this account now; it takes a human
+          // with dashboard access to lift the ban.
           console.error(
-            'rollback unban ALSO failed -- account is banned with no flag change, needs manual repair:',
-            rollbackError.message,
+            'restoring the prior ban state ALSO failed -- the account is banned with no flag change and needs the ban lifted by hand in the Supabase dashboard:',
+            restoreError.message,
           )
           return json({
             error: 'server_error',
-            detail: 'The change failed and the rollback also failed. The account is now banned and needs to be unbanned manually in the Supabase dashboard.',
+            detail: 'The change failed and this account has been left blocked. It cannot be unblocked from here, so get help before signing out.',
           }, 500)
         }
-        return json({
-          error: 'server_error',
-          detail: 'The change could not be completed and was rolled back. Nothing changed.',
-        }, 500)
+        // The backstop raises an exception, so the flag write definitely did
+        // not commit and the ban is back as it was -- the same 403 the
+        // handler's own count check returns.
+        return json({ error: 'forbidden', detail: 'At least one active owner is required.' }, 403)
       }
 
       return json({ ok: true })
