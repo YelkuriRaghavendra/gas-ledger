@@ -18,7 +18,7 @@ import { Avatar } from '../components/Avatar'
 import { StatementDialog } from '../components/StatementDialog'
 import { DetailModal } from '../components/DetailModal'
 import { WhatsAppStatus } from '../components/WhatsAppStatus'
-import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon } from '../components/icons'
+import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon, WhatsAppIcon } from '../components/icons'
 import { sendBillWhatsApp } from '../lib/whatsapp'
 import type { Bill, BillLine, BillLineProfit } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
@@ -392,6 +392,7 @@ export function CustomerDetail() {
               checked={whatsappEnabled}
               onChange={(e) => setWhatsappEnabled(e.target.checked)}
             />
+            <WhatsAppIcon size={17} />
             Send bills on WhatsApp
           </label>
           <div className="flex gap-2 pt-1">

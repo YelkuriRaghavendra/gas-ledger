@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { ChevronLeftIcon } from '../components/icons'
+import { ChevronLeftIcon, WhatsAppIcon } from '../components/icons'
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
 
 export function AddCustomer() {
@@ -90,6 +90,7 @@ export function AddCustomer() {
               checked={whatsappEnabled}
               onChange={(e) => setWhatsappEnabled(e.target.checked)}
             />
+            <WhatsAppIcon size={17} />
             Send bills on WhatsApp
           </label>
         </div>

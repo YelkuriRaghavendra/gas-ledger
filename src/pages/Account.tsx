@@ -5,7 +5,7 @@ import { useAgencySettings } from '../hooks/useAgencySettings'
 import { supabase } from '../lib/supabase'
 import { InitialsBadge } from '../components/InitialsBadge'
 import { AlertDialog } from '../components/AlertDialog'
-import { ChevronLeftIcon } from '../components/icons'
+import { ChevronLeftIcon, WhatsAppIcon } from '../components/icons'
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const rowCls =
@@ -88,7 +88,10 @@ export function Account() {
             onClick={() => setConfirmBulkEnable(true)}
             className={`${rowCls} w-full text-left transition active:scale-[0.99]`}
           >
-            Enable WhatsApp for everyone with a phone
+            <span className="flex items-center gap-[10px]">
+              <WhatsAppIcon size={18} />
+              Enable WhatsApp for everyone with a phone
+            </span>
           </button>
         )}
       </div>
