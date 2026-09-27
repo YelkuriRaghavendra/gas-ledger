@@ -267,8 +267,8 @@ export function AllStock() {
   const segBtnClass = (active: boolean) =>
     `flex-1 rounded-[12px] py-[11px] text-[13.5px] font-bold transition ${
       active
-        ? `text-white shadow-[0_8px_18px_-8px_${segColor}99]`
-        : 'bg-cream text-muted'
+      ? `text-white shadow-[0_8px_18px_-8px_${segColor}99]`
+      : 'bg-cream text-muted'
     }`
 
   const fieldInput = 'h-[50px] w-full rounded-[14px] border border-borderMuted bg-cream px-[14px] font-bold text-ink'
