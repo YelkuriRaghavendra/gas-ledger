@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { REMEMBER_ME_STORAGE_KEY } from '../lib/supabase'
 import { CylinderIcon } from '../components/CylinderIcon'
+import { takeSignOutReason, signOutMessage } from '../auth/signOutReason'
 
 export function Login() {
   const { session, signIn } = useAuth()
@@ -13,6 +14,11 @@ export function Login() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Read once on mount, before the early `if (session)` return can skip it.
+  const [notice] = useState(() => {
+    const reason = takeSignOutReason()
+    return reason ? signOutMessage(reason) : null
+  })
 
   if (session) return <Navigate to="/" replace />
 
@@ -23,7 +29,9 @@ export function Login() {
     localStorage.setItem(REMEMBER_ME_STORAGE_KEY, String(remember))
     const { error } = await signIn(email, password)
     setSubmitting(false)
-    if (error) setError(error)
+    if (error) {
+      setError(/banned|blocked/i.test(error) ? signOutMessage('inactive') : error)
+    }
   }
 
   const businessName = settings?.business_name || 'Cylinder Tracker'
@@ -82,8 +90,10 @@ export function Login() {
             />
             Remember me
           </label>
-          {error && (
-            <p className="rounded-xl bg-[#FBE9E4] px-4 py-3 text-sm font-semibold text-[#C23B22]">{error}</p>
+          {(error || notice) && (
+            <p className="rounded-xl bg-[#FBE9E4] px-4 py-3 text-sm font-semibold text-[#C23B22]">
+              {error ?? notice}
+            </p>
           )}
           <button
             type="submit"

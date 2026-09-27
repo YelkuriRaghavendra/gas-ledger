@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../types/db'
+import { setSignOutReason } from './signOutReason'
 
 interface AuthState {
   session: Session | null
@@ -41,13 +42,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     supabase
       .from('profiles')
-      .select('id, name, role, segment_access')
+      .select('id, name, role, segment_access, active, updated_at, updated_by')
       .eq('id', session.user.id)
       .single()
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) console.error('Failed to load profile:', error.message)
-        setProfile(data as Profile | null)
+        const loaded = data as Profile | null
+
+        // A signed-in user with no profile row hangs ModeGate on its loading
+        // branch forever. A deactivated one is already banned in GoTrue, but
+        // their current access token stays valid until it expires -- signing
+        // out here clears the screen now rather than at the next refresh.
+        if (!loaded || !loaded.active) {
+          setSignOutReason(loaded ? 'inactive' : 'no-profile')
+          setProfile(null)
+          setLoading(false)
+          void supabase.auth.signOut()
+          return
+        }
+
+        setProfile(loaded)
         setLoading(false)
       })
     return () => {
