@@ -19,6 +19,7 @@ import { StatementDialog } from '../components/StatementDialog'
 import { DetailModal } from '../components/DetailModal'
 import { WhatsAppStatus } from '../components/WhatsAppStatus'
 import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon, WhatsAppIcon } from '../components/icons'
+import { Toggle } from '../components/Toggle'
 import { sendBillWhatsApp } from '../lib/whatsapp'
 import type { Bill, BillLine, BillLineProfit } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
@@ -386,15 +387,18 @@ export function CustomerDetail() {
             onChange={(e) => setAddress(e.target.value)}
             className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
-          <label className="flex items-center gap-[10px] pt-1 text-[13px] font-bold text-ink">
-            <input
-              type="checkbox"
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <span className="flex items-center gap-[9px] text-[13px] font-bold text-ink">
+              <WhatsAppIcon size={17} />
+              Send bills on WhatsApp
+            </span>
+            <Toggle
               checked={whatsappEnabled}
-              onChange={(e) => setWhatsappEnabled(e.target.checked)}
+              onChange={setWhatsappEnabled}
+              label="Send bills on WhatsApp"
+              onColor="#25D366"
             />
-            <WhatsAppIcon size={17} />
-            Send bills on WhatsApp
-          </label>
+          </div>
           <div className="flex gap-2 pt-1">
             <button
               type="submit"

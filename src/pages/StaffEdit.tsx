@@ -17,6 +17,7 @@ import {
 } from '../utils/staff'
 import { formatDate } from '../utils/format'
 import { ChevronLeftIcon } from '../components/icons'
+import { Toggle } from '../components/Toggle'
 import type { Role, SegmentAccess } from '../types/db'
 
 const fieldLabel = 'mb-[7px] text-[11px] font-bold uppercase tracking-[0.5px] text-muted'
@@ -233,16 +234,15 @@ export function StaffEdit() {
               />
             </div>
             {!isNew && (
-              <label className="flex items-center justify-between py-1">
+              <div className="flex items-center justify-between py-1">
                 <span className="text-[14px] font-bold text-ink">Can sign in</span>
-                <input
-                  type="checkbox"
+                <Toggle
                   checked={active}
+                  onChange={setActive}
                   disabled={!accessEditable}
-                  onChange={(e) => setActive(e.target.checked)}
-                  className="h-[22px] w-[22px] accent-accent disabled:opacity-50"
+                  label="Can sign in"
                 />
-              </label>
+              </div>
             )}
             {!accessEditable && (
               <p className="text-[11.5px] font-semibold text-subtle">
