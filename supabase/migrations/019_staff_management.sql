@@ -79,13 +79,34 @@ begin
     end if;
 
     -- Backstop, applied to every caller including the service-role key.
+    --
+    -- pg_advisory_xact_lock with a fixed key serializes only this check, not
+    -- the whole trigger or ordinary profile updates: the branch is only
+    -- reached when an active owner is actually being demoted or
+    -- deactivated, so a staff member editing their own name never queues
+    -- behind it. Without the lock, two transactions each demoting a
+    -- different one of exactly two active owners can run concurrently
+    -- under READ COMMITTED: neither has committed when the other's `exists`
+    -- check runs, so each still sees the other owner as active, both pass,
+    -- and both commit -- leaving zero active owners with no in-app way back
+    -- in. The lock forces the second transaction to wait for the first to
+    -- commit or roll back; READ COMMITTED then gives the second
+    -- transaction's `exists` check a fresh snapshot that sees the first
+    -- transaction's committed result, so it correctly finds no other active
+    -- owner and raises. The key (72176331) is arbitrary but fixed, so every
+    -- transaction that could threaten the invariant contends for the same
+    -- lock; it is transaction-scoped and releases automatically at commit
+    -- or rollback, so there is no matching unlock call.
     if old.role = 'owner' and old.active
-       and (new.role <> 'owner' or not new.active)
-       and not exists (
-         select 1 from public.profiles
-         where id <> new.id and role = 'owner' and active
-       ) then
-      raise exception 'at least one active owner is required';
+       and (new.role <> 'owner' or not new.active) then
+      perform pg_advisory_xact_lock(72176331);
+
+      if not exists (
+        select 1 from public.profiles
+        where id <> new.id and role = 'owner' and active
+      ) then
+        raise exception 'at least one active owner is required';
+      end if;
     end if;
   end if;
 
