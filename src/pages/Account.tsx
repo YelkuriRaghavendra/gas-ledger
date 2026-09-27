@@ -114,46 +114,24 @@ export function Account() {
         <Link to="/account/business" className={rowCls}>
           Business details <span className="text-[#C0B4A2]">›</span>
         </Link>
-      </div>
-
-      {/* Not a fourth row above: those navigate, this writes to every customer
-          at once. It gets its own card, and it says who it covers so the owner
-          knows the size of what the switch is about to do. */}
-      {isOwner && (
-        <>
-          <p className="mb-2 mt-6 text-[11px] font-bold uppercase tracking-[0.5px] text-subtle">
-            WhatsApp
-          </p>
-          <div className="rounded-[20px] bg-surface p-5 shadow-card">
-            <div className="flex items-start gap-[13px]">
-              <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px] bg-[#EAF4EE]">
-                <WhatsAppIcon size={22} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-[16px] font-bold tracking-[-0.2px] text-ink">
-                  Bills on WhatsApp
-                </p>
-                <p className="mt-[5px] text-[12.5px] font-medium leading-[1.55] text-muted">
-                  {counts === null
-                    ? 'Checking who has a phone number…'
-                    : counts.withPhone === 0
-                      ? 'No customer has a phone number yet, so there is nobody to send to.'
-                      : allOn
-                        ? `All ${counts.withPhone} customers with a phone number get their bills on WhatsApp.`
-                        : `${counts.on} of ${counts.withPhone} customers with a phone number get their bills on WhatsApp.`}
-                </p>
-              </div>
-              <Toggle
-                checked={allOn}
-                onChange={(next) => setPending(next)}
-                disabled={counts === null || counts.withPhone === 0}
-                label="Send bills on WhatsApp to every customer with a phone number"
-                onColor="#25D366"
-              />
-            </div>
+        {/* A switch rather than a chevron: this row is the setting, not a way
+            through to one. The count it covers is named in the confirm. */}
+        {isOwner && (
+          <div className={rowCls}>
+            <span className="flex items-center gap-[10px]">
+              <WhatsAppIcon size={18} />
+              Push Notifications to WhatsApp
+            </span>
+            <Toggle
+              checked={allOn}
+              onChange={(next) => setPending(next)}
+              disabled={counts === null || counts.withPhone === 0}
+              label="Push Notify to WhatsApp"
+              onColor="#25D366"
+            />
           </div>
-        </>
-      )}
+        )}
+      </div>
 
       <button
         onClick={signOut}
