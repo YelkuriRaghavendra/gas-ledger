@@ -2,6 +2,8 @@ import { BottomSheet } from './BottomSheet'
 import { formatCurrency, formatDate, formatUpdated } from '../utils/format'
 import { emptiesGiven, purchaseTitle } from '../utils/purchases'
 import type { PurchaseOrderWithLines } from '../hooks/usePurchaseOrders'
+import type { Segment } from '../types/db'
+import { SEGMENT_THEME } from '../theme/segment'
 import truckMark from '../assets/truck.png'
 
 interface PurchaseDetailProps {
@@ -9,6 +11,7 @@ interface PurchaseDetailProps {
   productNameById: Map<number, string>
   profileNames: Map<string, string>
   isOwner: boolean
+  segment?: Segment
   onClose: () => void
   onEdit: () => void
   onDelete: () => void
@@ -24,6 +27,7 @@ export function PurchaseDetail({
   productNameById,
   profileNames,
   isOwner,
+  segment = 'commercial',
   onClose,
   onEdit,
   onDelete,
@@ -115,7 +119,7 @@ export function PurchaseDetail({
           <button
             type="button"
             onClick={onEdit}
-            className="h-[50px] flex-1 rounded-[15px] bg-gradient-to-br from-accentSoft to-accent text-sm font-extrabold text-white shadow-glow transition active:scale-[0.99]"
+            className={`h-[50px] flex-1 rounded-[15px] text-sm font-extrabold text-white transition active:scale-[0.99] ${SEGMENT_THEME[segment].primary}`}
           >
             Edit purchase
           </button>

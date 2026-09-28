@@ -27,9 +27,7 @@ import { SetCurrentStock } from './pages/SetCurrentStock'
 import { DomesticHome } from './pages/domestic/DomesticHome'
 import { DomesticNewBill } from './pages/domestic/DomesticNewBill'
 import { DomesticSetStock } from './pages/domestic/DomesticSetStock'
-import { DomesticPurchases } from './pages/domestic/DomesticPurchases'
 import { DomesticRecordPurchase } from './pages/domestic/DomesticRecordPurchase'
-import { DomesticHistory } from './pages/domestic/DomesticHistory'
 import { DomesticCombos } from './pages/domestic/DomesticCombos'
 import { DomesticPendingDeliveries } from './pages/domestic/DomesticPendingDeliveries'
 import { DomesticLogReturn } from './pages/domestic/DomesticLogReturn'
@@ -85,11 +83,12 @@ export default function App() {
             <Route path="/domestic/bill/:billId/edit" element={<DomesticNewBill />} />
             <Route path="/domestic/stock" element={<AllStock />} />
             <Route path="/domestic/stock/set-stock" element={<DomesticSetStock />} />
-            <Route path="/domestic/purchases" element={<DomesticPurchases />} />
+            <Route path="/domestic/purchases" element={<Purchases segment="domestic" />} />
             <Route path="/domestic/purchases/new" element={<DomesticRecordPurchase />} />
             <Route path="/domestic/purchases/:billId/edit" element={<DomesticRecordPurchase />} />
             <Route path="/domestic/return" element={<DomesticLogReturn />} />
-            <Route path="/domestic/history" element={<DomesticHistory />} />
+            <Route path="/domestic/activity" element={<ActivityFeed segment="domestic" />} />
+            <Route path="/domestic/history" element={<Navigate to="/domestic/activity" replace />} />
             <Route path="/domestic/pending-deliveries" element={<DomesticPendingDeliveries />} />
             <Route path="/domestic/combos" element={<DomesticCombos />} />
           </Route>

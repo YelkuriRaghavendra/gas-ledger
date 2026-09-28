@@ -152,8 +152,8 @@ export function DomesticHome() {
 
             <div className="mb-3 mt-[18px] flex items-baseline justify-between">
               <h2 className="font-display text-[18px] font-bold tracking-[-0.3px] text-ink">Today's bills</h2>
-              <Link to="/domestic/history" className="text-[13px] font-bold text-[#2E8B57]">
-                History ›
+              <Link to="/domestic/activity" className="text-[13px] font-bold text-[#2E8B57]">
+                Activity ›
               </Link>
             </div>
             <ul className="flex flex-col gap-[10px]">

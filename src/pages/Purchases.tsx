@@ -15,6 +15,8 @@ import {
   summarisePurchases,
 } from '../utils/purchases'
 import { ChevronLeftIcon, PlusIcon } from '../components/icons'
+import type { Segment } from '../types/db'
+import { SEGMENT_THEME } from '../theme/segment'
 import { AppHeader } from '../components/AppHeader'
 import { HeroCard, HeroCardStats } from '../components/HeroCard'
 import { PurchaseDetail } from '../components/PurchaseDetail'
@@ -25,12 +27,13 @@ const MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-export function Purchases() {
+export function Purchases({ segment = 'commercial' }: { segment?: Segment }) {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const isOwner = profile?.role === 'owner'
-  const { data: products } = useProducts()
-  const { data: purchaseOrders, refresh } = usePurchaseOrders()
+  const theme = SEGMENT_THEME[segment]
+  const { data: products } = useProducts(segment)
+  const { data: purchaseOrders, refresh } = usePurchaseOrders(segment)
   const [selected, setSelected] = useState<PurchaseOrderWithLines | null>(null)
   const profileNames = useProfiles()
 
@@ -71,21 +74,21 @@ export function Purchases() {
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="commercial" />
+      <AppHeader view={segment} />
 
       <div className="p-5 pt-1">
         <div className="mb-[14px] flex items-center justify-between">
           <h1 className="font-display text-2xl font-bold tracking-[-0.4px] text-ink">Purchases</h1>
           <Link
-            to="/commercial/purchases/new"
+            to={`${theme.base}/purchases/new`}
             aria-label="New purchase"
-            className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-gradient-to-br from-accentSoft to-accent shadow-glow"
+            className={`flex h-10 w-10 items-center justify-center rounded-[13px] ${theme.primary}`}
           >
             <PlusIcon size={20} strokeWidth={2.4} color="#fff" />
           </Link>
         </div>
 
-        <HeroCard className="mb-[14px] p-6">
+        <HeroCard className="mb-[14px] p-6" watermark={theme.watermark}>
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#C9BBA8]">Spent in</p>
             {/* Pulled tight to the card edge; the negative margin cancels the
@@ -181,8 +184,8 @@ export function Purchases() {
             </p>
             {purchaseOrders.length === 0 && (
               <Link
-                to="/commercial/purchases/new"
-                className="mt-[22px] flex h-[50px] items-center gap-2 rounded-[15px] bg-gradient-to-br from-accentSoft to-accent px-6 text-sm font-extrabold text-white shadow-glow transition active:scale-[0.99]"
+                to={`${theme.base}/purchases/new`}
+                className={`mt-[22px] flex h-[50px] items-center gap-2 rounded-[15px] px-6 text-sm font-extrabold text-white transition active:scale-[0.99] ${theme.primary}`}
               >
                 <PlusIcon size={17} strokeWidth={2.6} color="#fff" />
                 Record a purchase
@@ -198,11 +201,12 @@ export function Purchases() {
           productNameById={productNameById}
           profileNames={profileNames}
           isOwner={isOwner}
+          segment={segment}
           onClose={() => setSelected(null)}
           onEdit={() => {
             const id = selected.id
             setSelected(null)
-            navigate(`/commercial/purchases/${id}/edit`)
+            navigate(`${theme.base}/purchases/${id}/edit`)
           }}
           onDelete={() => handleDelete(selected.id)}
         />

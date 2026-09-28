@@ -3,13 +3,20 @@ import type { HTMLAttributes, ReactNode } from 'react'
 
 type HeroCardProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode
+  /** Fill for the cylinder watermark; defaults to the commercial orange. */
+  watermark?: string
 }
 
 /**
- * The shared, primary summary-card surface used across commercial screens.
- * Content stays page-specific; this component owns the fixed visual format.
+ * The shared, primary summary-card surface. Content stays page-specific; this
+ * component owns the fixed visual format.
  */
-export function HeroCard({ children, className = '', ...props }: HeroCardProps) {
+export function HeroCard({
+  children,
+  className = '',
+  watermark = 'rgba(228,87,27,.16)',
+  ...props
+}: HeroCardProps) {
   return (
     <div
       {...props}
@@ -20,7 +27,7 @@ export function HeroCard({ children, className = '', ...props }: HeroCardProps) 
         width="170"
         height="170"
         viewBox="0 0 24 24"
-        fill="rgba(228,87,27,.16)"
+        fill={watermark}
         className="pointer-events-none absolute -bottom-12 -right-8"
       >
         <rect x="6" y="6" width="12" height="16.5" rx="5" />

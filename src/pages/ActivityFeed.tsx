@@ -10,6 +10,8 @@ import { dateInputValue, formatCurrency, formatDate, formatRelativeDate, formatU
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
 import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
 import { ChevronLeftIcon } from '../components/icons'
+import type { Segment } from '../types/db'
+import { SEGMENT_THEME } from '../theme/segment'
 
 type Filter = 'all' | FeedItem['type']
 
@@ -20,6 +22,11 @@ const FILTERS: { key: Filter; label: string; noun: string }[] = [
   { key: 'payment', label: 'Payments', noun: 'payments' },
   { key: 'purchase', label: 'Purchases', noun: 'purchases' },
 ]
+
+// Domestic is a cash counter: every bill settles on the spot, so there is no
+// standalone payment to file away and the chip would always read zero.
+const filtersFor = (segment: Segment) =>
+  segment === 'domestic' ? FILTERS.filter((f) => f.key !== 'payment') : FILTERS
 
 function timeOf(iso: string) {
   return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
@@ -34,9 +41,11 @@ function collectedFrom(entries: FeedItem[]) {
   }, 0)
 }
 
+const ncCount = (entries: FeedItem[]) => entries.reduce((sum, e) => sum + (e.nc_qty ?? 0), 0)
+
 const firstOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1).getTime()
 
-export function ActivityFeed() {
+export function ActivityFeed({ segment = 'commercial' }: { segment?: Segment }) {
   const { profile } = useAuth()
   const [selected, setSelected] = useState<FeedItem | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
@@ -61,7 +70,7 @@ export function ActivityFeed() {
   }
 
   // A busy month can run well past the 50-row default.
-  const { data, loading, error, refresh } = useActivityFeed(500, 'commercial', from, to)
+  const { data, loading, error, refresh } = useActivityFeed(500, segment, from, to)
 
   async function handleDelete(entry: FeedItem) {
     if (!confirm('Delete this entry?')) return
@@ -73,6 +82,8 @@ export function ActivityFeed() {
     }
     refresh()
   }
+
+  const filters = useMemo(() => filtersFor(segment), [segment])
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { all: data.length, sale: 0, return: 0, payment: 0, purchase: 0 }
@@ -97,11 +108,11 @@ export function ActivityFeed() {
     return [...groups.entries()]
   }, [shown])
 
-  const activeFilter = FILTERS.find((f) => f.key === filter)!
+  const activeFilter = filters.find((f) => f.key === filter) ?? FILTERS[0]
 
   return (
     <div className="pb-[110px]">
-      <AppHeader view="commercial" />
+      <AppHeader view={segment} />
 
       <div className="px-5 pt-1">
         {/* Title and month browser share one line. The label is fixed-width so
@@ -139,7 +150,7 @@ export function ActivityFeed() {
         {/* Type filters — one scrolling line; bleeds to the screen edges so a
             partly-visible chip reads as "more this way" rather than as clipped. */}
         <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
-          {FILTERS.map((f) => {
+          {filters.map((f) => {
             const active = filter === f.key
             return (
               <button
@@ -174,15 +185,22 @@ export function ActivityFeed() {
 
         {days.map(([key, entries]) => {
           const dayCollected = collectedFrom(entries)
+          const dayNc = ncCount(entries)
           return (
             <section key={key} className="mt-[10px]">
               <div className="sticky top-0 z-10 -mx-5 flex items-baseline justify-between bg-cream px-5 py-[9px]">
                 <h2 className="font-display text-[14px] font-bold tracking-[-0.2px] text-ink">
                   {formatRelativeDate(entries[0].created_at)}
                 </h2>
-                {dayCollected > 0 && (
+                {(dayCollected > 0 || dayNc > 0) && (
                   <p className="text-[11.5px] font-semibold text-subtle">
-                    <span className="font-display font-bold text-muted">{formatCurrency(dayCollected)}</span> collected
+                    {dayCollected > 0 && (
+                      <>
+                        <span className="font-display font-bold text-muted">{formatCurrency(dayCollected)}</span> collected
+                      </>
+                    )}
+                    {dayCollected > 0 && dayNc > 0 && ' · '}
+                    {dayNc > 0 && <span className="font-display font-bold text-muted">{dayNc} NC</span>}
                   </p>
                 )}
               </div>
@@ -244,9 +262,9 @@ export function ActivityFeed() {
             isOwner ? (
               <>
                 <Link
-                  to={editPath(selected)}
+                  to={editPath(selected, segment)}
                   onClick={() => setSelected(null)}
-                  className="flex h-[48px] flex-1 items-center justify-center rounded-[14px] bg-gradient-to-br from-accentSoft to-accent font-bold text-white shadow-glow transition active:scale-[0.99]"
+                  className={`flex h-[48px] flex-1 items-center justify-center rounded-[14px] font-bold text-white transition active:scale-[0.99] ${SEGMENT_THEME[segment].primary}`}
                 >
                   Edit
                 </Link>
