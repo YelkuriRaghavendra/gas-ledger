@@ -42,7 +42,7 @@ describe('edge function copies match the src originals', () => {
 
   it('builds identical payment params', () => {
     expect(buildTemplateParams('bill_payment', ctx)).toEqual([
-      'Ramesh Traders', '4300', '13-09-2026', 'Cash', '12500',
+      'Ramesh Traders', '4300', '13-09-2026', 'Cash', '12500', '7',
     ])
   })
 
