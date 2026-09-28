@@ -20,7 +20,7 @@ export function HeroCard({
   return (
     <div
       {...props}
-      className={`relative h-[212px] overflow-hidden rounded-[26px] bg-gradient-to-br from-inkSoft to-ink text-white shadow-float ${className}`.trim()}
+      className={`relative min-h-[212px] overflow-hidden rounded-[26px] bg-gradient-to-br from-inkSoft to-ink text-white shadow-float ${className}`.trim()}
     >
       <svg
         aria-hidden="true"

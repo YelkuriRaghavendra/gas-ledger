@@ -10,6 +10,11 @@ export function currentMonthInIST() {
   return { year, month }
 }
 
+// Today by IST rather than the device clock, for the same reason.
+export function todayInIST() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+}
+
 // Half-open [start, end) bounds on the views' `day` column.
 function monthBounds(year: number, month: number) {
   const pad = (n: number) => String(n).padStart(2, '0')

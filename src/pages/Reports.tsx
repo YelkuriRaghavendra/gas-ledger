@@ -1,18 +1,32 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
 import { HeroCard, HeroCardStats } from '../components/HeroCard'
 import { ChevronLeftIcon } from '../components/icons'
 import { useAuth } from '../auth/AuthContext'
 import { useCommercialProfit } from '../hooks/useCommercialProfit'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
-import { currentMonthInIST } from '../hooks/useMonthSummary'
-import { billsInWindow, profitByCustomer, profitByProduct, summariseProfit } from '../utils/profit'
+import { useGodownStock } from '../hooks/useGodownStock'
+import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
 import { useCommercialMonthStats } from '../hooks/useCommercialMonthStats'
-import { rankMovers, unpaidFrom } from '../utils/reportsTrend'
-import { StatTile } from '../components/reports/StatTile'
-import { MoversList } from '../components/reports/MoversList'
+import { currentMonthInIST, todayInIST } from '../hooks/useMonthSummary'
+import { billsInWindow, profitByCustomer, profitByProduct, summariseProfit } from '../utils/profit'
+import { unpaidFrom } from '../utils/reportsTrend'
+import {
+  agedDebtors,
+  latestRates,
+  paceThroughDay,
+  perCylinder,
+  stockValue,
+  supplierDues,
+} from '../utils/reportsPosition'
+import { Statement } from '../components/reports/Statement'
+import { PositionCard } from '../components/reports/PositionCard'
+import { CashBar } from '../components/reports/CashBar'
+import { ChaseList } from '../components/reports/ChaseList'
+import { BreakdownList, type BreakdownRow } from '../components/reports/BreakdownList'
 import { formatCurrency } from '../utils/format'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 // The stats read the selected month and the one before it, nothing further back.
 const STATS_MONTHS = 2
@@ -25,8 +39,6 @@ function monthBounds(year: number, month: number) {
   return { start: `${year}-${pad(month)}-01`, end: `${nextYear}-${pad(nextMonth)}-01` }
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
 export function Reports() {
   const { profile } = useAuth()
   const now = currentMonthInIST()
@@ -35,40 +47,87 @@ export function Reports() {
 
   const { bills, history, lines, previousLines, loading, error, forbidden } = useCommercialProfit(year, month)
   const { data: balances } = useCustomerBalances()
-  const { window: trendWindow, series } = useCommercialMonthStats(year, month, STATS_MONTHS)
-
-  const summary = useMemo(() => summariseProfit(bills), [bills])
-  const names = useMemo(() => new Map(balances.map((c) => [c.id, c.name])), [balances])
-  const dues = useMemo(() => new Map(balances.map((c) => [c.id, c.amount_due])), [balances])
-  const customers = useMemo(() => profitByCustomer(bills, names), [bills, names])
-  const products = useMemo(() => profitByProduct(lines), [lines])
-
-  // Index of the month on screen and the one before it, shared by every delta.
-  const at = trendWindow.length - 1
-  const previousAt = at - 1
-  const previousLabel = trendWindow[previousAt]?.label ?? ''
-  const valueAt = (numbers: number[], index: number) => (index >= 0 ? numbers[index] ?? 0 : 0)
-
-  const previousBills = useMemo(() => {
-    const previousMonth = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
-    const bounds = monthBounds(previousMonth.year, previousMonth.month)
-    return billsInWindow(history, bounds.start, bounds.end)
-  }, [history, year, month])
-
-  const previousSummary = useMemo(() => summariseProfit(previousBills), [previousBills])
-  const unpaid = useMemo(() => unpaidFrom(bills), [bills])
-  const previousUnpaid = useMemo(() => unpaidFrom(previousBills), [previousBills])
-  const outstanding = useMemo(() => balances.reduce((sum, c) => sum + c.amount_due, 0), [balances])
-
-  const productMovers = useMemo(() => {
-    const toInput = (rows: ReturnType<typeof profitByProduct>) =>
-      rows.map((p) => ({ id: p.productId, name: p.name, value: p.profit }))
-    return rankMovers(toInput(products), toInput(profitByProduct(previousLines)))
-  }, [products, previousLines])
+  const { data: purchaseOrders } = usePurchaseOrders('commercial')
+  const { data: stock } = useGodownStock('commercial')
+  const { series } = useCommercialMonthStats(year, month, STATS_MONTHS)
 
   const atCurrentMonth = year === now.year && month === now.month
   const denied = forbidden || (profile != null && profile.role !== 'owner')
   const monthLabel = year === now.year ? MONTHS[month - 1] : `${MONTHS[month - 1]} ${year}`
+  const previousMonth = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
+  const previousLabel = MONTHS[previousMonth.month - 1]
+
+  const summary = useMemo(() => summariseProfit(bills), [bills])
+  const names = useMemo(() => new Map(balances.map((c) => [c.id, c.name])), [balances])
+  const dues = useMemo(() => new Map(balances.map((c) => [c.id, c.amount_due])), [balances])
+
+  const previousBills = useMemo(() => {
+    const bounds = monthBounds(previousMonth.year, previousMonth.month)
+    return billsInWindow(history, bounds.start, bounds.end)
+  }, [history, previousMonth.year, previousMonth.month])
+  const previousSummary = useMemo(() => summariseProfit(previousBills), [previousBills])
+
+  // Month in progress: comparing 28 days against a full month reads as a
+  // collapse, so the hero says where last month stood on the same date.
+  const today = todayInIST()
+  const dayOfMonth = Number(today.slice(8, 10))
+  const monthInProgress = atCurrentMonth && dayOfMonth < 28
+  const pace = useMemo(
+    () => (monthInProgress ? paceThroughDay(previousBills, dayOfMonth) : null),
+    [monthInProgress, previousBills, dayOfMonth],
+  )
+
+  const rate = perCylinder(summary.profit, summary.qty)
+  const previousRate = perCylinder(previousSummary.profit, previousSummary.qty)
+
+  const products = useMemo(() => profitByProduct(lines), [lines])
+  const previousProducts = useMemo(() => profitByProduct(previousLines), [previousLines])
+  const customers = useMemo(() => profitByCustomer(bills, names), [bills, names])
+  const previousCustomers = useMemo(() => profitByCustomer(previousBills, names), [previousBills, names])
+
+  const productRows: BreakdownRow[] = useMemo(() => {
+    const before = new Map(previousProducts.map((p) => [p.productId, p.profit]))
+    return products.map((p) => ({
+      id: p.productId,
+      name: p.name,
+      qty: p.qty,
+      profit: p.profit,
+      previousProfit: before.get(p.productId) ?? null,
+    }))
+  }, [products, previousProducts])
+
+  const customerRows: BreakdownRow[] = useMemo(() => {
+    const before = new Map(previousCustomers.map((c) => [c.customerId, c.profit]))
+    return customers.map((c) => {
+      const due = dues.get(c.customerId) ?? 0
+      return {
+        id: c.customerId,
+        name: c.name,
+        qty: c.qty,
+        profit: c.profit,
+        previousProfit: before.get(c.customerId) ?? null,
+        note: due > 0 ? `${formatCurrency(due)} due` : 'settled',
+        noteTone: due > 0 ? ('warn' as const) : ('good' as const),
+        to: `/commercial/customers/${c.customerId}`,
+      }
+    })
+  }, [customers, previousCustomers, dues])
+
+  // Debt ages against today, so it is only honest on the current month; an
+  // older month would age its bills as they stood at that month's end.
+  const debtors = useMemo(
+    () => (atCurrentMonth ? agedDebtors(history, names, today).slice(0, 4) : []),
+    [atCurrentMonth, history, names, today],
+  )
+
+  const owedToYou = useMemo(() => balances.reduce((sum, c) => sum + c.amount_due, 0), [balances])
+  const owedToSupplier = useMemo(() => supplierDues(purchaseOrders), [purchaseOrders])
+  const godownValue = useMemo(
+    () => stockValue(stock, latestRates(purchaseOrders)),
+    [stock, purchaseOrders],
+  )
+
+  const unpaid = useMemo(() => unpaidFrom(bills), [bills])
 
   function shiftMonth(delta: number) {
     const next = month + delta
@@ -90,7 +149,7 @@ export function Reports() {
           <>
             <HeroCard className="p-6">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold uppercase tracking-[0.5px] text-[#C9BBA8]">Gross profit</p>
+                <p className="text-[13px] font-semibold text-mutedOnDark">Gross profit</p>
                 <div className="-mr-[5px] flex items-center gap-[2px]">
                   <button
                     type="button"
@@ -115,168 +174,94 @@ export function Reports() {
                 </div>
               </div>
 
-              <p className="mt-1 font-display text-[38px] font-bold leading-none tracking-[-1px]">
+              <p className="mt-[6px] font-display text-[40px] font-bold leading-none tracking-[-1.2px] tabular-nums">
                 {formatCurrency(summary.profit)}
               </p>
-              <p className="mt-[9px] text-[12.5px] font-semibold text-mutedOnDark">
+
+              {/* The per-cylinder rate leads: total profit can rise on volume
+                  while every cylinder earns less, and only this shows it. */}
+              <p className="mt-[10px] text-[13px] font-semibold text-white/85">
+                {rate != null ? `${formatCurrency(Math.round(rate))} a cylinder` : 'No cylinders sold'}
+                {previousRate != null && rate != null && (
+                  <span className="text-mutedOnDark">
+                    {' · '}
+                    {previousLabel} {formatCurrency(Math.round(previousRate))}
+                  </span>
+                )}
+              </p>
+              <p className="mt-[3px] text-[12px] font-semibold text-mutedOnDark">
                 {summary.marginPct.toFixed(1)}% margin · {summary.qty} cylinders · excludes GST
               </p>
 
+              {pace && (
+                <p className="mt-[9px] text-[12px] font-semibold text-mutedOnDark">
+                  Day {dayOfMonth} · {previousLabel} stood at{' '}
+                  <span className="font-display font-bold text-white/85">{formatCurrency(pace.profit)}</span> by now
+                </p>
+              )}
+
               <HeroCardStats className="border-t border-white/[.14] pt-[12px]">
                 <div>
-                  <p className="text-[10px] font-semibold text-mutedOnDark">Realised</p>
-                  <p className="mt-[1px] font-display text-[16px] font-semibold text-[#5FCF97]">
+                  <p className="text-[11px] font-semibold text-mutedOnDark">Realised</p>
+                  <p className="mt-[1px] font-display text-[16px] font-semibold tabular-nums text-[#5FCF97]">
                     {formatCurrency(summary.realised)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-mutedOnDark">Pending</p>
-                  <p className="mt-[1px] font-display text-[16px] font-semibold text-[#EF9F27]">
+                  <p className="text-[11px] font-semibold text-mutedOnDark">Pending</p>
+                  <p className="mt-[1px] font-display text-[16px] font-semibold tabular-nums text-[#EF9F27]">
                     {formatCurrency(summary.pending)}
                   </p>
                 </div>
               </HeroCardStats>
             </HeroCard>
 
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <StatTile
-                label="Revenue"
-                value={formatCurrency(summary.revenue)}
-                current={summary.revenue}
-                previous={previousSummary.revenue}
-                againstLabel={previousLabel}
-              />
-              <StatTile
-                label="Cost"
-                value={formatCurrency(summary.cost)}
-                current={summary.cost}
-                previous={previousSummary.cost}
-                againstLabel={previousLabel}
-                lowerIsBetter
-              />
-              <StatTile label="GST payable" value={formatCurrency(summary.gstPayable)} />
-            </div>
-
-            <p className="mt-4 px-1 text-[10px] font-bold uppercase tracking-[0.5px] text-muted">Cash</p>
-            <div className="mt-[6px] grid grid-cols-3 gap-2">
-              <StatTile
-                label="Collected"
-                value={formatCurrency(valueAt(series.collected, at))}
-                current={valueAt(series.collected, at)}
-                previous={valueAt(series.collected, previousAt)}
-                againstLabel={previousLabel}
-              />
-              <StatTile
-                label="Unpaid"
-                value={formatCurrency(unpaid)}
-                current={unpaid}
-                previous={previousUnpaid}
-                againstLabel={previousLabel}
-                lowerIsBetter
-              />
-              <StatTile label="Outstanding" value={formatCurrency(outstanding)} />
-            </div>
-
-            <p className="mt-4 px-1 text-[10px] font-bold uppercase tracking-[0.5px] text-muted">
-              Cylinders &amp; empties
-            </p>
-            <div className="mt-[6px] grid grid-cols-3 gap-2">
-              <StatTile
-                label="Sold"
-                value={String(valueAt(series.sold, at))}
-                current={valueAt(series.sold, at)}
-                previous={valueAt(series.sold, previousAt)}
-                againstLabel={previousLabel}
-              />
-              <StatTile
-                label="Bought"
-                value={String(valueAt(series.purchased, at))}
-                current={valueAt(series.purchased, at)}
-                previous={valueAt(series.purchased, previousAt)}
-                againstLabel={previousLabel}
-              />
-              <StatTile
-                label="Spend"
-                value={formatCurrency(valueAt(series.purchaseSpend, at))}
-                current={valueAt(series.purchaseSpend, at)}
-                previous={valueAt(series.purchaseSpend, previousAt)}
-                againstLabel={previousLabel}
-                lowerIsBetter
-              />
-            </div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <StatTile label="Empties in" value={String(valueAt(series.emptiesIn, at))} />
-              <StatTile label="Empties out" value={String(valueAt(series.emptiesOut, at))} />
-              <StatTile
-                label="Net empties"
-                value={String(valueAt(series.emptiesIn, at) - valueAt(series.emptiesOut, at))}
-              />
-            </div>
-
-            <MoversList
-              title="Product movers"
-              risers={productMovers.risers}
-              fallers={productMovers.fallers}
+            <Statement
+              revenue={summary.revenue}
+              cost={summary.cost}
+              profit={summary.profit}
+              gstPayable={summary.gstPayable}
+              previous={{
+                revenue: previousSummary.revenue,
+                cost: previousSummary.cost,
+                profit: previousSummary.profit,
+              }}
               againstLabel={previousLabel}
             />
 
             {summary.unknownCostBills > 0 && (
-              <p className="mt-3 rounded-[12px] bg-[#FAEEDA] px-3 py-2 text-[12px] font-semibold text-[#854F0B]">
-                {summary.unknownCostBills} bill{summary.unknownCostBills === 1 ? '' : 's'} excluded — no purchase
-                recorded for those products, so cost is unknown.
+              <p className="mt-3 rounded-[14px] bg-[#FAEEDA] px-4 py-3 text-[12.5px] font-semibold leading-[1.45] text-[#854F0B]">
+                {summary.unknownCostBills} bill{summary.unknownCostBills === 1 ? '' : 's'} left out — nothing was
+                bought for those products yet, so their cost is unknown.
               </p>
             )}
 
-            <div className="mt-3 rounded-[16px] bg-surface p-3 shadow-card">
-              <p className="mb-[9px] text-[10px] font-bold uppercase tracking-[0.5px] text-muted">By product</p>
-              {products.length === 0 && <p className="text-[13px] text-muted">No sales this month.</p>}
-              {products.map((p, i) => (
-                <div
-                  key={p.productId}
-                  className={`flex items-baseline justify-between py-[7px] ${
-                    i < products.length - 1 ? 'border-b border-borderMuted' : ''
-                  }`}
-                >
-                  <span className="text-[13px] font-bold text-ink">
-                    {p.name} <span className="font-semibold text-subtle">· {p.qty}</span>
-                  </span>
-                  <span className="text-[13px] font-bold text-ink">{formatCurrency(p.profit)}</span>
-                </div>
-              ))}
-            </div>
+            <CashBar
+              collected={series.collected[series.collected.length - 1] ?? 0}
+              unpaid={unpaid}
+              cylindersSold={series.sold[series.sold.length - 1] ?? 0}
+              cylindersBought={series.purchased[series.purchased.length - 1] ?? 0}
+              emptiesIn={series.emptiesIn[series.emptiesIn.length - 1] ?? 0}
+              emptiesOut={series.emptiesOut[series.emptiesOut.length - 1] ?? 0}
+            />
 
-            <div className="mt-3 rounded-[16px] bg-surface p-3 shadow-card">
-              <div className="mb-[10px] flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-[0.5px] text-muted">By customer</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.5px] text-subtle">Profit / due</p>
-              </div>
+            <PositionCard owedToYou={owedToYou} owedToSupplier={owedToSupplier} stock={godownValue} />
 
-              {customers.length === 0 && <p className="text-[13px] text-muted">No sales this month.</p>}
+            <ChaseList debtors={debtors} />
 
-              {customers.map((c, i) => {
-                const due = dues.get(c.customerId) ?? 0
-                return (
-                  <Link
-                    key={c.customerId}
-                    to={`/commercial/customers/${c.customerId}`}
-                    className={`flex items-center justify-between py-[9px] ${
-                      i < customers.length - 1 ? 'border-b border-borderMuted' : ''
-                    }`}
-                  >
-                    <div>
-                      <p className="text-[13px] font-bold text-ink">{c.name}</p>
-                      <p className="mt-[1px] text-[11px] font-semibold text-subtle">{c.qty} cylinders</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[13px] font-bold text-ink">{formatCurrency(c.profit)}</p>
-                      <p className={`mt-[1px] text-[11px] font-semibold ${due > 0 ? 'text-[#A32D2D]' : 'text-[#1D9E75]'}`}>
-                        {due > 0 ? `${formatCurrency(due)} due` : 'settled'}
-                      </p>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+            <BreakdownList
+              title="Where the profit came from"
+              rows={productRows}
+              unit="cylinders"
+              empty={`Nothing sold in ${monthLabel}.`}
+            />
+
+            <BreakdownList
+              title="Who it came from"
+              rows={customerRows}
+              unit="cylinders"
+              empty={`No customer bought in ${monthLabel}.`}
+            />
           </>
         )}
       </div>
