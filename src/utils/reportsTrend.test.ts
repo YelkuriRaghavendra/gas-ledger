@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { monthWindow, profitTrend, pctChange, sumByMonth, rankMovers, unpaidFrom } from './reportsTrend'
+import { monthWindow, pctChange, sumByMonth, rankMovers, unpaidFrom } from './reportsTrend'
 import type { SettledBill } from './profit'
 
 function bill(day: string, over: Partial<SettledBill> = {}): SettledBill {
@@ -27,33 +27,6 @@ describe('monthWindow', () => {
     const w = monthWindow(2026, 1, 2)
     expect(w.map((m) => m.label)).toEqual(['Dec', 'Jan'])
     expect(w.map((m) => m.fullLabel)).toEqual(['Dec 2025', 'Jan 2026'])
-  })
-})
-
-describe('profitTrend', () => {
-  it('buckets bills into the window by their IST day', () => {
-    const points = profitTrend([bill('2026-08-14'), bill('2026-09-02'), bill('2026-09-27')], monthWindow(2026, 9, 2))
-    expect(points.map((p) => p.profit)).toEqual([300, 600])
-    expect(points.map((p) => p.qty)).toEqual([2, 4])
-  })
-
-  it('reports an empty month as zero rather than dropping it', () => {
-    const points = profitTrend([bill('2026-09-02')], monthWindow(2026, 9, 3))
-    expect(points.map((p) => p.profit)).toEqual([0, 0, 300])
-  })
-
-  it('ignores bills outside the window', () => {
-    const points = profitTrend([bill('2026-01-05'), bill('2026-09-05')], monthWindow(2026, 9, 2))
-    expect(points.map((p) => p.profit)).toEqual([0, 300])
-  })
-
-  it('counts an uncosted bill as revenue but not as profit', () => {
-    const points = profitTrend(
-      [bill('2026-09-05', { cost_known: false, profit: null, cost_ex: null })],
-      monthWindow(2026, 9, 1),
-    )
-    expect(points[0].revenue).toBe(1000)
-    expect(points[0].profit).toBe(0)
   })
 })
 

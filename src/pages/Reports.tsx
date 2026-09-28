@@ -9,13 +9,13 @@ import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { currentMonthInIST } from '../hooks/useMonthSummary'
 import { billsInWindow, profitByCustomer, profitByProduct, summariseProfit } from '../utils/profit'
 import { useCommercialMonthStats } from '../hooks/useCommercialMonthStats'
-import { monthWindow, profitTrend, rankMovers, unpaidFrom } from '../utils/reportsTrend'
-import { TrendChart } from '../components/reports/TrendChart'
+import { rankMovers, unpaidFrom } from '../utils/reportsTrend'
 import { StatTile } from '../components/reports/StatTile'
 import { MoversList } from '../components/reports/MoversList'
 import { formatCurrency } from '../utils/format'
 
-const TREND_MONTHS = 12
+// The stats read the selected month and the one before it, nothing further back.
+const STATS_MONTHS = 2
 
 // Half-open [start, end) on the IST `day` column, matching the profit hook.
 function monthBounds(year: number, month: number) {
@@ -35,21 +35,13 @@ export function Reports() {
 
   const { bills, history, lines, previousLines, loading, error, forbidden } = useCommercialProfit(year, month)
   const { data: balances } = useCustomerBalances()
-  const { window: trendWindow, series } = useCommercialMonthStats(year, month, TREND_MONTHS)
+  const { window: trendWindow, series } = useCommercialMonthStats(year, month, STATS_MONTHS)
 
   const summary = useMemo(() => summariseProfit(bills), [bills])
   const names = useMemo(() => new Map(balances.map((c) => [c.id, c.name])), [balances])
   const dues = useMemo(() => new Map(balances.map((c) => [c.id, c.amount_due])), [balances])
   const customers = useMemo(() => profitByCustomer(bills, names), [bills, names])
   const products = useMemo(() => profitByProduct(lines), [lines])
-
-  // The trend is a slice of the settlement history the profit hook already
-  // holds, so moving through the chart costs no further queries.
-  const trend = useMemo(
-    () => profitTrend(history, monthWindow(year, month, TREND_MONTHS)),
-    [history, year, month],
-  )
-  const selectedKey = `${year}-${String(month).padStart(2, '0')}`
 
   // Index of the month on screen and the one before it, shared by every delta.
   const at = trendWindow.length - 1
@@ -67,12 +59,6 @@ export function Reports() {
   const unpaid = useMemo(() => unpaidFrom(bills), [bills])
   const previousUnpaid = useMemo(() => unpaidFrom(previousBills), [previousBills])
   const outstanding = useMemo(() => balances.reduce((sum, c) => sum + c.amount_due, 0), [balances])
-
-  const customerMovers = useMemo(() => {
-    const toInput = (rows: ReturnType<typeof profitByCustomer>) =>
-      rows.map((c) => ({ id: c.customerId, name: c.name, value: c.profit }))
-    return rankMovers(toInput(customers), toInput(profitByCustomer(previousBills, names)))
-  }, [customers, previousBills, names])
 
   const productMovers = useMemo(() => {
     const toInput = (rows: ReturnType<typeof profitByProduct>) =>
@@ -152,15 +138,6 @@ export function Reports() {
               </HeroCardStats>
             </HeroCard>
 
-            <TrendChart
-              points={trend}
-              selectedKey={selectedKey}
-              onSelect={(point) => {
-                setYear(point.year)
-                setMonth(point.month)
-              }}
-            />
-
             <div className="mt-3 grid grid-cols-3 gap-2">
               <StatTile
                 label="Revenue"
@@ -235,14 +212,6 @@ export function Reports() {
                 value={String(valueAt(series.emptiesIn, at) - valueAt(series.emptiesOut, at))}
               />
             </div>
-
-            <MoversList
-              title="Customer movers"
-              risers={customerMovers.risers}
-              fallers={customerMovers.fallers}
-              againstLabel={previousLabel}
-              linkTo={(mover) => `/commercial/customers/${mover.id}`}
-            />
 
             <MoversList
               title="Product movers"

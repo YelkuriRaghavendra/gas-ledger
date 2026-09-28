@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { formatCurrency } from '../../utils/format'
 import type { Mover } from '../../utils/reportsTrend'
 
@@ -7,8 +6,6 @@ interface MoversListProps {
   risers: Mover[]
   fallers: Mover[]
   againstLabel: string
-  /** Given an id, where tapping the row goes. Omitted for rows with nowhere to go. */
-  linkTo?: (mover: Mover) => string
 }
 
 /**
@@ -16,7 +13,7 @@ interface MoversListProps {
  * percentage, so the list answers "who do I call" rather than "who doubled a
  * small number".
  */
-export function MoversList({ title, risers, fallers, againstLabel, linkTo }: MoversListProps) {
+export function MoversList({ title, risers, fallers, againstLabel }: MoversListProps) {
   if (risers.length === 0 && fallers.length === 0) return null
 
   return (
@@ -26,20 +23,20 @@ export function MoversList({ title, risers, fallers, againstLabel, linkTo }: Mov
         <p className="text-[10px] font-bold uppercase tracking-[0.5px] text-subtle">vs {againstLabel}</p>
       </div>
 
-      <Side movers={risers} linkTo={linkTo} />
+      <Side movers={risers} />
       {risers.length > 0 && fallers.length > 0 && <div className="my-[6px] border-t border-borderMuted" />}
-      <Side movers={fallers} linkTo={linkTo} />
+      <Side movers={fallers} />
     </div>
   )
 }
 
-function Side({ movers, linkTo }: { movers: Mover[]; linkTo?: (mover: Mover) => string }) {
+function Side({ movers }: { movers: Mover[] }) {
   return (
     <>
       {movers.map((mover) => {
         const up = mover.change > 0
-        const body = (
-          <>
+        return (
+          <div key={mover.id} className="flex items-center justify-between py-[7px]">
             <div className="min-w-0 flex-1 pr-3">
               <p className="truncate text-[13px] font-bold text-ink">{mover.name}</p>
               <p className="mt-[1px] text-[11px] font-semibold text-subtle">
@@ -55,16 +52,6 @@ function Side({ movers, linkTo }: { movers: Mover[]; linkTo?: (mover: Mover) => 
                 </span>
               )}
             </p>
-          </>
-        )
-
-        return linkTo ? (
-          <Link key={mover.id} to={linkTo(mover)} className="flex items-center justify-between py-[7px]">
-            {body}
-          </Link>
-        ) : (
-          <div key={mover.id} className="flex items-center justify-between py-[7px]">
-            {body}
           </div>
         )
       })}

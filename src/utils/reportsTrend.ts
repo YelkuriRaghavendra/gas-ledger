@@ -30,33 +30,6 @@ export function monthWindow(year: number, month: number, count = 12): MonthKey[]
   return out
 }
 
-export interface TrendPoint extends MonthKey {
-  profit: number
-  revenue: number
-  qty: number
-}
-
-/**
- * One point per month in the window, in window order. Months with no bills stay
- * in the series at zero — a gap in the chart is information, and dropping it
- * would slide the remaining bars into the wrong slots.
- *
- * Costing follows summariseProfit: an uncosted bill still contributes revenue
- * and quantity, but never profit, because costing it at zero would draw a bar
- * showing pure margin.
- */
-export function profitTrend(bills: SettledBill[], window: MonthKey[]): TrendPoint[] {
-  const points = new Map(window.map((m) => [m.key, { ...m, profit: 0, revenue: 0, qty: 0 }]))
-  for (const b of bills) {
-    const point = points.get(b.day.slice(0, 7))
-    if (!point) continue
-    point.revenue += b.revenue_ex
-    point.qty += b.qty
-    if (b.cost_known && b.profit != null) point.profit += b.profit
-  }
-  return [...points.values()]
-}
-
 /**
  * Change from `previous` to `current`, as a percentage of `previous`. Null when
  * there is nothing meaningful to divide by: a zero baseline makes any rise
