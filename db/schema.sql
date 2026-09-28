@@ -561,16 +561,23 @@ group by c.id, c.name, c.phone, c.address;
 -- ── activity_feed ────────────────────────────────────────────
 create view public.activity_feed as
 select
-  b.id, b.customer_id, c.name as customer_name, b.type,
+  b.id, b.customer_id,
+  c.name as customer_name,
+  b.type,
   coalesce((select sum(bl.qty) from bill_lines bl where bl.bill_id = b.id), 0) as qty,
   coalesce((select sum(bl.empties) from bill_lines bl where bl.bill_id = b.id), 0) as empties,
   b.total_amount as amount, b.note, b.created_by, b.created_at, b.updated_at, b.updated_by,
   (select bl.product_id from bill_lines bl where bl.bill_id = b.id limit 1) as product_id,
   (select p.name from bill_lines bl join products p on p.id = bl.product_id where bl.bill_id = b.id limit 1) as product_name,
-  b.surrender as outright, 'commercial' as segment,
-  b.bill_number, b.method, b.paid
+  b.surrender as outright,
+  case when b.customer_id is null then 'domestic' else 'commercial' end as segment,
+  b.bill_number, b.method, b.paid,
+  coalesce((
+    select sum(bl.qty) from bill_lines bl join products p on p.id = bl.product_id
+    where bl.bill_id = b.id and p.is_new_connection
+  ), 0) as nc_qty
 from bills b
-join customers c on c.id = b.customer_id
+left join customers c on c.id = b.customer_id
 where b.type in ('sale', 'return', 'payment')
 union all
 select
@@ -584,7 +591,7 @@ select
   (select p.name from purchase_lines pl join products p on p.id = pl.product_id where pl.purchase_order_id = po.id limit 1) as product_name,
   false as outright,
   (select p.segment from purchase_lines pl join products p on p.id = pl.product_id where pl.purchase_order_id = po.id limit 1) as segment,
-  po.po_number as bill_number, null::text as method, po.paid
+  po.po_number as bill_number, null::text as method, po.paid, 0::numeric as nc_qty
 from purchase_orders po
 where po.type = 'purchase'
 order by created_at desc;

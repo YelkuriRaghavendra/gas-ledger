@@ -6,9 +6,14 @@ export interface FeedItem extends ActivityEntry {
   title: string
 }
 
+// Commercial entries are titled by the counterparty. Domestic counter bills
+// have none, so they are titled by bill number and product — the two things
+// that identify a bill at the counter.
 export function normalizeFeedRow(row: ActivityEntry): FeedItem {
-  const title = row.type === 'purchase' ? `Purchase · ${row.customer_name}` : row.customer_name
-  return { ...row, title }
+  if (row.type === 'purchase') return { ...row, title: `Purchase · ${row.customer_name}` }
+  if (row.customer_name) return { ...row, title: row.customer_name }
+  const parts = [row.bill_number, row.product_name].filter(Boolean)
+  return { ...row, title: parts.length ? parts.join(' · ') : 'Counter bill' }
 }
 
 // `from`/`to` are optional ISO bounds (half-open: from <= created_at < to) used

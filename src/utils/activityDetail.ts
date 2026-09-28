@@ -1,5 +1,6 @@
 import { formatCurrency } from './format'
 import type { FeedItem } from '../hooks/useActivityFeed'
+import type { Segment } from '../types/db'
 
 // Shared presentation helpers for an activity-feed entry, used by both the
 // Activity page and Home's recent-activity list so the two stay in sync.
@@ -64,7 +65,14 @@ export function detailRows(entry: FeedItem): { k: string; v: string }[] {
   return rows
 }
 
-export function editPath(entry: FeedItem) {
+// Domestic bills are counter bills with no customer, so they edit through the
+// single bill form rather than the per-customer sale/return/payment forms.
+export function editPath(entry: FeedItem, segment: Segment = 'commercial') {
+  if (segment === 'domestic') {
+    return entry.type === 'purchase'
+      ? `/domestic/purchases/${entry.id}/edit`
+      : `/domestic/bill/${entry.id}/edit`
+  }
   if (entry.type === 'purchase') return `/commercial/purchases/${entry.id}/edit`
   return `/commercial/customers/${entry.customer_id}/${entry.type}/${entry.id}/edit`
 }

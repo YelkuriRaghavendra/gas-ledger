@@ -236,7 +236,7 @@ export function DomesticNewBill() {
         return
       }
     }
-    navigate(editing ? '/domestic/history' : '/domestic')
+    navigate(editing ? '/domestic/activity' : '/domestic')
   }
 
   const fieldInput =
@@ -253,7 +253,7 @@ export function DomesticNewBill() {
     <div className="p-5 pb-10 pt-3">
       <div className="mb-[14px] flex items-center justify-between">
         <Link
-          to={editing ? '/domestic/history' : '/domestic'}
+          to={editing ? '/domestic/activity' : '/domestic'}
           aria-label="Back"
           className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-surface text-muted shadow-card"
         >

@@ -133,7 +133,8 @@ export interface GodownStock {
 export interface ActivityEntry {
   id: number
   customer_id: number | null
-  customer_name: string
+  // Null on domestic counter bills, which have no customer.
+  customer_name: string | null
   type: 'sale' | 'return' | 'payment' | 'purchase'
   product_id: number | null
   product_name: string | null
@@ -150,6 +151,9 @@ export interface ActivityEntry {
   bill_number: string
   method: PaymentMethod | null
   paid: boolean
+  // New Connection cylinders on the bill, summed across every line — the feed
+  // only carries the first line's product, so this cannot be derived client-side.
+  nc_qty: number
 }
 
 export interface AgencySettings {
