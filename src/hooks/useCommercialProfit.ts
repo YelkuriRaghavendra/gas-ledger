@@ -28,9 +28,21 @@ function isForbidden(error: { code?: string } | null) {
   return error?.code === '42501'
 }
 
+/**
+ * `bills` is the selected month; `history` is every settled bill up to the end
+ * of it. The RPC already returns the whole history because settlement needs it,
+ * so the trend chart and the month-on-month deltas are a slice of data that has
+ * been fetched either way rather than a second round trip.
+ *
+ * `lines` covers the selected month AND the one before it, so the by-product
+ * movers have something to compare against; `previousLines` is that earlier
+ * slice, already separated.
+ */
 export function useCommercialProfit(year: number, month: number) {
   const [bills, setBills] = useState<SettledBill[]>([])
+  const [history, setHistory] = useState<SettledBill[]>([])
   const [lines, setLines] = useState<BillLineProfit[]>([])
+  const [previousLines, setPreviousLines] = useState<BillLineProfit[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [forbidden, setForbidden] = useState(false)
@@ -39,6 +51,7 @@ export function useCommercialProfit(year: number, month: number) {
     setLoading(true)
     setForbidden(false)
     const { start, end } = monthBounds(year, month)
+    const previous = monthBounds(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1)
 
     // Bills are fetched from the beginning of time, not from `start`, because
     // settlement is a running process over a customer's whole history: it pools
@@ -55,7 +68,7 @@ export function useCommercialProfit(year: number, month: number) {
     // breakdown has no settlement in it and needs no history.
     const [billRes, lineRes] = await Promise.all([
       supabase.rpc('commercial_bill_profit', { p_from: '1900-01-01', p_to: end }),
-      supabase.rpc('commercial_line_profit_range', { p_from: start, p_to: end }),
+      supabase.rpc('commercial_line_profit_range', { p_from: previous.start, p_to: end }),
     ])
 
     const rpcError = billRes.error ?? lineRes.error
@@ -63,7 +76,9 @@ export function useCommercialProfit(year: number, month: number) {
       setForbidden(isForbidden(rpcError))
       setError(isForbidden(rpcError) ? null : rpcError.message)
       setBills([])
+      setHistory([])
       setLines([])
+      setPreviousLines([])
       setLoading(false)
       return
     }
@@ -71,13 +86,18 @@ export function useCommercialProfit(year: number, month: number) {
     try {
       const payments = await loadPayments()
       const settled = settleOldestFirst((billRes.data ?? []) as BillProfit[], payments)
+      const allLines = (lineRes.data ?? []) as BillLineProfit[]
       setBills(billsInWindow(settled, start, end))
-      setLines((lineRes.data ?? []) as BillLineProfit[])
+      setHistory(settled)
+      setLines(billsInWindow(allLines, start, end))
+      setPreviousLines(billsInWindow(allLines, previous.start, previous.end))
       setError(null)
     } catch (e: any) {
       setError(e.message)
       setBills([])
+      setHistory([])
       setLines([])
+      setPreviousLines([])
     }
     setLoading(false)
   }, [year, month])
@@ -86,7 +106,7 @@ export function useCommercialProfit(year: number, month: number) {
     refresh()
   }, [refresh])
 
-  return { bills, lines, loading, error, forbidden, refresh }
+  return { bills, history, lines, previousLines, loading, error, forbidden, refresh }
 }
 
 export function useCustomerProfit(customerId: number) {

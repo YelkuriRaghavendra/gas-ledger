@@ -189,6 +189,7 @@ export interface DailyMoneySummary {
 export interface DailyPurchaseSummary {
   day: string
   product_id: number
+  segment: Segment
   cylinders_purchased: number
   empties_given_to_supplier: number
   purchase_amount: number

@@ -7,8 +7,23 @@ import { useAuth } from '../auth/AuthContext'
 import { useCommercialProfit } from '../hooks/useCommercialProfit'
 import { useCustomerBalances } from '../hooks/useCustomerBalances'
 import { currentMonthInIST } from '../hooks/useMonthSummary'
-import { profitByCustomer, profitByProduct, summariseProfit } from '../utils/profit'
+import { billsInWindow, profitByCustomer, profitByProduct, summariseProfit } from '../utils/profit'
+import { useCommercialMonthStats } from '../hooks/useCommercialMonthStats'
+import { monthWindow, profitTrend, rankMovers, unpaidFrom } from '../utils/reportsTrend'
+import { TrendChart } from '../components/reports/TrendChart'
+import { StatTile } from '../components/reports/StatTile'
+import { MoversList } from '../components/reports/MoversList'
 import { formatCurrency } from '../utils/format'
+
+const TREND_MONTHS = 12
+
+// Half-open [start, end) on the IST `day` column, matching the profit hook.
+function monthBounds(year: number, month: number) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const nextYear = month === 12 ? year + 1 : year
+  const nextMonth = month === 12 ? 1 : month + 1
+  return { start: `${year}-${pad(month)}-01`, end: `${nextYear}-${pad(nextMonth)}-01` }
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -18,14 +33,52 @@ export function Reports() {
   const [year, setYear] = useState(now.year)
   const [month, setMonth] = useState(now.month)
 
-  const { bills, lines, loading, error, forbidden } = useCommercialProfit(year, month)
+  const { bills, history, lines, previousLines, loading, error, forbidden } = useCommercialProfit(year, month)
   const { data: balances } = useCustomerBalances()
+  const { window: trendWindow, series } = useCommercialMonthStats(year, month, TREND_MONTHS)
 
   const summary = useMemo(() => summariseProfit(bills), [bills])
   const names = useMemo(() => new Map(balances.map((c) => [c.id, c.name])), [balances])
   const dues = useMemo(() => new Map(balances.map((c) => [c.id, c.amount_due])), [balances])
   const customers = useMemo(() => profitByCustomer(bills, names), [bills, names])
   const products = useMemo(() => profitByProduct(lines), [lines])
+
+  // The trend is a slice of the settlement history the profit hook already
+  // holds, so moving through the chart costs no further queries.
+  const trend = useMemo(
+    () => profitTrend(history, monthWindow(year, month, TREND_MONTHS)),
+    [history, year, month],
+  )
+  const selectedKey = `${year}-${String(month).padStart(2, '0')}`
+
+  // Index of the month on screen and the one before it, shared by every delta.
+  const at = trendWindow.length - 1
+  const previousAt = at - 1
+  const previousLabel = trendWindow[previousAt]?.label ?? ''
+  const valueAt = (numbers: number[], index: number) => (index >= 0 ? numbers[index] ?? 0 : 0)
+
+  const previousBills = useMemo(() => {
+    const previousMonth = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
+    const bounds = monthBounds(previousMonth.year, previousMonth.month)
+    return billsInWindow(history, bounds.start, bounds.end)
+  }, [history, year, month])
+
+  const previousSummary = useMemo(() => summariseProfit(previousBills), [previousBills])
+  const unpaid = useMemo(() => unpaidFrom(bills), [bills])
+  const previousUnpaid = useMemo(() => unpaidFrom(previousBills), [previousBills])
+  const outstanding = useMemo(() => balances.reduce((sum, c) => sum + c.amount_due, 0), [balances])
+
+  const customerMovers = useMemo(() => {
+    const toInput = (rows: ReturnType<typeof profitByCustomer>) =>
+      rows.map((c) => ({ id: c.customerId, name: c.name, value: c.profit }))
+    return rankMovers(toInput(customers), toInput(profitByCustomer(previousBills, names)))
+  }, [customers, previousBills, names])
+
+  const productMovers = useMemo(() => {
+    const toInput = (rows: ReturnType<typeof profitByProduct>) =>
+      rows.map((p) => ({ id: p.productId, name: p.name, value: p.profit }))
+    return rankMovers(toInput(products), toInput(profitByProduct(previousLines)))
+  }, [products, previousLines])
 
   const atCurrentMonth = year === now.year && month === now.month
   const denied = forbidden || (profile != null && profile.role !== 'owner')
@@ -99,11 +152,104 @@ export function Reports() {
               </HeroCardStats>
             </HeroCard>
 
+            <TrendChart
+              points={trend}
+              selectedKey={selectedKey}
+              onSelect={(point) => {
+                setYear(point.year)
+                setMonth(point.month)
+              }}
+            />
+
             <div className="mt-3 grid grid-cols-3 gap-2">
-              <Tile label="Revenue" value={formatCurrency(summary.revenue)} />
-              <Tile label="Cost" value={formatCurrency(summary.cost)} />
-              <Tile label="GST payable" value={formatCurrency(summary.gstPayable)} />
+              <StatTile
+                label="Revenue"
+                value={formatCurrency(summary.revenue)}
+                current={summary.revenue}
+                previous={previousSummary.revenue}
+                againstLabel={previousLabel}
+              />
+              <StatTile
+                label="Cost"
+                value={formatCurrency(summary.cost)}
+                current={summary.cost}
+                previous={previousSummary.cost}
+                againstLabel={previousLabel}
+                lowerIsBetter
+              />
+              <StatTile label="GST payable" value={formatCurrency(summary.gstPayable)} />
             </div>
+
+            <p className="mt-4 px-1 text-[10px] font-bold uppercase tracking-[0.5px] text-muted">Cash</p>
+            <div className="mt-[6px] grid grid-cols-3 gap-2">
+              <StatTile
+                label="Collected"
+                value={formatCurrency(valueAt(series.collected, at))}
+                current={valueAt(series.collected, at)}
+                previous={valueAt(series.collected, previousAt)}
+                againstLabel={previousLabel}
+              />
+              <StatTile
+                label="Unpaid"
+                value={formatCurrency(unpaid)}
+                current={unpaid}
+                previous={previousUnpaid}
+                againstLabel={previousLabel}
+                lowerIsBetter
+              />
+              <StatTile label="Outstanding" value={formatCurrency(outstanding)} />
+            </div>
+
+            <p className="mt-4 px-1 text-[10px] font-bold uppercase tracking-[0.5px] text-muted">
+              Cylinders &amp; empties
+            </p>
+            <div className="mt-[6px] grid grid-cols-3 gap-2">
+              <StatTile
+                label="Sold"
+                value={String(valueAt(series.sold, at))}
+                current={valueAt(series.sold, at)}
+                previous={valueAt(series.sold, previousAt)}
+                againstLabel={previousLabel}
+              />
+              <StatTile
+                label="Bought"
+                value={String(valueAt(series.purchased, at))}
+                current={valueAt(series.purchased, at)}
+                previous={valueAt(series.purchased, previousAt)}
+                againstLabel={previousLabel}
+              />
+              <StatTile
+                label="Spend"
+                value={formatCurrency(valueAt(series.purchaseSpend, at))}
+                current={valueAt(series.purchaseSpend, at)}
+                previous={valueAt(series.purchaseSpend, previousAt)}
+                againstLabel={previousLabel}
+                lowerIsBetter
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <StatTile label="Empties in" value={String(valueAt(series.emptiesIn, at))} />
+              <StatTile label="Empties out" value={String(valueAt(series.emptiesOut, at))} />
+              <StatTile
+                label="Net empties"
+                value={String(valueAt(series.emptiesIn, at) - valueAt(series.emptiesOut, at))}
+              />
+            </div>
+
+            <MoversList
+              title="Customer movers"
+              risers={customerMovers.risers}
+              fallers={customerMovers.fallers}
+              againstLabel={previousLabel}
+              linkTo={(mover) => `/commercial/customers/${mover.id}`}
+            />
+
+            <MoversList
+              title="Product movers"
+              risers={productMovers.risers}
+              fallers={productMovers.fallers}
+              againstLabel={previousLabel}
+            />
 
             {summary.unknownCostBills > 0 && (
               <p className="mt-3 rounded-[12px] bg-[#FAEEDA] px-3 py-2 text-[12px] font-semibold text-[#854F0B]">
@@ -165,15 +311,6 @@ export function Reports() {
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-function Tile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[12px] bg-surface px-3 py-[11px] shadow-card">
-      <p className="text-[10px] font-bold uppercase tracking-[0.4px] text-muted">{label}</p>
-      <p className="mt-[2px] font-display text-[15px] font-bold text-ink">{value}</p>
     </div>
   )
 }
