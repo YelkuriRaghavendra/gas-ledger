@@ -146,6 +146,7 @@ export function buildTemplateParams(template: TemplateName, ctx: BillContext): s
         date,
         titleCase(clean(ctx.method ?? 'cash')),
         rupees(ctx.balanceDue),
+        String(Math.round(ctx.emptiesOutstanding)),
       ]
     case 'bill_return':
       return [

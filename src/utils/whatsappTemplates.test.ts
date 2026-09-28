@@ -200,8 +200,18 @@ describe('buildTemplateParams', () => {
 
   it('builds payment params with a title-cased method', () => {
     expect(buildTemplateParams('bill_payment', { ...base, method: 'upi' })).toEqual([
-      'Ramesh Traders', '4300', '13-09-2026', 'Upi', '12500',
+      'Ramesh Traders', '4300', '13-09-2026', 'Upi', '12500', '7',
     ])
+  })
+
+  it('tells the customer how many empties they still hold after paying', () => {
+    const out = buildTemplateParams('bill_payment', { ...base, emptiesOutstanding: 3 })
+    expect(out[5]).toBe('3')
+  })
+
+  it('rounds a fractional empties count, as the sale and return templates do', () => {
+    const out = buildTemplateParams('bill_payment', { ...base, emptiesOutstanding: 2.6 })
+    expect(out[5]).toBe('3')
   })
 
   it('falls back to Cash when a payment has no method recorded', () => {
