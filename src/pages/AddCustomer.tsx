@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ChevronLeftIcon, WhatsAppIcon } from '../components/icons'
 import { Toggle } from '../components/Toggle'
-import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
+import { sanitizePhoneInput, validateCustomerDetails } from '../utils/validation'
 
 export function AddCustomer() {
   const navigate = useNavigate()
@@ -16,12 +16,9 @@ export function AddCustomer() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!name.trim()) {
-      setError('Enter a name')
-      return
-    }
-    if (phone.trim() && !isValidPhone(phone)) {
-      setError('Enter a valid 10-digit phone number')
+    const problem = validateCustomerDetails({ name, phone, address })
+    if (problem) {
+      setError(problem)
       return
     }
     setSaving(true)
@@ -30,8 +27,8 @@ export function AddCustomer() {
       .from('customers')
       .insert({
         name: name.trim(),
-        phone: phone.trim() || null,
-        address: address.trim() || null,
+        phone: phone.trim(),
+        address: address.trim(),
         whatsapp_enabled: whatsappEnabled,
       })
       .select('id')
@@ -66,7 +63,7 @@ export function AddCustomer() {
             />
           </div>
           <div className="mb-4">
-            <p className={fieldLabel}>Phone number</p>
+            <p className={fieldLabel}>Mobile number</p>
             <input
               placeholder="10-digit mobile"
               inputMode="numeric"
@@ -77,9 +74,9 @@ export function AddCustomer() {
             />
           </div>
           <div className="mb-4">
-            <p className={fieldLabel}>Address</p>
+            <p className={fieldLabel}>Location</p>
             <input
-              placeholder="Locality / area"
+              placeholder="Locality or area"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               className={fieldInput}
