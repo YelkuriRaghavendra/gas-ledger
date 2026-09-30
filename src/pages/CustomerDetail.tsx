@@ -13,7 +13,7 @@ import { useCustomerProfit } from '../hooks/useCommercialProfit'
 import { summariseProfit } from '../utils/profit'
 import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
-import { isValidPhone, sanitizePhoneInput } from '../utils/validation'
+import { sanitizePhoneInput, validateCustomerDetails } from '../utils/validation'
 import { Avatar } from '../components/Avatar'
 import { StatementDialog } from '../components/StatementDialog'
 import { DetailModal } from '../components/DetailModal'
@@ -228,8 +228,11 @@ export function CustomerDetail() {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
-    if (phone.trim() && !isValidPhone(phone)) {
-      setActionError('Enter a valid 10-digit phone number')
+    // Same rule as Add customer: an edit must not be able to blank a detail
+    // the customer was required to have in the first place.
+    const problem = validateCustomerDetails({ name, phone, address })
+    if (problem) {
+      setActionError(problem)
       return
     }
     setSaving(true)
@@ -238,8 +241,8 @@ export function CustomerDetail() {
       .from('customers')
       .update({
         name: name.trim(),
-        phone: phone.trim() || null,
-        address: address.trim() || null,
+        phone: phone.trim(),
+        address: address.trim(),
         whatsapp_enabled: whatsappEnabled,
       })
       .eq('id', customerId)
@@ -369,13 +372,20 @@ export function CustomerDetail() {
 
       {editing ? (
         <form onSubmit={handleSave} className="mb-[18px] space-y-3 rounded-[20px] bg-surface p-[18px] shadow-card">
+          {/* All three are required, so each box says what it wants — an
+              emptied field is otherwise unidentifiable once the error fires. */}
           <input
             required
+            placeholder="Business or person"
+            aria-label="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <input
+            required
+            placeholder="10-digit mobile"
+            aria-label="Mobile number"
             inputMode="numeric"
             maxLength={10}
             value={phone}
@@ -383,6 +393,9 @@ export function CustomerDetail() {
             className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
           />
           <input
+            required
+            placeholder="Locality or area"
+            aria-label="Location"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             className="h-[50px] w-full rounded-[14px] border-[1.5px] border-borderMuted bg-surface px-[14px] font-semibold text-ink"
