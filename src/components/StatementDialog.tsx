@@ -59,14 +59,14 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
     }
   }, [open])
 
-  const amountDue = useMemo(
-    () => periodAmountDue(groups, period, totalDue, from, to),
-    [groups, period, totalDue, from, to],
-  )
-
   const filtered = useMemo(
     () => filterGroupsByPeriod(groups, period, from, to),
     [groups, period, from, to],
+  )
+
+  const amountDue = useMemo(
+    () => periodAmountDue(filtered, period, totalDue),
+    [filtered, period, totalDue],
   )
 
   // The preview renders the same markup generatePdfBlob rasterises, so what is

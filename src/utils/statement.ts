@@ -222,40 +222,19 @@ export function periodRangeLabel(
 }
 
 /**
- * Amount due as of the END of the period: the running balance after the
- * latest entry on or before the period end. `all` and any period reaching
- * today use the live `amountDue`. No entries by then means nothing was owed.
+ * Due raised inside the period only: unpaid sales minus payments among the
+ * already-filtered entries. Balance carried over from earlier periods is
+ * excluded. `all` uses the live `amountDue`.
  */
-export function periodAmountDue(
-  groups: HistoryGroup[],
-  period: StatementPeriod,
-  amountDue: number,
-  from?: string,
-  to?: string,
-  today: Date = new Date(),
-): number {
+export function periodAmountDue(filtered: HistoryGroup[], period: StatementPeriod, amountDue: number): number {
   if (period === 'all') return amountDue
-
-  let end: Date
-  if (period === 'this-month') {
-    end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
-  } else if (period === 'last-month') {
-    end = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999)
-  } else {
-    if (!from || !to) return amountDue
-    const [ty, tm, td] = to.split('-').map(Number)
-    end = new Date(ty, tm - 1, td, 23, 59, 59, 999)
-  }
-  const endMs = end.getTime()
-  if (endMs >= today.getTime()) return amountDue
-
-  // Groups and entries are newest-first, so the first match is the latest.
-  for (const g of groups) {
+  let due = 0
+  for (const g of filtered)
     for (const e of g.entries) {
-      if (new Date(e.created_at).getTime() <= endMs) return e.balanceAfter
+      if (e.type === 'sale' && !e.paid) due += e.amount
+      else if (e.type === 'payment') due -= e.amount
     }
-  }
-  return 0
+  return due
 }
 
 export function filterGroupsByPeriod(
