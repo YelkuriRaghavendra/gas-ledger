@@ -5,6 +5,7 @@ import {
   filterGroupsByPeriod,
   generatePdfBlob,
   generatePdfHtml,
+  periodAmountDue,
   periodRangeLabel,
   statementFilename,
 } from '../utils/statement'
@@ -36,7 +37,7 @@ function toDateInputValue(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-export function StatementDialog({ open, onClose, customerName, amountDue, groups, customer, agency }: StatementDialogProps) {
+export function StatementDialog({ open, onClose, customerName, amountDue: totalDue, groups, customer, agency }: StatementDialogProps) {
   const now = new Date()
   const [period, setPeriod] = useState<StatementPeriod>('this-month')
   const [from, setFrom] = useState(toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
@@ -63,11 +64,16 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
     [groups, period, from, to],
   )
 
+  const amountDue = useMemo(
+    () => periodAmountDue(filtered, period, totalDue),
+    [filtered, period, totalDue],
+  )
+
   // The preview renders the same markup generatePdfBlob rasterises, so what is
   // on screen cannot drift from what gets shared, printed or downloaded.
   const previewHtml = useMemo(
-    () => generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency),
-    [customerName, customer.phone, customer.address, amountDue, filtered, agency],
+    () => generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency, period === 'all'),
+    [customerName, customer.phone, customer.address, amountDue, filtered, agency, period],
   )
 
   useEffect(() => {
@@ -78,7 +84,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
     let cancelled = false
     setBuilding(true)
     setPdfBlob(null)
-    generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency)
+    generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency, period === 'all')
       .then((blob) => {
         if (!cancelled) setPdfBlob(blob)
       })
@@ -92,7 +98,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, filtered, amountDue, customerName])
+  }, [open, filtered, amountDue, customerName, period])
 
   function summaryText() {
     const business = agency?.name || 'Statement'
