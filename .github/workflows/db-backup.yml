@@ -8,19 +8,63 @@ on:
 permissions:
   contents: read
 
-jobs:
-  backup:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      PG_IMAGE: postgres:17
-    steps:
-      - name: Set backup file name
-        run: echo "BACKUP_FILE=backup-$(date -u +%F).dump" >> "$GITHUB_ENV"
+env:
+  PG_IMAGE: postgres:17
+  PG_IMAGE_CACHE_KEY: docker-postgres-17-v1
 
-      - name: Dump database
+jobs:
+  setup:
+    name: 1. Install dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Restore postgres image cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: pg-image.tar
+          key: ${{ env.PG_IMAGE_CACHE_KEY }}
+
+      - name: Pull and save postgres image (cache miss only)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          docker pull "$PG_IMAGE"
+          docker save "$PG_IMAGE" -o pg-image.tar
+
+      - name: Check tools
+        run: |
+          docker load -i pg-image.tar
+          docker run --rm "$PG_IMAGE" pg_dump --version
+          gpg --version | head -1
+          aws --version
+
+  dump_verify:
+    name: 2. Dump and verify
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      file: ${{ steps.name.outputs.file }}
+      size: ${{ steps.size.outputs.size }}
+    steps:
+      - name: Restore postgres image cache
+        uses: actions/cache/restore@v4
+        with:
+          path: pg-image.tar
+          key: ${{ env.PG_IMAGE_CACHE_KEY }}
+
+      - name: Load postgres image
+        run: |
+          if [ -f pg-image.tar ]; then docker load -i pg-image.tar; else docker pull "$PG_IMAGE"; fi
+
+      - name: Set backup file name
+        id: name
+        run: echo "file=backup-$(date -u +%F).dump" >> "$GITHUB_OUTPUT"
+
+      - name: pg_dump (3 attempts)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_FILE: ${{ steps.name.outputs.file }}
         run: |
           for attempt in 1 2 3; do
             echo "pg_dump attempt $attempt"
@@ -35,19 +79,60 @@ jobs:
           echo "pg_dump failed after 3 attempts" >&2
           exit 1
 
-      - name: Verify dump
+      - name: Verify dump is a valid archive
+        env:
+          BACKUP_FILE: ${{ steps.name.outputs.file }}
         run: |
           test -s "$BACKUP_FILE"
-          ls -lh "$BACKUP_FILE"
           docker run --rm -v "$PWD:/out" "$PG_IMAGE" pg_restore --list "/out/$BACKUP_FILE" > /dev/null
+          echo "dump OK"
 
-      - name: Upload to Cloudflare R2
+      - name: Record size
+        id: size
+        env:
+          BACKUP_FILE: ${{ steps.name.outputs.file }}
+        run: echo "size=$(du -h "$BACKUP_FILE" | cut -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Encrypt dump for hand-off
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          BACKUP_FILE: ${{ steps.name.outputs.file }}
+        run: |
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o "$BACKUP_FILE.gpg" "$BACKUP_FILE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dump
+          path: ${{ steps.name.outputs.file }}.gpg
+          retention-days: 1
+
+  upload:
+    name: 3. Upload to R2
+    needs: dump_verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dump
+
+      - name: Decrypt dump
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          BACKUP_FILE: ${{ needs.dump_verify.outputs.file }}
+        run: |
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            -o "$BACKUP_FILE" --decrypt "$BACKUP_FILE.gpg"
+
+      - name: Upload (3 attempts)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          BACKUP_FILE: ${{ needs.dump_verify.outputs.file }}
         run: |
           for attempt in 1 2 3; do
             echo "upload attempt $attempt"
