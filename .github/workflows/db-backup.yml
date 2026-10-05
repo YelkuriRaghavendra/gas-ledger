@@ -11,24 +11,35 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      PG_IMAGE: postgres:17
     steps:
-      - name: Install PostgreSQL 17 client
-        run: |
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+      - name: Set backup file name
+        run: echo "BACKUP_FILE=backup-$(date -u +%F).dump" >> "$GITHUB_ENV"
 
       - name: Dump database
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" \
-            --no-owner --no-privileges -Fc \
-            -f "backup-$(date +%F).dump"
-          ls -lh backup-*.dump
+          for attempt in 1 2 3; do
+            echo "pg_dump attempt $attempt"
+            if docker run --rm --user "$(id -u):$(id -g)" \
+                 -e SUPABASE_DB_URL -v "$PWD:/out" "$PG_IMAGE" \
+                 sh -c 'pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc -f "/out/$0"' "$BACKUP_FILE"; then
+              exit 0
+            fi
+            rm -f "$BACKUP_FILE"
+            sleep $((attempt * 20))
+          done
+          echo "pg_dump failed after 3 attempts" >&2
+          exit 1
+
+      - name: Verify dump
+        run: |
+          test -s "$BACKUP_FILE"
+          ls -lh "$BACKUP_FILE"
+          docker run --rm -v "$PWD:/out" "$PG_IMAGE" pg_restore --list "/out/$BACKUP_FILE" > /dev/null
 
       - name: Upload to Cloudflare R2
         env:
@@ -38,5 +49,13 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
-          aws s3 cp backup-*.dump "s3://$R2_BUCKET/" \
-            --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          for attempt in 1 2 3; do
+            echo "upload attempt $attempt"
+            if aws s3 cp "$BACKUP_FILE" "s3://$R2_BUCKET/" \
+                 --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          echo "upload failed after 3 attempts" >&2
+          exit 1
