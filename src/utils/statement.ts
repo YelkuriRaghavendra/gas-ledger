@@ -31,6 +31,7 @@ export function generatePdfHtml(
   amountDue: number,
   groups: HistoryGroup[],
   agency: { name: string; phone: string | null; address: string | null } | null,
+  showBalance = true,
 ) {
   const rows = groups
     .flatMap((g) =>
@@ -46,7 +47,7 @@ export function generatePdfHtml(
             </td>
             <td style="padding:10px 12px;vertical-align:middle;font-size:13px;font-weight:600;color:#1F1813">${esc(historyTitle(t, t.productName))}</td>
             <td style="padding:10px 12px;vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#1F1813">${t.type !== 'return' ? formatCurrency(t.amount) : '—'}</td>
-            <td style="padding:10px 12px;vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#6B5E50">${formatCurrency(t.balanceAfter)}</td>
+            ${showBalance ? `<td style="padding:10px 12px;vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#6B5E50">${formatCurrency(t.balanceAfter)}</td>` : ''}
           </tr>`
         },
       ),
@@ -87,7 +88,7 @@ export function generatePdfHtml(
       <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Type</th>
       <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Description</th>
       <th style="padding:8px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Amount</th>
-      <th style="padding:8px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Balance</th>
+      ${showBalance ? `<th style="padding:8px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Balance</th>` : ''}
     </tr>
   </thead>
   <tbody>${rows}</tbody>
@@ -110,8 +111,9 @@ export async function generatePdfBlob(
   amountDue: number,
   groups: HistoryGroup[],
   agency: { name: string; phone: string | null; address: string | null } | null,
+  showBalance = true,
 ): Promise<Blob> {
-  const html = generatePdfHtml(customerName, phone, address, amountDue, groups, agency)
+  const html = generatePdfHtml(customerName, phone, address, amountDue, groups, agency, showBalance)
 
   const iframe = document.createElement('iframe')
   iframe.style.position = 'fixed'

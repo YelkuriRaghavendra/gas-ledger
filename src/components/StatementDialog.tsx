@@ -72,8 +72,8 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
   // The preview renders the same markup generatePdfBlob rasterises, so what is
   // on screen cannot drift from what gets shared, printed or downloaded.
   const previewHtml = useMemo(
-    () => generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency),
-    [customerName, customer.phone, customer.address, amountDue, filtered, agency],
+    () => generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency, period === 'all'),
+    [customerName, customer.phone, customer.address, amountDue, filtered, agency, period],
   )
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
     let cancelled = false
     setBuilding(true)
     setPdfBlob(null)
-    generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency)
+    generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency, period === 'all')
       .then((blob) => {
         if (!cancelled) setPdfBlob(blob)
       })
@@ -98,7 +98,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, filtered, amountDue, customerName])
+  }, [open, filtered, amountDue, customerName, period])
 
   function summaryText() {
     const business = agency?.name || 'Statement'
