@@ -10,15 +10,53 @@ permissions:
 
 env:
   PG_IMAGE: postgres:17
+  PG_IMAGE_CACHE_KEY: docker-postgres-17-v1
 
 jobs:
-  dump:
-    name: 1. Dump
+  setup:
+    name: 1. Install dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Restore postgres image cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: pg-image.tar
+          key: ${{ env.PG_IMAGE_CACHE_KEY }}
+
+      - name: Pull and save postgres image (cache miss only)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          docker pull "$PG_IMAGE"
+          docker save "$PG_IMAGE" -o pg-image.tar
+
+      - name: Check tools
+        run: |
+          docker load -i pg-image.tar
+          docker run --rm "$PG_IMAGE" pg_dump --version
+          gpg --version | head -1
+          aws --version
+
+  dump_verify:
+    name: 2. Dump and verify
+    needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       file: ${{ steps.name.outputs.file }}
+      size: ${{ steps.size.outputs.size }}
     steps:
+      - name: Restore postgres image cache
+        uses: actions/cache/restore@v4
+        with:
+          path: pg-image.tar
+          key: ${{ env.PG_IMAGE_CACHE_KEY }}
+
+      - name: Load postgres image
+        run: |
+          if [ -f pg-image.tar ]; then docker load -i pg-image.tar; else docker pull "$PG_IMAGE"; fi
+
       - name: Set backup file name
         id: name
         run: echo "file=backup-$(date -u +%F).dump" >> "$GITHUB_OUTPUT"
@@ -33,7 +71,6 @@ jobs:
             if docker run --rm --user "$(id -u):$(id -g)" \
                  -e SUPABASE_DB_URL -v "$PWD:/out" "$PG_IMAGE" \
                  sh -c 'pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc -f "/out/$0"' "$BACKUP_FILE"; then
-              ls -lh "$BACKUP_FILE"
               exit 0
             fi
             rm -f "$BACKUP_FILE"
@@ -41,6 +78,20 @@ jobs:
           done
           echo "pg_dump failed after 3 attempts" >&2
           exit 1
+
+      - name: Verify dump is a valid archive
+        env:
+          BACKUP_FILE: ${{ steps.name.outputs.file }}
+        run: |
+          test -s "$BACKUP_FILE"
+          docker run --rm -v "$PWD:/out" "$PG_IMAGE" pg_restore --list "/out/$BACKUP_FILE" > /dev/null
+          echo "dump OK"
+
+      - name: Record size
+        id: size
+        env:
+          BACKUP_FILE: ${{ steps.name.outputs.file }}
+        run: echo "size=$(du -h "$BACKUP_FILE" | cut -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Encrypt dump for hand-off
         env:
@@ -56,35 +107,9 @@ jobs:
           path: ${{ steps.name.outputs.file }}.gpg
           retention-days: 1
 
-  verify:
-    name: 2. Verify
-    needs: dump
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dump
-
-      - name: Decrypt dump
-        env:
-          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
-          BACKUP_FILE: ${{ needs.dump.outputs.file }}
-        run: |
-          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
-            -o "$BACKUP_FILE" --decrypt "$BACKUP_FILE.gpg"
-
-      - name: Check dump is a valid archive
-        env:
-          BACKUP_FILE: ${{ needs.dump.outputs.file }}
-        run: |
-          test -s "$BACKUP_FILE"
-          docker run --rm -v "$PWD:/out" "$PG_IMAGE" pg_restore --list "/out/$BACKUP_FILE" > /dev/null
-          echo "dump OK"
-
   upload:
     name: 3. Upload to R2
-    needs: [dump, verify]
+    needs: dump_verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -95,7 +120,7 @@ jobs:
       - name: Decrypt dump
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
-          BACKUP_FILE: ${{ needs.dump.outputs.file }}
+          BACKUP_FILE: ${{ needs.dump_verify.outputs.file }}
         run: |
           gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
             -o "$BACKUP_FILE" --decrypt "$BACKUP_FILE.gpg"
@@ -107,7 +132,7 @@ jobs:
           AWS_DEFAULT_REGION: auto
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          BACKUP_FILE: ${{ needs.dump.outputs.file }}
+          BACKUP_FILE: ${{ needs.dump_verify.outputs.file }}
         run: |
           for attempt in 1 2 3; do
             echo "upload attempt $attempt"
@@ -119,3 +144,59 @@ jobs:
           done
           echo "upload failed after 3 attempts" >&2
           exit 1
+
+  notify:
+    name: 4. Email
+    needs: [setup, dump_verify, upload]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send email
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          SETUP_RESULT: ${{ needs.setup.result }}
+          DUMP_RESULT: ${{ needs.dump_verify.result }}
+          UPLOAD_RESULT: ${{ needs.upload.result }}
+          BACKUP_FILE: ${{ needs.dump_verify.outputs.file }}
+          BACKUP_SIZE: ${{ needs.dump_verify.outputs.size }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import os, smtplib, ssl
+          from email.message import EmailMessage
+
+          e = os.environ
+          ok = all(e[k] == "success" for k in ("SETUP_RESULT", "DUMP_RESULT", "UPLOAD_RESULT"))
+          status = "SUCCESS" if ok else "FAILED"
+
+          msg = EmailMessage()
+          msg["Subject"] = f"[gas-ledger] DB backup {status}"
+          msg["From"] = e["SMTP_USERNAME"]
+          msg["To"] = e["MAIL_TO"]
+          msg.set_content(
+              f"DB backup {status}\n\n"
+              f"1. Install dependencies: {e['SETUP_RESULT']}\n"
+              f"2. Dump and verify:      {e['DUMP_RESULT']}\n"
+              f"3. Upload to R2:         {e['UPLOAD_RESULT']}\n\n"
+              f"File: {e['BACKUP_FILE'] or '-'}\n"
+              f"Size: {e['BACKUP_SIZE'] or '-'}\n"
+              f"Run:  {e['RUN_URL']}\n"
+          )
+
+          host, port = e["SMTP_HOST"], int(e["SMTP_PORT"])
+          ctx = ssl.create_default_context()
+          if port == 465:
+              server = smtplib.SMTP_SSL(host, port, context=ctx, timeout=30)
+          else:
+              server = smtplib.SMTP(host, port, timeout=30)
+              server.starttls(context=ctx)
+          with server:
+              server.login(e["SMTP_USERNAME"], e["SMTP_PASSWORD"])
+              server.send_message(msg)
+          print("email sent")
+          PY
