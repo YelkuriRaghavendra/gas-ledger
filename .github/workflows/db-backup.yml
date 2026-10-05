@@ -5,6 +5,9 @@ on:
     - cron: "30 17 * * *" # 23:00 IST daily
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   backup:
     runs-on: ubuntu-latest
@@ -37,10 +40,3 @@ jobs:
         run: |
           aws s3 cp backup-*.dump "s3://$R2_BUCKET/" \
             --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-
-      - name: Upload backup
-        uses: actions/upload-artifact@v4
-        with:
-          name: db-backup-${{ github.run_id }}
-          path: backup-*.dump
-          retention-days: 7
