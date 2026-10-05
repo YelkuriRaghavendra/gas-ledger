@@ -45,6 +45,9 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
   // The PDF is rasterised from HTML (async), so build it ahead of time and keep
   // it ready. This also lets the share fire synchronously inside the user's tap
   // — navigator.share needs an active user gesture, which an await would consume.
+  // Off by default: the statement shows the customer's total due. Ticking it
+  // swaps in the due raised within the selected period.
+  const [periodDueOnly, setPeriodDueOnly] = useState(false)
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
   const [building, setBuilding] = useState(false)
 
@@ -56,6 +59,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
       setFrom(toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)))
       setTo(toDateInputValue(today))
       setPeriod('this-month')
+      setPeriodDueOnly(false)
     }
   }, [open])
 
@@ -65,15 +69,15 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
   )
 
   const amountDue = useMemo(
-    () => periodAmountDue(filtered, period, totalDue),
-    [filtered, period, totalDue],
+    () => periodDueOnly ? periodAmountDue(filtered, period, totalDue) : totalDue,
+    [filtered, period, totalDue, periodDueOnly],
   )
 
   // The preview renders the same markup generatePdfBlob rasterises, so what is
   // on screen cannot drift from what gets shared, printed or downloaded.
   const previewHtml = useMemo(
-    () => generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency, period === 'all'),
-    [customerName, customer.phone, customer.address, amountDue, filtered, agency, period],
+    () => generatePdfHtml(customerName, customer.phone, customer.address, amountDue, filtered, agency, !(periodDueOnly && period !== 'all')),
+    [customerName, customer.phone, customer.address, amountDue, filtered, agency, period, periodDueOnly],
   )
 
   useEffect(() => {
@@ -84,7 +88,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
     let cancelled = false
     setBuilding(true)
     setPdfBlob(null)
-    generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency, period === 'all')
+    generatePdfBlob(customerName, customer.phone, customer.address, amountDue, filtered, agency, !(periodDueOnly && period !== 'all'))
       .then((blob) => {
         if (!cancelled) setPdfBlob(blob)
       })
@@ -98,7 +102,7 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, filtered, amountDue, customerName, period])
+  }, [open, filtered, amountDue, customerName, period, periodDueOnly])
 
   function summaryText() {
     const business = agency?.name || 'Statement'
@@ -184,6 +188,18 @@ export function StatementDialog({ open, onClose, customerName, amountDue: totalD
             </button>
           ))}
         </div>
+
+        {period !== 'all' && (
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold text-ink">
+            <input
+              type="checkbox"
+              checked={periodDueOnly}
+              onChange={(e) => setPeriodDueOnly(e.target.checked)}
+              className="h-4 w-4 accent-[#E4571B]"
+            />
+            Show due for this period only
+          </label>
+        )}
 
         {period === 'custom' && (
           <div className="mt-2 flex items-center gap-2">
