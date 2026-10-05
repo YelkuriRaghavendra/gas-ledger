@@ -5,6 +5,7 @@ import {
   filterGroupsByPeriod,
   generatePdfBlob,
   generatePdfHtml,
+  periodAmountDue,
   periodRangeLabel,
   statementFilename,
 } from '../utils/statement'
@@ -36,7 +37,7 @@ function toDateInputValue(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-export function StatementDialog({ open, onClose, customerName, amountDue, groups, customer, agency }: StatementDialogProps) {
+export function StatementDialog({ open, onClose, customerName, amountDue: totalDue, groups, customer, agency }: StatementDialogProps) {
   const now = new Date()
   const [period, setPeriod] = useState<StatementPeriod>('this-month')
   const [from, setFrom] = useState(toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
@@ -57,6 +58,11 @@ export function StatementDialog({ open, onClose, customerName, amountDue, groups
       setPeriod('this-month')
     }
   }, [open])
+
+  const amountDue = useMemo(
+    () => periodAmountDue(groups, period, totalDue, from, to),
+    [groups, period, totalDue, from, to],
+  )
 
   const filtered = useMemo(
     () => filterGroupsByPeriod(groups, period, from, to),
