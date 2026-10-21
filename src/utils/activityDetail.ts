@@ -43,9 +43,11 @@ export function detailRows(entry: FeedItem): { k: string; v: string }[] {
   if (entry.type === 'sale') {
     if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })
     rows.push({ k: 'Quantity sold', v: String(entry.qty) })
+    if (entry.qty > 0) rows.push({ k: 'Per cylinder', v: formatCurrency(entry.amount / entry.qty) })
+    rows.push({ k: 'Total', v: formatCurrency(entry.amount) })
     if (entry.outright) rows.push({ k: 'Surrender', v: 'Customer surrendered cylinder' })
     else rows.push({ k: 'Empties collected', v: String(entry.empties) })
-    rows.push({ k: 'Payment', v: entry.paid ? `Paid${entry.method ? ` · ${methodLabel(entry.method)}` : ''}` : 'On credit' })
+    rows.push({ k: 'Payment', v: entry.paid ? `Received on spot${entry.method ? ` · ${methodLabel(entry.method)}` : ''}` : 'On credit' })
     if (entry.note) rows.push({ k: 'Note', v: entry.note })
   } else if (entry.type === 'purchase') {
     if (entry.product_name) rows.push({ k: 'Product', v: entry.product_name })

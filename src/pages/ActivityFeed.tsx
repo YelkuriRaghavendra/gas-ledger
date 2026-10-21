@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import { AppHeader } from '../components/AppHeader'
-import { DetailModal } from '../components/DetailModal'
+import { ActivityBillDetail } from '../components/ActivityBillDetail'
 import { useActivityFeed, type FeedItem } from '../hooks/useActivityFeed'
 import { useProfiles } from '../hooks/useProfiles'
-import { dateInputValue, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
+import { dateInputValue, formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
-import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
+import { subtitleFor, editPath } from '../utils/activityDetail'
 import { ChevronLeftIcon } from '../components/icons'
 import type { Segment } from '../types/db'
 import { SEGMENT_THEME } from '../theme/segment'
@@ -245,19 +245,11 @@ export function ActivityFeed({ segment = 'commercial' }: { segment?: Segment }) 
       </div>
 
       {selected && (
-        <DetailModal
-          open={selected !== null}
+        <ActivityBillDetail
+          item={selected}
           onClose={() => setSelected(null)}
-          icon={getActivityIcon(selected.type)}
-          iconBg={getActivityTint(selected.type).bg}
-          iconColor={getActivityTint(selected.type).color}
-          title={detailTitle(selected)}
-          amount={formatCurrency(selected.amount)}
-          rows={detailRows(selected)}
-          created={formatDate(selected.created_at)}
-          createdBy={selected.created_by ? profileNames.get(selected.created_by) : undefined}
-          updated={formatUpdated(selected.updated_at, selected.created_at)}
-          updatedBy={selected.updated_by ? profileNames.get(selected.updated_by) : undefined}
+          isOwner={isOwner}
+          profileNames={profileNames}
           actions={
             isOwner ? (
               <>

@@ -9,6 +9,8 @@ import { Login } from './pages/Login'
 import { Account } from './pages/Account'
 import { Home } from './pages/Home'
 import { Customers } from './pages/Customers'
+import { Chats } from './pages/Chats'
+import { ChatThread } from './pages/ChatThread'
 import { AddCustomer } from './pages/AddCustomer'
 import { CustomerDetail } from './pages/CustomerDetail'
 import { NewSale } from './pages/NewSale'
@@ -35,7 +37,7 @@ import { DomesticLogReturn } from './pages/domestic/DomesticLogReturn'
 export default function App() {
   const location = useLocation()
   const isDomestic = location.pathname.startsWith('/domestic')
-  const hideNav = location.pathname === '/login'
+  const hideNav = location.pathname === '/login' || location.pathname.startsWith('/commercial/chats/')
 
   return (
     <div className="min-h-screen bg-[#E7E0D6] md:px-6">
@@ -51,6 +53,8 @@ export default function App() {
             <Route path="/commercial/customers" element={<Customers />} />
             <Route path="/commercial/customers/new" element={<AddCustomer />} />
             <Route path="/commercial/customers/:id" element={<CustomerDetail />} />
+            <Route path="/commercial/chats" element={<Chats />} />
+            <Route path="/commercial/chats/:phone" element={<ChatThread />} />
             <Route path="/commercial/sale" element={<NewSale />} />
             <Route path="/commercial/customers/:id/sale" element={<NewSale />} />
             <Route path="/commercial/customers/:id/sale/:billId/edit" element={<NewSale />} />

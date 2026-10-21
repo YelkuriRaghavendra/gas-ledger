@@ -212,3 +212,11 @@ export function SortIcon({ size = 18, color = 'currentColor', strokeWidth = 2 }:
   )
 }
 
+
+export function ChatIcon({ size = 24, color = 'currentColor', strokeWidth = 2 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.6-.8L3 21l1.9-5.4A8.4 8.4 0 1 1 21 11.5z" />
+    </svg>
+  )
+}

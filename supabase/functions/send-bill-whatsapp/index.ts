@@ -1,6 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolveRecipient } from './recipient.ts'
-import { buildHeaderParams, buildTemplateParams, templateForBillType, type BillContext } from './templates.ts'
+import { buildHeaderParams, buildTemplateParams, renderChatBody, templateForBillType, type BillContext } from './templates.ts'
 import { updateWithRetry } from './retryUpdate.ts'
 
 const GRAPH_VERSION = 'v25.0'
@@ -263,6 +263,27 @@ async function resolve(db: any, bill: any): Promise<ResolveResult> {
       .eq('id', claim.claimId),
   )
 
+  // Show the bill message in the in-app chat too, sent or failed (a failed one
+  // carries a Retry button there). Best effort: the customer already has a sent
+  // message, so a failed log must not turn it into an error or trigger a retry
+  // (which would send a duplicate).
+  if (sendOutcome.status === 'sent' || sendOutcome.status === 'failed') {
+    // A successful attempt supersedes earlier failed ones for this bill.
+    if (sendOutcome.status === 'sent') {
+      await db.from('chat_messages').delete().eq('bill_id', bill.id).eq('status', 'failed')
+    }
+    const { error: chatError } = await db.from('chat_messages').insert({
+      wa_message_id: sendOutcome.message_id,
+      phone: to,
+      direction: 'out',
+      msg_type: 'template',
+      body: renderChatBody(template, ctx),
+      status: sendOutcome.status,
+      bill_id: bill.id,
+    })
+    if (chatError) console.error('send-bill-whatsapp: could not log to chat', chatError.message)
+  }
+
   return { outcome: sendOutcome, alreadyRecorded: true, recorded }
 }
 
@@ -296,7 +317,7 @@ async function claimSend(db: any, billId: number, template: string): Promise<Cla
   // crashed between claiming and recording its result.
   const { data: rows, error: readError } = await db
     .from('whatsapp_sends')
-    .select('id, status, created_at, delivery_status')
+    .select('id, status, created_at, message_id')
     .eq('bill_id', billId)
     .in('status', ['pending', 'sent'])
     .limit(1)
@@ -313,18 +334,28 @@ async function claimSend(db: any, billId: number, template: string): Promise<Cla
   // send: Meta accepted the message and then could not deliver it, so the
   // customer has nothing. Treating it as live would make Retry a no-op that
   // records a 'skipped/already_sent' row — which reads as success in the UI and
-  // hides the delivery failure entirely.
+  // hides the delivery failure entirely. The webhook records delivery on the
+  // chat message, so that is where the failure is read from.
   //
   // Retire it to 'failed' so it leaves the one-live-per-bill slot, then fall
   // through and claim a fresh attempt. The history is preserved: the attempt
   // genuinely did fail, just at delivery rather than at the API call.
-  if (existing.status === 'sent' && existing.delivery_status === 'failed') {
+  let deliveryFailed = false
+  if (existing.status === 'sent' && existing.message_id) {
+    const { data: chatRow } = await db
+      .from('chat_messages')
+      .select('status')
+      .eq('wa_message_id', existing.message_id)
+      .maybeSingle()
+    deliveryFailed = chatRow?.status === 'failed'
+  }
+
+  if (deliveryFailed) {
     const { error: retireError } = await db
       .from('whatsapp_sends')
       .update({ status: 'failed', reason: 'not_delivered' })
       .eq('id', existing.id)
       .eq('status', 'sent')
-      .eq('delivery_status', 'failed')
 
     if (retireError) {
       return { claimId: null, outcome: failedDataError(template) }

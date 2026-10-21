@@ -12,14 +12,14 @@ import { useDailySummary } from '../hooks/useDailySummary'
 import { currentMonthInIST, useMonthSummary } from '../hooks/useMonthSummary'
 import { useCommercialProfit } from '../hooks/useCommercialProfit'
 import { summariseProfit } from '../utils/profit'
-import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
+import { emptiesOwed, formatCurrency, formatRelativeDate } from '../utils/format'
 import { getActivityIcon, getActivityTint } from '../utils/activityIcon'
-import { subtitleFor, detailTitle, detailRows, editPath } from '../utils/activityDetail'
+import { subtitleFor, editPath } from '../utils/activityDetail'
 import { ChevronLeftIcon } from '../components/icons'
 import { AppHeader } from '../components/AppHeader'
 import { HeroCard, HeroCardStats } from '../components/HeroCard'
 import { CylindersCard, type CardItem } from '../components/CylindersCard'
-import { DetailModal } from '../components/DetailModal'
+import { ActivityBillDetail } from '../components/ActivityBillDetail'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -284,19 +284,11 @@ export function Home() {
       </div>
 
       {selected && (
-        <DetailModal
-          open={selected !== null}
+        <ActivityBillDetail
+          item={selected}
           onClose={() => setSelected(null)}
-          icon={getActivityIcon(selected.type)}
-          iconBg={getActivityTint(selected.type).bg}
-          iconColor={getActivityTint(selected.type).color}
-          title={detailTitle(selected)}
-          amount={formatCurrency(selected.amount)}
-          rows={detailRows(selected)}
-          created={formatDate(selected.created_at)}
-          createdBy={selected.created_by ? profileNames.get(selected.created_by) : undefined}
-          updated={formatUpdated(selected.updated_at, selected.created_at)}
-          updatedBy={selected.updated_by ? profileNames.get(selected.updated_by) : undefined}
+          isOwner={isOwner}
+          profileNames={profileNames}
           actions={
             isOwner ? (
               <>

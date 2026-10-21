@@ -2,7 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { InitialsBadge } from './InitialsBadge'
-import { SwapIcon } from './icons'
+import { ChatIcon, SwapIcon } from './icons'
+import { useUnreadChatCount } from '../hooks/useChats'
 import { setMode } from '../mode/mode'
 
 export type HeaderView = 'commercial' | 'domestic'
@@ -15,6 +16,7 @@ export function AppHeader({ view, title }: { view: HeaderView; title?: string })
   const { data } = useAgencySettings()
   const canSwitch = profile?.segment_access === 'both'
   const biz = data?.business_name || 'Cylinder Tracker'
+  const unread = useUnreadChatCount()
 
   const label = view === 'commercial' ? 'Commercial' : 'Domestic'
   const badge =
@@ -46,6 +48,20 @@ export function AppHeader({ view, title }: { view: HeaderView; title?: string })
         </div>
       )}
       <div className="flex shrink-0 items-center gap-[9px]">
+        {view === 'commercial' && (
+          <button
+            onClick={() => navigate('/commercial/chats')}
+            aria-label={unread > 0 ? `Chats, ${unread} unread` : 'Chats'}
+            className="relative flex h-[34px] w-[34px] items-center justify-center rounded-[11px] bg-[#FBEDE4]"
+          >
+            <ChatIcon size={18} color="#E4571B" strokeWidth={2.2} />
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-[4px] text-[9.5px] font-bold text-white">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </button>
+        )}
         {canSwitch && (
           <button
             onClick={switchSide}

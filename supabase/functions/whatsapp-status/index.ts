@@ -1,4 +1,6 @@
-// Receives Meta's delivery-status callbacks for bill notifications.
+// Receives Meta's webhook: delivery-status callbacks for chat messages (bill
+// notifications are chat messages too) and inbound customer messages for the
+// in-app chat.
 //
 // Meta reports delivery exactly once, to a webhook, and discards it if nobody
 // is listening. There is no endpoint that returns a message's status later, so
@@ -9,14 +11,18 @@
 // JWT, so it must be deployed with --no-verify-jwt. Authenticity is established
 // instead by the X-Hub-Signature-256 HMAC, which is verified on every POST.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { parseStatusPayload, outranks, type DeliveryStatus } from './statuses.ts'
+import { parseInboundMessages } from './messages.ts'
 
 // Meta's status payloads are small; a legitimate one never approaches this.
 const MAX_BODY_BYTES = 256 * 1024
 // One SELECT and one UPDATE per status, so an enormous batch would run the
 // function out of wall clock and make Meta retry the whole payload forever.
 const MAX_STATUSES = 200
+const MAX_MESSAGES = 200
+// Chat messages are kept for a week; see migration 022.
+const CHAT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
 
 const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN')
 const APP_SECRET = Deno.env.get('META_APP_SECRET')
@@ -86,59 +92,62 @@ Deno.serve(async (req: Request) => {
   }
 
   let updates: ReturnType<typeof parseStatusPayload>
+  let inbound: ReturnType<typeof parseInboundMessages>
   try {
-    updates = parseStatusPayload(JSON.parse(new TextDecoder().decode(rawBytes)))
+    const parsed = JSON.parse(new TextDecoder().decode(rawBytes))
+    updates = parseStatusPayload(parsed)
+    inbound = parseInboundMessages(parsed)
   } catch {
     // Unparseable body. Meta retries non-200 responses indefinitely, and a
     // retry cannot fix malformed JSON, so acknowledge and drop it.
     return new Response('ok', { status: 200 })
   }
 
-  if (updates.length > 0) {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  )
 
+  if (inbound.length > 0) {
+    // upsert on the wamid makes a Meta retry of the same delivery a no-op.
+    // A DB error is logged and swallowed: a non-200 only makes Meta resend
+    // the identical payload, which would fail the same way.
+    const { error } = await supabase.from('chat_messages').upsert(
+      inbound.slice(0, MAX_MESSAGES).map((m) => ({
+        wa_message_id: m.waMessageId,
+        phone: m.phone,
+        direction: 'in',
+        msg_type: m.type,
+        body: m.body,
+        profile_name: m.profileName,
+        created_at: m.at,
+      })),
+      { onConflict: 'wa_message_id', ignoreDuplicates: true },
+    )
+    if (error) console.error('whatsapp-status: could not store inbound message', error.message)
+
+    // Backstop for the daily pg_cron prune.
+    await supabase
+      .from('chat_messages')
+      .delete()
+      .lt('created_at', new Date(Date.now() - CHAT_RETENTION_MS).toISOString())
+  }
+
+  if (updates.length > 0) {
     const batch = updates.slice(0, MAX_STATUSES)
 
-    // One lookup for the whole batch rather than one per status.
-    const { data: rows } = await supabase
-      .from('whatsapp_sends')
-      .select('id, message_id, delivery_status')
-      .in('message_id', batch.map((u) => u.messageId))
-
-    const byMessageId = new Map<string, { id: number; delivery_status: DeliveryStatus | null }>()
-    for (const r of rows ?? []) {
-      byMessageId.set(r.message_id as string, { id: r.id as number, delivery_status: r.delivery_status })
-    }
-
+    // Outbound chat messages report delivery through the same callback.
+    const { data: chatRows } = await supabase
+      .from('chat_messages')
+      .select('id, wa_message_id, status')
+      .in('wa_message_id', batch.map((u) => u.messageId))
+    const chatByWamid = new Map<string, { id: number; status: DeliveryStatus | null }>()
+    for (const r of chatRows ?? []) chatByWamid.set(r.wa_message_id as string, { id: r.id as number, status: r.status })
     for (const u of batch) {
-      const row = byMessageId.get(u.messageId)
-
-      // A wamid we never recorded — a message sent from WhatsApp Manager by
-      // hand, or from another app sharing this number. Not ours to track.
-      if (!row) continue
-
-      const current = row.delivery_status
-      if (!outranks(u.status, current)) continue
-
-      // Guarding on the value just read makes the write lose harmlessly if a
-      // concurrent callback advanced the row first: the WHERE clause no longer
-      // matches and the update affects nothing.
-      const update = supabase
-        .from('whatsapp_sends')
-        .update({
-          delivery_status: u.status,
-          delivery_updated_at: u.at,
-          error_code: u.errorCode,
-          error_detail: u.errorDetail,
-        })
-        .eq('id', row.id)
-
-      await (current === null
-        ? update.is('delivery_status', null)
-        : update.eq('delivery_status', current))
+      const chat = chatByWamid.get(u.messageId)
+      if (chat && outranks(u.status, chat.status)) {
+        await supabase.from('chat_messages').update({ status: u.status }).eq('id', chat.id)
+      }
     }
   }
 
