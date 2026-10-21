@@ -40,9 +40,10 @@ describe('buildThreads', () => {
     expect(t).toMatchObject({ name: 'Sree Krishna', customerId: 7 })
   })
 
-  it('names an unknown number by its WhatsApp profile name, else the number', () => {
-    expect(buildThreads([msg({ phone: '919111111111', profile_name: 'Stranger' })], [])[0].name).toBe('Stranger')
-    expect(buildThreads([msg({ phone: '919111111111' })], [])[0].name).toBe('+919111111111')
+  it('titles an unknown number by its phone and keeps the profile name as secondary text', () => {
+    const [t] = buildThreads([msg({ phone: '919111111111', profile_name: 'Sree Krishna' })], [])
+    expect(t).toMatchObject({ name: '+919111111111', profileName: 'Sree Krishna', customerId: null })
+    expect(buildThreads([msg({ phone: '919111111111' })], [])[0].profileName).toBeNull()
   })
 
   it('counts only unread inbound messages and orders newest thread first', () => {

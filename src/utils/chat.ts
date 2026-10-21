@@ -13,6 +13,8 @@ export interface ChatCustomer {
 export interface ChatThread {
   phone: string
   name: string
+  /** WhatsApp profile name of an unsaved sender. Self-chosen, so never used as the title. */
+  profileName: string | null
   customerId: number | null
   last: ChatMessage
   unread: number
@@ -51,12 +53,14 @@ export function buildThreads(messages: ChatMessage[], customers: ChatCustomer[])
     const customer = byPhone.get(m.phone)
     let thread = threads.get(m.phone)
     if (!thread) {
-      thread = { phone: m.phone, name: customer?.name ?? `+${m.phone}`, customerId: customer?.id ?? null, last: m, unread: 0 }
+      thread = { phone: m.phone, name: customer?.name ?? `+${m.phone}`, profileName: null, customerId: customer?.id ?? null, last: m, unread: 0 }
       threads.set(m.phone, thread)
     }
     if (m.created_at >= thread.last.created_at) thread.last = m
-    // A saved customer is named by us; an unknown number takes the sender's WhatsApp name.
-    if (!customer && m.profile_name) thread.name = m.profile_name
+    // A saved customer is named by us. An unknown number keeps its phone number as
+    // the title: the WhatsApp profile name is whatever the sender typed, so it
+    // could imitate a real customer, and is shown only as secondary text.
+    if (!customer && m.profile_name) thread.profileName = m.profile_name
     if (m.direction === 'in' && !m.read_at) thread.unread += 1
   }
 

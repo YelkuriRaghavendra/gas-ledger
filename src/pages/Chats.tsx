@@ -98,7 +98,12 @@ export function Chats() {
                 <InitialsBadge name={t.name.replace(/^\+/, '')} size={46} radius={15} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
-                    <p className={`truncate text-[15px] text-ink ${t.unread > 0 ? 'font-extrabold' : 'font-bold'}`}>{t.name}</p>
+                    <p className={`flex min-w-0 items-baseline gap-[6px] text-[15px] text-ink ${t.unread > 0 ? 'font-extrabold' : 'font-bold'}`}>
+                      <span className="truncate">{t.name}</span>
+                      {t.customerId === null && (
+                        <span className="shrink-0 rounded-full bg-cream px-[7px] py-[1px] text-[10px] font-bold text-muted">Not saved</span>
+                      )}
+                    </p>
                     <p className={`shrink-0 text-[11.5px] font-semibold ${t.unread > 0 ? 'text-accent' : 'text-subtle'}`}>
                       {threadStamp(t.last.created_at)}
                     </p>
@@ -114,6 +119,9 @@ export function Chats() {
                       </span>
                     )}
                   </div>
+                  {t.customerId === null && t.profileName && (
+                    <p className="mt-[3px] truncate text-[11px] font-semibold text-subtle">~{t.profileName} (name set by the sender)</p>
+                  )}
                   {open && (
                     <p className="mt-[5px] inline-flex items-center gap-[5px] text-[10.5px] font-bold text-[#1D7A4A]">
                       <span className="h-[6px] w-[6px] rounded-full bg-[#1D9E75]" /> Can reply

@@ -108,7 +108,9 @@ export function ChatThread() {
         ) : (
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-[16px] font-bold leading-tight text-ink">{title}</p>
-            <p className="mt-[1px] truncate text-[11px] font-semibold text-muted">+{phone}</p>
+            <p className="mt-[1px] truncate text-[11px] font-semibold text-muted">
+              Not a saved customer{thread?.profileName ? ` · ~${thread.profileName} (name set by the sender)` : ''}
+            </p>
           </div>
         )}
         <a
