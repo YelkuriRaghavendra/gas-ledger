@@ -1,8 +1,6 @@
 name: db-backup
 
 on:
-  schedule:
-    - cron: "30 17 * * *" # 23:00 IST daily
   workflow_dispatch:
 
 permissions:
