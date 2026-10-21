@@ -175,3 +175,70 @@ export function buildHeaderParams(template: TemplateName): string[] {
       return []
   }
 }
+
+/**
+ * The bill message as the customer sees it, for the in-app chat. The approved
+ * template text lives in Meta, not here, so this mirrors it from the same
+ * parameters that are sent, keeping the chat and the customer's phone in step.
+ * `*word*` marks bold, exactly as WhatsApp does; the chat renders it.
+ */
+export function renderChatBody(template: TemplateName, ctx: BillContext): string {
+  const p = buildTemplateParams(template, ctx)
+  const icon = buildHeaderParams(template)[0]
+  const rule = '\u2500'.repeat(14)
+
+  switch (template) {
+    case 'bill_sale':
+      return [
+        `${icon} *New Bill*`,
+        `Namaste *${p[0]}* \u{1F64F}`,
+        '',
+        `*Bill No:* ${p[1]}  |  *Date:* ${p[2]}`,
+        '',
+        '*Delivered*',
+        p[3],
+        '',
+        '*Empties Collected Today*',
+        p[4],
+        '',
+        rule,
+        `*Total Bill Amount:* \u20B9${p[5]}`,
+        `*Payment Status:* ${p[6]}`,
+        '',
+        `*Empty Cylinders Pending:* ${p[7]}`,
+        `*Total Account Balance Due:* \u20B9${p[8]}`,
+        '',
+        'Contact us for any corrections.',
+      ].join('\n')
+    case 'bill_payment':
+      return [
+        `${icon} *Payment Received*`,
+        `Namaste *${p[0]}* \u{1F64F}`,
+        '',
+        `*Amount:* \u20B9${p[1]}  |  *Date:* ${p[2]}`,
+        `*Method:* ${p[3]}`,
+        '',
+        rule,
+        `*Empty Cylinders Pending:* ${p[5]}`,
+        `*Total Account Balance Due:* \u20B9${p[4]}`,
+        '',
+        'Contact us for any corrections.',
+      ].join('\n')
+    case 'bill_return':
+      return [
+        '*Empties Returned*',
+        `Namaste *${p[0]}* \u{1F64F}`,
+        '',
+        `*Date:* ${p[1]}`,
+        '',
+        '*Returned*',
+        p[2],
+        '',
+        rule,
+        `*Empty Cylinders Pending:* ${p[3]}`,
+        `*Total Account Balance Due:* \u20B9${p[4]}`,
+        '',
+        'Contact us for any corrections.',
+      ].join('\n')
+  }
+}

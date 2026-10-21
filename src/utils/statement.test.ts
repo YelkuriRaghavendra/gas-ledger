@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { periodRangeLabel } from './statement'
+import { periodRangeLabel, statementTotals, type HistoryEntry, type HistoryGroup } from './statement'
 
 // A fixed "today" so the relative periods are deterministic. 13 Sep 2026.
 const TODAY = new Date(2026, 8, 13)
@@ -46,5 +46,21 @@ describe('periodRangeLabel', () => {
   it('handles February in a leap year', () => {
     const mar = new Date(2028, 2, 5)
     expect(periodRangeLabel('last-month', undefined, undefined, mar)).toBe('01–29 Feb 2028')
+  })
+})
+
+describe('statementTotals', () => {
+  const base = { balanceAfter: 0, productName: 'Domestic', qty: 0, empties: 0, amount: 0, lines: [], surrender: false, paid: false } as unknown as HistoryEntry
+  const sale = (qty: number, empties: number, paid: boolean, amount: number): HistoryEntry =>
+    ({ ...base, type: 'sale', paid, amount, qty, empties, lines: [{ productName: 'Domestic', qty, empties, amount }] }) as HistoryEntry
+  const ret = (qty: number, surrender = false): HistoryEntry =>
+    ({ ...base, type: 'return', surrender, qty, lines: [{ productName: 'Domestic', qty, empties: 0, amount: 0 }] }) as HistoryEntry
+  const group = (entries: HistoryEntry[]): HistoryGroup => ({ key: 'k', label: 'l', entries, sales: 0, returns: 0, collected: 0 })
+
+  it('counts sold and empties from sales and returns, ignoring surrenders', () => {
+    const t = statementTotals([group([sale(3, 2, true, 3000), sale(2, 0, false, 2000), ret(4), ret(1, true)])])
+    expect(t.sold).toBe(5)
+    expect(t.empties).toBe(6)
+    expect(t.byProduct).toEqual([{ name: 'Domestic', sold: 5, empties: 6 }])
   })
 })

@@ -6,10 +6,11 @@ import { useProducts } from '../../hooks/useProducts'
 import { useGodownStock } from '../../hooks/useGodownStock'
 import { useDomesticSales, type DomesticBill } from '../../hooks/useDomesticSales'
 import { useProfiles } from '../../hooks/useProfiles'
-import { formatCurrency, formatDate, formatUpdated } from '../../utils/format'
+import { formatCurrency } from '../../utils/format'
 import { getActivityIcon, getActivityTint } from '../../utils/activityIcon'
 import { AppHeader } from '../../components/AppHeader'
-import { DetailModal } from '../../components/DetailModal'
+import { ActivityBillDetail } from '../../components/ActivityBillDetail'
+import type { FeedItem } from '../../hooks/useActivityFeed'
 import { CylindersCard, type CardItem } from '../../components/CylindersCard'
 
 function todayStartIso() {
@@ -23,6 +24,34 @@ function monthStartIso() {
   d.setDate(1)
   d.setHours(0, 0, 0, 0)
   return d.toISOString()
+}
+
+// The shared bill popup is built around an activity-feed row, so describe the
+// counter bill as one. A counter bill has no customer and settles on the spot.
+function toFeedItem(b: DomesticBill): FeedItem {
+  return {
+    id: b.billId,
+    customer_id: null,
+    customer_name: null,
+    type: b.type,
+    product_id: b.lines[0]?.product_id ?? null,
+    product_name: null,
+    qty: b.lines.reduce((sum, l) => sum + l.qty, 0),
+    empties: b.lines.reduce((sum, l) => sum + l.empties, 0),
+    amount: b.total,
+    note: b.note,
+    created_by: b.createdBy,
+    created_at: b.createdAt,
+    updated_at: b.updatedAt,
+    updated_by: b.updatedBy,
+    outright: false,
+    segment: 'domestic',
+    bill_number: b.billNumber,
+    method: b.method,
+    paid: b.type === 'sale',
+    nc_qty: 0,
+    title: 'Counter bill',
+  }
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -198,32 +227,11 @@ export function DomesticHome() {
       </div>
 
       {selected && (
-        <DetailModal
-          open={selected !== null}
+        <ActivityBillDetail
+          item={toFeedItem(selected)}
           onClose={() => setSelected(null)}
-          icon="🧾"
-          iconBg="#E7F3EC"
-          iconColor="#2E8B57"
-          title="Counter bill"
-          subtitle={formatDate(selected.createdAt)}
-          amount={formatCurrency(selected.total)}
-          rows={[
-            { k: 'Bill number', v: selected.billNumber },
-            ...(selected.method ? [{ k: 'Payment', v: selected.method === 'upi' ? 'UPI' : selected.method === 'vitran' ? 'Vitran' : 'Cash' }] : []),
-            ...selected.lines.map((l) => {
-              const name = l.product_id !== null ? productNameById.get(l.product_id) ?? 'item' : 'item'
-              const delivered = l.delivered ? '' : ' (pending)'
-              return { k: `${l.qty} × ${name}${delivered}`, v: formatCurrency(l.amount) }
-            }),
-            ...(selected.lines.reduce((s, l) => s + l.empties, 0) > 0
-              ? [{ k: 'Empties received', v: String(selected.lines.reduce((s, l) => s + l.empties, 0)) }]
-              : []),
-            ...(selected.note ? [{ k: 'Note', v: selected.note }] : []),
-          ]}
-          created={formatDate(selected.createdAt)}
-          createdBy={selected.createdBy ? profileNames.get(selected.createdBy) : undefined}
-          updated={formatUpdated(selected.updatedAt, selected.createdAt)}
-          updatedBy={selected.updatedBy ? profileNames.get(selected.updatedBy) : undefined}
+          isOwner={isOwner}
+          profileNames={profileNames}
           actions={
             isOwner ? (
               <>

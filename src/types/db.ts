@@ -205,12 +205,6 @@ export interface WhatsAppSend {
   reason: string | null
   message_id: string | null
   template: string
-  // Set by the delivery webhook, null until Meta reports back. `status` above
-  // says whether Meta accepted the message; these say whether it arrived.
-  delivery_status: WhatsAppDeliveryStatus | null
-  delivery_updated_at: string | null
-  error_code: number | null
-  error_detail: string | null
   created_at: string
 }
 
@@ -265,4 +259,22 @@ export interface PaymentBill {
   customer_id: number
   created_at: string
   total_amount: number
+}
+
+// In-app WhatsApp chat. Rows are kept for 7 days and written only by Edge
+// Functions; `phone` is digits-only E.164 as Meta reports it.
+export interface ChatMessage {
+  id: number
+  wa_message_id: string | null
+  phone: string
+  direction: 'in' | 'out'
+  msg_type: string
+  body: string | null
+  profile_name: string | null
+  status: WhatsAppDeliveryStatus | null
+  created_by: string | null
+  created_at: string
+  read_at: string | null
+  /** Set on bill messages, so a failed one can be retried. */
+  bill_id: number | null
 }

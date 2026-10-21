@@ -8,6 +8,7 @@ import {
   formatDeliveredWithPrices,
   formatEmptiesCollected,
   formatPaymentStatus,
+  renderChatBody,
   type BillContext,
 } from './whatsappTemplates'
 
@@ -286,5 +287,50 @@ describe('buildHeaderParams', () => {
         expect(p.length).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+describe('renderChatBody', () => {
+  it('renders a sale in the same layout as the approved template', () => {
+    const ctx: BillContext = {
+      ...base,
+      customerName: 'Raghu',
+      billNumber: 'B-20261021-0003',
+      createdAt: '2026-10-21T06:30:00.000Z',
+      totalAmount: 3010,
+      paid: false,
+      method: null,
+      lines: [{ productName: '19 kg', qty: 1, amount: 3010, empties: 0 }],
+      balanceDue: 9030,
+      emptiesOutstanding: 3,
+    }
+    expect(renderChatBody('bill_sale', ctx)).toBe(
+      [
+        '\u{1F9FE} *New Bill*',
+        'Namaste *Raghu* \u{1F64F}',
+        '',
+        '*Bill No:* B-20261021-0003  |  *Date:* 21-10-2026',
+        '',
+        '*Delivered*',
+        '1 \u00D7 19 kg @ \u20B93010 = \u20B93010',
+        '',
+        '*Empties Collected Today*',
+        'None',
+        '',
+        '\u2500'.repeat(14),
+        '*Total Bill Amount:* \u20B93010',
+        '*Payment Status:* Not paid',
+        '',
+        '*Empty Cylinders Pending:* 3',
+        '*Total Account Balance Due:* \u20B99030',
+        '',
+        'Contact us for any corrections.',
+      ].join('\n'),
+    )
+  })
+
+  it('renders a payment and a return', () => {
+    expect(renderChatBody('bill_payment', base)).toContain('*Payment Received*')
+    expect(renderChatBody('bill_return', base)).toContain('*Empties Returned*')
   })
 })

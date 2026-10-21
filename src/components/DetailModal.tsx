@@ -2,9 +2,9 @@ import type { ReactNode } from 'react'
 import { BottomSheet } from './BottomSheet'
 
 interface Row { k: string; v: string }
-export function DetailModal({ open, onClose, icon, iconBg, iconColor, title, subtitle, amount, rows, created, createdBy, updated, updatedBy, actions }: {
+export function DetailModal({ open, onClose, icon, iconBg, iconColor, title, subtitle, amount, summary, rows, created, createdBy, updated, updatedBy, actions }: {
   open: boolean; onClose: () => void; icon: ReactNode; iconBg: string; iconColor: string
-  title: string; subtitle?: string; amount?: string; rows: Row[]; created: string; createdBy?: string; updated?: string; updatedBy?: string; actions?: ReactNode
+  title: string; subtitle?: string; amount?: string; summary?: ReactNode; rows: Row[]; created: string; createdBy?: string; updated?: string; updatedBy?: string; actions?: ReactNode
 }) {
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -13,6 +13,7 @@ export function DetailModal({ open, onClose, icon, iconBg, iconColor, title, sub
         <div className="min-w-0"><p className="font-display text-[17px] font-bold text-ink">{title}</p>{subtitle && <p className="text-[11.5px] font-semibold text-muted">{subtitle}</p>}</div>
         {amount && <p className="ml-auto shrink-0 font-display text-[20px] font-bold" style={{ color: iconColor }}>{amount}</p>}
       </div>
+      {summary}
       <dl className="flex flex-col">
         {rows.map((r) => (
           <div key={r.k} className="flex justify-between border-b border-[#F1E9DB] py-[11px]">

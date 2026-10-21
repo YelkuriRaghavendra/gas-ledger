@@ -3,7 +3,45 @@ import html2canvas from 'html2canvas'
 import { formatCurrency, formatDate } from './format'
 import type { Bill } from '../types/db'
 
-export type HistoryEntry = Bill & { balanceAfter: number; productName: string | null; qty: number; empties: number; amount: number }
+export interface HistoryLine { productName: string | null; qty: number; empties: number; amount: number }
+
+export type HistoryEntry = Bill & {
+  balanceAfter: number
+  productName: string | null
+  qty: number
+  empties: number
+  amount: number
+  lines: HistoryLine[]
+}
+
+export interface ProductTotals { name: string; sold: number; empties: number }
+export interface StatementTotals { sold: number; empties: number; byProduct: ProductTotals[] }
+
+/**
+ * Cylinders sold and empties received across the entries in view. Empties come
+ * from sale lines (swapped at delivery) and from non-surrender returns; a
+ * surrendered cylinder is given up for good, so it is not an empty received.
+ */
+export function statementTotals(groups: HistoryGroup[]): StatementTotals {
+  const byName = new Map<string, ProductTotals>()
+  const bucket = (name: string | null) => {
+    const key = name ?? 'Cylinders'
+    let b = byName.get(key)
+    if (!b) { b = { name: key, sold: 0, empties: 0 }; byName.set(key, b) }
+    return b
+  }
+  for (const g of groups)
+    for (const e of g.entries) {
+      if (e.type === 'sale') for (const l of e.lines) { const b = bucket(l.productName); b.sold += l.qty; b.empties += l.empties }
+      else if (e.type === 'return' && !e.surrender) for (const l of e.lines) bucket(l.productName).empties += l.qty
+    }
+  const byProduct = [...byName.values()].filter((b) => b.sold > 0 || b.empties > 0)
+  return {
+    sold: byProduct.reduce((s, b) => s + b.sold, 0),
+    empties: byProduct.reduce((s, b) => s + b.empties, 0),
+    byProduct,
+  }
+}
 
 export interface HistoryGroup {
   key: string
@@ -45,7 +83,7 @@ export function generatePdfHtml(
             <td style="padding:10px 12px;vertical-align:middle;text-align:center">
               <span style="color:${typeColor};font-size:12px;font-weight:700;letter-spacing:0.3px">${typeLabel}</span>
             </td>
-            <td style="padding:10px 12px;vertical-align:middle;font-size:13px;font-weight:600;color:#1F1813">${esc(historyTitle(t, t.productName))}</td>
+            <td style="padding:10px 12px;vertical-align:middle;font-size:13px;font-weight:600;color:#1F1813">${esc(historyTitle(t, t.productName))}${t.type === 'sale' && t.paid ? `<div style="font-size:11px;font-weight:600;color:#1D7A4A;margin-top:2px">Received ${formatCurrency(t.amount)} on the spot</div>` : ''}</td>
             <td style="padding:10px 12px;vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#1F1813">${t.type !== 'return' ? formatCurrency(t.amount) : '—'}</td>
             ${showBalance ? `<td style="padding:10px 12px;vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#6B5E50">${formatCurrency(t.balanceAfter)}</td>` : ''}
           </tr>`
@@ -53,6 +91,20 @@ export function generatePdfHtml(
       ),
     )
     .join('')
+
+  const totals = statementTotals(groups)
+  const summaryHtml = totals.sold > 0 || totals.empties > 0
+    ? `<div style="display:flex;gap:10px;margin-bottom:${totals.byProduct.length > 1 ? 8 : 18}px">
+  <div style="flex:1;border:1px solid #E0D8CC;border-radius:12px;padding:12px 14px;background:#FAFAF7">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Cylinders sold</div>
+    <div style="font-size:24px;font-weight:800;line-height:1.1;margin-top:4px;color:#C24B1A">${totals.sold}</div>
+  </div>
+  <div style="flex:1;border:1px solid #E0D8CC;border-radius:12px;padding:12px 14px;background:#FAFAF7">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B7E6E">Empties received</div>
+    <div style="font-size:24px;font-weight:800;line-height:1.1;margin-top:4px;color:#1D7A4A">${totals.empties}</div>
+  </div>
+</div>${totals.byProduct.length > 1 ? `<div style="font-size:11.5px;color:#6B5E50;margin:0 2px 18px">${totals.byProduct.map((b) => `${esc(b.name)}: <strong>${b.sold}</strong> sold, <strong>${b.empties}</strong> empties`).join(' &nbsp;·&nbsp; ')}</div>` : ''}`
+    : ''
 
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -81,6 +133,7 @@ export function generatePdfHtml(
   </div>
 </div>
 
+${summaryHtml}
 <table style="width:100%;border-collapse:collapse">
   <thead>
     <tr style="border-bottom:2px solid #E0D8CC">

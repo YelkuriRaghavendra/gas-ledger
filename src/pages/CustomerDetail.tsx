@@ -5,10 +5,9 @@ import { supabase } from '../lib/supabase'
 import { useCustomerBalance } from '../hooks/useCustomerBalance'
 import { useCustomerProductBalances } from '../hooks/useCustomerProductBalances'
 import { useProducts } from '../hooks/useProducts'
-import { useBills } from '../hooks/useBills'
+import { useBills, type BillWithLines } from '../hooks/useBills'
 import { useAgencySettings } from '../hooks/useAgencySettings'
 import { useProfiles } from '../hooks/useProfiles'
-import { useWhatsAppSends } from '../hooks/useWhatsAppSends'
 import { useCustomerProfit } from '../hooks/useCommercialProfit'
 import { summariseProfit } from '../utils/profit'
 import { emptiesOwed, formatCurrency, formatDate, formatRelativeDate, formatUpdated } from '../utils/format'
@@ -17,86 +16,16 @@ import { sanitizePhoneInput, validateCustomerDetails } from '../utils/validation
 import { Avatar } from '../components/Avatar'
 import { StatementDialog } from '../components/StatementDialog'
 import { DetailModal } from '../components/DetailModal'
-import { WhatsAppStatus } from '../components/WhatsAppStatus'
-import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon, WhatsAppIcon } from '../components/icons'
+import { ChevronLeftIcon, PhoneIcon, MapPinIcon, ShareIcon, WhatsAppIcon, ChatIcon } from '../components/icons'
 import { Toggle } from '../components/Toggle'
-import { sendBillWhatsApp } from '../lib/whatsapp'
-import type { Bill, BillLine, BillLineProfit } from '../types/db'
+import type { BillLineProfit } from '../types/db'
 import { HistoryEntry, HistoryGroup, historyTitle } from '../utils/statement'
-
-function historyAmount(t: HistoryEntry) {
-  if (t.type === 'return') return t.surrender ? `${t.qty}` : `−${t.qty}`
-  return formatCurrency(t.amount)
-}
+import { buildHistoryGroups, detailRows, historyAmount } from '../utils/billHistory'
+import { SaleSummary } from '../components/SaleSummary'
+import { normalizeIndianPhone } from '../utils/phone'
 
 function billEditPath(t: HistoryEntry) {
   return `/commercial/customers/${t.customer_id}/${t.type}/${t.id}/edit`
-}
-
-function dayKey(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-}
-
-interface BillWithLines extends Bill {
-  bill_lines: BillLine[]
-}
-
-function flattenBills(bills: BillWithLines[], productNameById: Map<number, string>): HistoryEntry[] {
-  const entries: HistoryEntry[] = []
-  for (const bill of bills) {
-    if (bill.type === 'payment' || bill.bill_lines.length === 0) {
-      entries.push({
-        ...bill,
-        balanceAfter: 0,
-        productName: null,
-        qty: 0,
-        empties: 0,
-        amount: bill.total_amount,
-      })
-    } else {
-      const line = bill.bill_lines[0]
-      const totalQty = bill.bill_lines.reduce((s, l) => s + l.qty, 0)
-      const totalEmpties = bill.bill_lines.reduce((s, l) => s + l.empties, 0)
-      entries.push({
-        ...bill,
-        balanceAfter: 0,
-        productName: line.product_id ? productNameById.get(line.product_id) ?? null : null,
-        qty: totalQty,
-        empties: totalEmpties,
-        amount: bill.total_amount,
-      })
-    }
-  }
-  return entries
-}
-
-function buildHistoryGroups(bills: BillWithLines[], productNameById: Map<number, string>): HistoryGroup[] {
-  const flat = flattenBills(bills, productNameById)
-  const chronological = [...flat].reverse()
-  let running = 0
-  const withBalance: HistoryEntry[] = chronological.map((t) => {
-    if (t.type === 'sale' && !t.paid) running += t.amount
-    else if (t.type === 'payment') running -= t.amount
-    return { ...t, balanceAfter: running }
-  })
-  const newestFirst = [...withBalance].reverse()
-
-  const groups: HistoryGroup[] = []
-  for (const t of newestFirst) {
-    const key = dayKey(t.created_at)
-    let group = groups.find((g) => g.key === key)
-    if (!group) {
-      group = { key, label: formatRelativeDate(t.created_at), entries: [], sales: 0, returns: 0, collected: 0 }
-      groups.push(group)
-    }
-    group.entries.push(t)
-    if (t.type === 'sale') group.sales += 1
-    if (t.type === 'return') group.returns += 1
-    if (t.type === 'payment') group.collected += t.amount
-    if (t.type === 'sale' && t.paid) group.collected += t.amount
-  }
-  return groups
 }
 
 function digestLine(group: HistoryGroup) {
@@ -105,42 +34,6 @@ function digestLine(group: HistoryGroup) {
   if (group.returns > 0) parts.push(`${group.returns} return${group.returns > 1 ? 's' : ''}`)
   if (group.collected > 0) parts.push(`${formatCurrency(group.collected)} collected`)
   return parts.join(' · ')
-}
-
-function detailRows(
-  t: HistoryEntry,
-  profitLines: BillLineProfit[] = [],
-  billLinesError: string | null = null,
-): { k: string; v: string }[] {
-  const rows: { k: string; v: string }[] = []
-  if (t.productName) rows.push({ k: 'Product', v: t.productName })
-  if (t.type === 'sale') {
-    rows.push({ k: 'Quantity sold', v: String(t.qty) })
-    if (t.surrender) rows.push({ k: 'Type', v: 'New Connection' })
-    else rows.push({ k: 'Empties collected', v: String(t.empties) })
-    rows.push({ k: 'Payment', v: t.paid ? `Paid${t.method ? ` · ${t.method === 'upi' ? 'UPI' : 'Cash'}` : ''}` : 'On credit' })
-  } else if (t.type === 'return') {
-    rows.push({ k: 'Quantity', v: String(t.qty) })
-    if (t.surrender) rows.push({ k: 'Surrender', v: 'Customer surrendered cylinder' })
-  } else if (t.type === 'payment' && t.method) {
-    rows.push({ k: 'Method', v: t.method === 'upi' ? 'UPI' : 'Cash' })
-  }
-  if (t.note) rows.push({ k: 'Note', v: t.note })
-  rows.push({ k: 'Balance after', v: formatCurrency(t.balanceAfter) })
-  if (t.type === 'sale' && profitLines.length > 0) {
-    for (const l of profitLines) {
-      // bill_line_id keeps the row key unique per line — nothing in the schema
-      // stops two lines on the same bill sharing a product_id.
-      rows.push({
-        k: `Cost · ${l.product_name} · #${l.bill_line_id}`,
-        v: l.cost_known ? `${formatCurrency(l.unit_cost_ex ?? 0)} × ${l.qty}${l.cost_source ? ` (${l.cost_source})` : ''}` : 'unknown',
-      })
-      rows.push({ k: `Profit · ${l.product_name} · #${l.bill_line_id}`, v: l.cost_known ? formatCurrency(l.profit ?? 0) : '—' })
-    }
-  } else if (t.type === 'sale' && billLinesError) {
-    rows.push({ k: 'Margin', v: 'Could not load' })
-  }
-  return rows
 }
 
 export function CustomerDetail() {
@@ -160,8 +53,6 @@ export function CustomerDetail() {
   const { data: products } = useProducts()
   const { data: bills, refresh: refreshBills } = useBills(customerId)
   const { data: agencySettings } = useAgencySettings()
-  const billIds = bills.map((b) => b.id)
-  const { data: sends, refetch: refetchSends } = useWhatsAppSends(billIds)
   const [editing, setEditing] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [statementOpen, setStatementOpen] = useState(false)
@@ -272,16 +163,6 @@ export function CustomerDetail() {
     navigate('/commercial/customers')
   }
 
-  function retryWhatsApp(billId: number) {
-    sendBillWhatsApp(billId)
-    setTimeout(refetchSends, 2500)
-  }
-
-  async function enableWhatsAppAndSend(billId: number) {
-    await supabase.from('customers').update({ whatsapp_enabled: true }).eq('id', customerId)
-    retryWhatsApp(billId)
-  }
-
   async function handleDeleteBill(billId: number) {
     if (!confirm('Delete this entry?')) return
     setActionError(null)
@@ -298,6 +179,7 @@ export function CustomerDetail() {
   if (loading) return <p className="p-4 text-muted">Loading…</p>
   if (error || !balance) return <p className="p-4 text-red-600">{error ?? 'Customer not found'}</p>
 
+  const chatPhone = normalizeIndianPhone(balance.phone)
   const historyGroups = buildHistoryGroups(bills as BillWithLines[], productNameById)
   const totalEmptiesOut = productBalances.reduce((sum, pb) => sum + pb.empties_outstanding, 0)
 
@@ -453,6 +335,14 @@ export function CustomerDetail() {
             <PhoneIcon size={15} /> Call
           </a>
         )}
+        {chatPhone && (
+          <Link
+            to={`/commercial/chats/${chatPhone}`}
+            className="flex flex-1 items-center justify-center gap-[6px] rounded-[14px] bg-surface py-[13px] text-[12.5px] font-bold text-ink shadow-card transition active:scale-[0.98]"
+          >
+            <ChatIcon size={15} color="#E4571B" /> Chat
+          </Link>
+        )}
         {balance.address && (
           <a
             href={`https://maps.google.com/?q=${encodeURIComponent(balance.address)}`}
@@ -592,16 +482,6 @@ export function CustomerDetail() {
                       <ChevronLeftIcon size={16} color="#B7AC9B" />
                     </span>
                   </button>
-                  {sends[t.id] && (
-                    <div className="px-2 pb-[6px] pl-[57px]">
-                      <WhatsAppStatus
-                        send={sends[t.id]}
-                        onRetry={() => retryWhatsApp(t.id)}
-                        onEnable={isOwner ? () => enableWhatsAppAndSend(t.id) : undefined}
-                        onAddPhone={isOwner ? () => startEdit() : undefined}
-                      />
-                    </div>
-                  )}
                 </li>
               )
             })}
@@ -629,6 +509,7 @@ export function CustomerDetail() {
           iconColor={getActivityTint(viewingTx.type).color}
           title={historyTitle(viewingTx, viewingTx.productName)}
           amount={historyAmount(viewingTx)}
+          summary={viewingTx.type === 'sale' && viewingTx.lines.length > 0 ? <SaleSummary t={viewingTx} /> : undefined}
           rows={detailRows(viewingTx, billLines, billLinesError)}
           created={formatDate(viewingTx.created_at)}
           createdBy={viewingTx.created_by ? profileNames.get(viewingTx.created_by) : undefined}
