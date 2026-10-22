@@ -20,6 +20,7 @@ describe('parseInboundMessages', () => {
         profileName: 'Ram Reddy',
         type: 'text',
         body: 'Send 5 cylinders',
+        media: null,
         at: '2025-09-25T11:33:20.000Z',
       },
     ])
@@ -31,6 +32,31 @@ describe('parseInboundMessages', () => {
     )
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({ type: 'image', body: null, profileName: null })
+  })
+
+  it('reads image and voice-note media ids and the image caption', () => {
+    const out = parseInboundMessages(
+      payload({
+        messages: [
+          { id: 'wamid.G', from: '919876543210', type: 'image', image: { id: '1234567890', mime_type: 'image/jpeg', caption: 'Empty cylinders' } },
+          { id: 'wamid.H', from: '919876543210', type: 'audio', audio: { id: '9876543210', mime_type: 'audio/ogg; codecs=opus', voice: true } },
+        ],
+      }),
+    )
+    expect(out[0]).toMatchObject({ type: 'image', body: 'Empty cylinders', media: { id: '1234567890', mime: 'image/jpeg' } })
+    expect(out[1]).toMatchObject({ type: 'audio', body: null, media: { id: '9876543210', mime: 'audio/ogg; codecs=opus' } })
+  })
+
+  it('does not download video or documents, or a media id that is not numeric', () => {
+    const out = parseInboundMessages(
+      payload({
+        messages: [
+          { id: 'wamid.I', from: '919876543210', type: 'video', video: { id: '1234567890', mime_type: 'video/mp4' } },
+          { id: 'wamid.J', from: '919876543210', type: 'image', image: { id: '../../etc/passwd', mime_type: 'image/png' } },
+        ],
+      }),
+    )
+    expect(out.map((m) => m.media)).toEqual([null, null])
   })
 
   it('reads a quick-reply button title', () => {

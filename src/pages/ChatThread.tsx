@@ -3,10 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useChats } from '../hooks/useChats'
 import {
-  buildThreads, customersByPhone, dayLabel, lastInboundAt, messageText, messagesForPhone, parseBold, replyWindowOpen, timeLabel,
+  buildThreads, customersByPhone, dayLabel, lastInboundAt, mediaKind, messageText, messagesForPhone, parseBold, replyWindowOpen, timeLabel,
 } from '../utils/chat'
 import { ChatTicks } from '../components/ChatTicks'
 import { InitialsBadge } from '../components/InitialsBadge'
+import { ChatMedia } from '../components/ChatMedia'
 import { sendBillWhatsApp } from '../lib/whatsapp'
 import { ChevronLeftIcon, PhoneIcon } from '../components/icons'
 
@@ -23,6 +24,7 @@ export function ChatThread() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [viewer, setViewer] = useState<string | null>(null)
   const [retrying, setRetrying] = useState<Set<number>>(new Set())
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -108,7 +110,9 @@ export function ChatThread() {
         ) : (
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-[16px] font-bold leading-tight text-ink">{title}</p>
-            <p className="mt-[1px] truncate text-[11px] font-semibold text-muted">+{phone}</p>
+            <p className="mt-[1px] truncate text-[11px] font-semibold text-muted">
+              Not a saved customer{thread?.profileName ? ` · ~${thread.profileName} (name set by the sender)` : ''}
+            </p>
           </div>
         )}
         <a
@@ -164,6 +168,7 @@ export function ChatThread() {
                     />
                   )}
                   <div className="relative text-[14px] leading-[19px] text-ink">
+                    {mediaKind(m) && <ChatMedia message={m} onOpenImage={setViewer} />}
                     <span className={`whitespace-pre-wrap break-words ${m.body ? '' : 'italic text-muted'}`}>
                       {m.body
                         ? parseBold(m.body).map((r, k) =>
@@ -240,6 +245,23 @@ export function ChatThread() {
           </>
         )}
       </div>
+      {viewer && (
+        <div
+          role="dialog"
+          aria-label="Photo"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setViewer(null)}
+        >
+          <img src={viewer} alt="Photo from customer" className="max-h-full max-w-full rounded-[8px] object-contain" />
+          <button
+            type="button"
+            aria-label="Close photo"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[22px] font-bold leading-none text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }
