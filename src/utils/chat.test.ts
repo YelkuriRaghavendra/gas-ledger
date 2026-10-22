@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildThreads, customersByPhone, dayLabel, lastInboundAt, messageText, messagesForPhone,
-  parseBold, previewLine, replyWindowOpen, REPLY_WINDOW_MS,
+  mediaKind, parseBold, previewLine, replyWindowOpen, REPLY_WINDOW_MS,
 } from './chat'
 import type { ChatMessage } from '../types/db'
 
@@ -10,7 +10,7 @@ function msg(o: Partial<ChatMessage>): ChatMessage {
   n += 1
   return {
     id: n, wa_message_id: `w${n}`, phone: '919876543210', direction: 'in', msg_type: 'text', body: 'hi',
-    profile_name: null, status: null, created_by: null, created_at: '2026-10-21T10:00:00.000Z', read_at: null, bill_id: null, ...o,
+    profile_name: null, status: null, created_by: null, created_at: '2026-10-21T10:00:00.000Z', read_at: null, bill_id: null, media_path: null, media_mime: null, ...o,
   }
 }
 
@@ -108,5 +108,19 @@ describe('previewLine', () => {
   it('uses the first line of a plain message and a label for media', () => {
     expect(previewLine(msg({ body: 'Send 5\nthanks' }))).toBe('Send 5')
     expect(previewLine(msg({ body: null, msg_type: 'audio' }))).toBe('Voice message')
+  })
+})
+
+describe('mediaKind', () => {
+  it('is null without a stored file, so the placeholder shows', () => {
+    expect(mediaKind(msg({ msg_type: 'image', body: null }))).toBeNull()
+  })
+  it('tells images and voice notes apart', () => {
+    expect(mediaKind(msg({ msg_type: 'image', media_path: 'a/b.jpg', media_mime: 'image/jpeg' }))).toBe('image')
+    expect(mediaKind(msg({ msg_type: 'sticker', media_path: 'a/b.webp', media_mime: 'image/webp' }))).toBe('image')
+    expect(mediaKind(msg({ msg_type: 'audio', media_path: 'a/b.ogg', media_mime: 'audio/ogg' }))).toBe('audio')
+  })
+  it('renders no placeholder text for a message whose file is stored', () => {
+    expect(messageText(msg({ msg_type: 'image', body: null, media_path: 'a/b.jpg', media_mime: 'image/jpeg' }))).toBe('')
   })
 })

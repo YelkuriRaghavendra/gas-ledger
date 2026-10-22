@@ -277,4 +277,7 @@ export interface ChatMessage {
   read_at: string | null
   /** Set on bill messages, so a failed one can be retried. */
   bill_id: number | null
+  /** Storage path of a downloaded photo / voice note, in the private chat-media bucket. */
+  media_path: string | null
+  media_mime: string | null
 }

@@ -80,6 +80,7 @@ const MEDIA_LABEL: Record<string, string> = {
 /** What to show for a message: its text, or a placeholder for media the app cannot render. */
 export function messageText(m: ChatMessage): string {
   if (m.body) return m.body
+  if (mediaKind(m)) return ''
   return `${MEDIA_LABEL[m.msg_type] ?? 'Message'} — open WhatsApp to view`
 }
 
@@ -139,4 +140,15 @@ export function parseBold(text: string): TextRun[] {
   }
   if (last < text.length) runs.push({ text: text.slice(last), bold: false })
   return runs
+}
+
+export type MediaKind = 'image' | 'audio'
+
+/** What to render for a message that has a stored file; null when it has none. */
+export function mediaKind(m: ChatMessage): MediaKind | null {
+  if (!m.media_path) return null
+  const mime = m.media_mime ?? ''
+  if (mime.startsWith('audio/') || m.msg_type === 'audio') return 'audio'
+  if (mime.startsWith('image/') || m.msg_type === 'image' || m.msg_type === 'sticker') return 'image'
+  return null
 }
