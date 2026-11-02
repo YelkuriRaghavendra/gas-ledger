@@ -292,6 +292,28 @@ export function periodAmountDue(filtered: HistoryGroup[], period: StatementPerio
   return due
 }
 
+export type StatementTypeFilter = 'all' | HistoryEntry['type']
+
+/** Keep only entries of one type; groups left empty are dropped. */
+export function filterGroupsByType(groups: HistoryGroup[], type: StatementTypeFilter): HistoryGroup[] {
+  if (type === 'all') return groups
+  return groups
+    .map((g) => {
+      const entries = g.entries.filter((e) => e.type === type)
+      let sales = 0
+      let returns = 0
+      let collected = 0
+      for (const t of entries) {
+        if (t.type === 'sale') sales += 1
+        if (t.type === 'return') returns += 1
+        if (t.type === 'payment') collected += t.amount
+        if (t.type === 'sale' && t.paid) collected += t.amount
+      }
+      return { ...g, entries, sales, returns, collected }
+    })
+    .filter((g) => g.entries.length > 0)
+}
+
 export function filterGroupsByPeriod(
   groups: HistoryGroup[],
   period: StatementPeriod,

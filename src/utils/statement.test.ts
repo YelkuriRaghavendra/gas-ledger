@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { periodRangeLabel, statementTotals, type HistoryEntry, type HistoryGroup } from './statement'
+import { filterGroupsByType, periodRangeLabel, statementTotals, type HistoryEntry, type HistoryGroup } from './statement'
 
 // A fixed "today" so the relative periods are deterministic. 13 Sep 2026.
 const TODAY = new Date(2026, 8, 13)
@@ -62,5 +62,24 @@ describe('statementTotals', () => {
     expect(t.sold).toBe(5)
     expect(t.empties).toBe(6)
     expect(t.byProduct).toEqual([{ name: 'Domestic', sold: 5, empties: 6 }])
+  })
+})
+
+describe('filterGroupsByType', () => {
+  const e = (type: string, amount = 0, paid = false) => ({ type, amount, paid, lines: [] }) as unknown as HistoryEntry
+  const group = (entries: HistoryEntry[]): HistoryGroup => ({ key: 'k', label: 'l', entries, sales: 0, returns: 0, collected: 0 })
+
+  it('returns groups untouched for all', () => {
+    const g = [group([e('sale'), e('payment')])]
+    expect(filterGroupsByType(g, 'all')).toBe(g)
+  })
+
+  it('keeps one type, recomputes counts and drops empty groups', () => {
+    const g = [group([e('sale', 100, true), e('payment', 50)]), group([e('return')])]
+    const out = filterGroupsByType(g, 'payment')
+    expect(out).toHaveLength(1)
+    expect(out[0].entries).toHaveLength(1)
+    expect(out[0].collected).toBe(50)
+    expect(out[0].sales).toBe(0)
   })
 })
